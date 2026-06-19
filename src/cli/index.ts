@@ -54,10 +54,21 @@ import type { SystemUsm, ServiceUsm, FeatureUsm, DataUsm } from "../types.js";
 
 const program = new Command();
 
+// Read version from package.json (resolved relative to compiled location)
+// dist/cli/index.js → ../../package.json
+const packageJsonPath = path.resolve(__dirname, "..", "..", "package.json");
+let version = "0.0.0";
+try {
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as { version?: string };
+  version = pkg.version ?? version;
+} catch {
+  // ignore — keep fallback
+}
+
 program
   .name("usm")
   .description("Universal System Map — CLI for .usm files")
-  .version("0.1.0");
+  .version(version);
 
 // ─── scaffold (renamed from init) ────────────────────────────────────────────
 
