@@ -1,0 +1,62 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-enrich
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: "The usm enrich command fills in TODO: describe placeholders in .usm files using an LLM (LiteLLM, OpenAI, Anthropic, or Ollama)."
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Scanned .usm files contain TODO placeholders for summary, intent, decisions, flows, contracts, and tests. Enrich calls an LLM with source code context to fill these in, preserving existing human-written content.
+
+flows:
+  - id: enrich-single-file
+    name: Enrich a single .usm file
+    description: User enriches one file with LLM-generated content
+    steps:
+      - id: s1
+        action: parse
+        target: .usm file with TODO placeholders
+      - id: s2
+        action: setup
+        target: source code context from referenced file paths
+      - id: s3
+        action: post
+        target: LLM API with system prompt + user prompt
+      - id: s4
+        action: parse
+        target: LLM response YAML
+      - id: s5
+        action: merge
+        target: filled fields into original .usm, preserving human edits
+
+contracts:
+  - id: enrich-preserves-human-edits
+    description: Enrich must never overwrite fields that already have non-TODO content
+    must_have:
+      - "Fields with TODO: describe are filled"
+      - "Fields with existing content are preserved"
+      - "preserve_human_edits defaults to true"
+
+tests:
+  - id: enrich-fills-todos
+    setup:
+      usm_with_todo_fields: true
+    expect:
+      - assertion: TODO fields replaced with LLM content
+      - assertion: non-TODO fields unchanged
+  - id: enrich-dry-run
+    setup:
+      dry_run: true
+    expect:
+      - assertion: no files written
+      - assertion: planned changes reported
+
+implementation:
+  primary: src/enrich/index.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-scan"

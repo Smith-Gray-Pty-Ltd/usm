@@ -1,0 +1,60 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-scaffold-project
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: The usm scaffold-project command generates a starter .usm/ directory for single-app, monorepo-sub, or monorepo-root projects.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  New projects need an initial .usm/ structure with system, service, and a starter feature. Scaffold-project creates the directory tree and template files based on the project type (single-app, monorepo-sub, or monorepo-root).
+
+flows:
+  - id: scaffold-single-app
+    name: Scaffold single-app project
+    description: User creates .usm/ for a single application
+    steps:
+      - id: s1
+        action: setup
+        target: project name, org prefix, output directory
+      - id: s2
+        action: generate
+        target: .usm/system.usm with identity block
+      - id: s3
+        action: generate
+        target: .usm/services/<name>.usm with web-app template
+      - id: s4
+        action: generate
+        target: .usm/features/auth/login.usm starter
+
+contracts:
+  - id: scaffold-project-creates-structure
+    description: Scaffold-project must create all directories and files without overwriting existing ones
+    must_have:
+      - "Creates .usm/ directory tree"
+      - "Skips existing files (reports ⊘)"
+      - "Produces valid YAML for each file"
+
+tests:
+  - id: scaffold-project-single
+    setup:
+      empty_directory: true
+      type: single-app
+    expect:
+      - assertion: system.usm, service .usm, and login feature created
+      - assertion: all files validate
+  - id: scaffold-project-mono-root
+    setup:
+      empty_directory: true
+      type: monorepo-root
+    expect:
+      - assertion: system.usm plus app service files created
+
+implementation:
+  primary: src/cli/index.ts (scaffold-project command)
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-scaffold"

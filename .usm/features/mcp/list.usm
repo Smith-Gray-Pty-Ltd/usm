@@ -1,0 +1,50 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-list
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP list tool — lists all .usm files in a directory or monorepo with id, type, version, and summary, optionally filtered by $type.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  AI agents need to discover what .usm files exist before reading them. The list tool returns a summary of all files, optionally filtered by type, so agents can navigate the system map without reading every file.
+
+flows:
+  - id: list-all
+    name: List all .usm files
+    description: Agent lists all .usm files in the monorepo
+    steps:
+      - id: s1
+        action: get
+        target: directory path or monorepo root
+      - id: s2
+        action: parse
+        target: each .usm file for $id, $type, $version, summary
+      - id: s3
+        action: observe
+        target: filtered results sorted by path
+
+contracts:
+  - id: list-returns-metadata
+    description: List must return path, id, type, version, and summary for each file
+    must_have:
+      - "Count of files returned"
+      - "Optional $type filter applied"
+      - "Results sorted by path"
+
+tests:
+  - id: list-with-filter
+    setup:
+      usm_files_mixed_types: true
+    expect:
+      - assertion: type=service returns only service files
+      - assertion: count matches filtered set
+
+implementation:
+  primary: src/mcp/list.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp"

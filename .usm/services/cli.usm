@@ -1,0 +1,34 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli
+$type: service
+$version: 1
+$last_updated: "2026-06-19"
+summary: |
+  The USM CLI — a Commander-based Node.js CLI providing init, scan, validate, generate, enrich, scaffold, scaffold-project, roundtrip, and info commands. Entry point: src/cli/index.ts, compiled to dist/cli/index.js.
+
+$system: usm/system
+name: USM CLI
+type: api
+runtime: node
+port: 0
+paths:
+  - src/cli
+depends_on: []
+
+dev:
+  command: "node dist/cli/index.js"
+  env: {}
+
+modules:
+  - name: commander
+    purpose: CLI framework (Commander.js) for subcommand routing
+    paths: [src/cli/index.ts]
+  - name: scan
+    purpose: Structural, route, infrastructure, and merge modules for codebase scanning
+    paths: [src/scan]
+  - name: enrich
+    purpose: LLM-based enrichment of TODO placeholders in .usm files
+    paths: [src/enrich]
+  - name: generators
+    purpose: Output generators (markdown, mermaid, openapi, archimate, togaf, agentsMd, testSpecs)
+    paths: [src/generators]

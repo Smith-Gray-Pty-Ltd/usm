@@ -1,0 +1,50 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-openapi
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: OpenAPI 3.1 generator — produces an openapi.yaml spec and TypeScript types from feature .usm route and contract data.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  API documentation must be machine-readable for SDK generation and testing. The OpenAPI generator extracts routes, HTTP methods, and contracts from feature files and produces a valid OpenAPI 3.1 spec plus generated TypeScript types.
+
+flows:
+  - id: gen-openapi-spec
+    name: Generate OpenAPI spec
+    description: Produce openapi.yaml from feature routes and contracts
+    steps:
+      - id: s1
+        action: parse
+        target: all feature .usm files with routes
+      - id: s2
+        action: generate
+        target: paths, schemas, and operation objects
+      - id: s3
+        action: submit
+        target: write openapi.yaml and openapi-types.ts
+
+contracts:
+  - id: openapi-valid-spec
+    description: Generated OpenAPI spec must validate against the OpenAPI 3.1 schema
+    must_have:
+      - "All routes present as paths with correct HTTP methods"
+      - "Security schemes for auth-required routes"
+      - "TypeScript types generated for request/response schemas"
+
+tests:
+  - id: openapi-has-routes
+    setup:
+      features_with_api_routes: true
+    expect:
+      - assertion: openapi.yaml contains /api/* paths
+      - assertion: TypeScript types file generated
+
+implementation:
+  primary: src/generators/openapi.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"

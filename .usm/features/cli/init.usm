@@ -1,0 +1,59 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-init
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: The usm init command analyzes the repo and generates a starter usmconfig.json.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  New users need a config file that tells usm scan where to look. Init detects apps, packages, Prisma schemas, and Docker Compose services from the repo structure and writes a usmconfig.json so the next scan can work immediately.
+
+flows:
+  - id: run-init
+    name: Run usm init
+    description: User runs usm init in the repo root to generate a usmconfig.json
+    steps:
+      - id: s1
+        action: setup
+        target: repo root directory
+      - id: s2
+        action: parse
+        target: apps/* and packages/* directories for package.json
+      - id: s3
+        action: parse
+        target: prisma schema files
+      - id: s4
+        action: generate
+        target: usmconfig.json with services, shared, data, outputs sections
+
+contracts:
+  - id: init-creates-config
+    description: usm init must create a valid usmconfig.json at the specified output path
+    must_have:
+      - "Config has version: '1'"
+      - "Config has name, services, shared, data, sources, outputs fields"
+      - "Config does not overwrite unless --force is passed"
+
+tests:
+  - id: init-default
+    setup:
+      repo_with_apps: true
+    expect:
+      - assertion: usmconfig.json created with services matching apps/*
+      - assertion: exit code 0
+  - id: init-no-overwrite
+    setup:
+      existing_config: true
+    expect:
+      - assertion: error thrown "File already exists"
+      - assertion: exit code 1
+
+implementation:
+  primary: src/scan/init.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/system"

@@ -1,0 +1,52 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-archimate
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: ArchiMate 3.1 generator — produces an Open Exchange XML model (XMI 2.1) from USM data for enterprise architecture tools.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Enterprise architecture teams use ArchiMate tools (Archi, BiZZdesign, Orbus iServer). The ArchiMate generator translates .usm services, features, and data into a standard Open Exchange XML model importable by these tools.
+
+flows:
+  - id: gen-archimate
+    name: Generate ArchiMate model
+    description: Produce model.xml with ArchiMate elements and relationships
+    steps:
+      - id: s1
+        action: parse
+        target: all .usm files (system, services, features, data)
+      - id: s2
+        action: generate
+        target: XMI elements for ApplicationComponent, BusinessFunction, DataEntity
+      - id: s3
+        action: generate
+        target: XMI relationships (Serving, Realization, Access)
+      - id: s4
+        action: submit
+        target: write model.xml
+
+contracts:
+  - id: archimate-valid-xml
+    description: Generated XML must conform to the ArchiMate 3.1 Open Exchange format
+    must_have:
+      - "Valid XML with proper namespace declarations"
+      - "Elements organized by ArchiMate layer folders"
+
+tests:
+  - id: archimate-xml-valid
+    setup:
+      system_with_services_and_features: true
+    expect:
+      - assertion: model.xml is well-formed XML
+      - assertion: Contains ApplicationComponent elements for services
+
+implementation:
+  primary: src/generators/archimate.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/gen-togaf"

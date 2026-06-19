@@ -1,0 +1,64 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-scan
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: The usm scan command reads usmconfig.json, scans the codebase, and generates .usm files for services, packages, data, and features.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  After init creates the config, scan detects the actual structure — services from package.json, routes from app/ directories, data from Prisma schemas — and writes .usm files. Smart-merge preserves human edits on re-scan.
+
+flows:
+  - id: run-scan
+    name: Run usm scan
+    description: User runs usm scan to generate .usm files from the codebase
+    steps:
+      - id: s1
+        action: get
+        target: usmconfig.json
+        expect:
+          - valid: true
+      - id: s2
+        action: parse
+        target: package.json in matched service directories
+      - id: s3
+        action: parse
+        target: app/*/app directories for Next.js routes
+      - id: s4
+        action: generate
+        target: .usm/services/*.usm, .usm/features/*.usm, .usm/data/*.usm
+      - id: s5
+        action: update
+        target: .usm/system.usm index with new findings
+
+contracts:
+  - id: scan-preserves-edits
+    description: Smart-merge preserves human-edited fields (summary, intent, decisions, flows, contracts, tests) on re-scan
+    must_have:
+      - "PRESERVE_FIELDS are kept if non-default"
+      - "UPDATE_FIELDS ($last_updated, paths, port, depends_on) are overwritten"
+      - "--force bypasses merge"
+
+tests:
+  - id: scan-creates-files
+    setup:
+      config_exists: true
+    expect:
+      - assertion: .usm/services/*.usm files created for each matched app
+      - assertion: .usm/features/*.usm files created from route extraction
+  - id: scan-smart-merge
+    setup:
+      existing_usm_with_human_edits: true
+    expect:
+      - assertion: human-edited summary preserved
+      - assertion: mechanical fields like $last_updated updated
+
+implementation:
+  primary: src/scan/structural.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-init"

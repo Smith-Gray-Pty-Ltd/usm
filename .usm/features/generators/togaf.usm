@@ -1,0 +1,53 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-togaf
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: TOGAF ADM generator — produces phase deliverables (A through H) from USM data for TOGAF-compliant architecture documentation.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Organizations following TOGAF need phase-specific deliverables (Architecture Vision, Business Architecture, Data Architecture, etc.). The TOGAF generator maps .usm data to each ADM phase, producing markdown docs for phases A, B, C1, C2, D, E, G, and H.
+
+flows:
+  - id: gen-togaf-phases
+    name: Generate all TOGAF phases
+    description: Produce markdown for each ADM phase
+    steps:
+      - id: s1
+        action: parse
+        target: all .usm files
+      - id: s2
+        action: generate
+        target: Phase A (Architecture Vision)
+      - id: s3
+        action: generate
+        target: Phases B through H deliverables
+      - id: s4
+        action: submit
+        target: write to .agents-workspace/docs/togaf/
+
+contracts:
+  - id: togaf-phase-coverage
+    description: Generator must produce deliverables for phases A, B, C1, C2, D, E, G, H
+    must_have:
+      - "Each phase in its own markdown file"
+      - "Phase A includes principles and stakeholders"
+      - "Phase C1 includes data model from data .usm files"
+
+tests:
+  - id: togaf-all-phases
+    setup:
+      system_with_services: true
+    expect:
+      - assertion: 8 phase markdown files generated
+      - assertion: Phase A contains architecture principles
+
+implementation:
+  primary: src/generators/togaf.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/gen-archimate"

@@ -1,0 +1,54 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-markdown
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: Markdown generator — produces GitHub-flavored markdown docs for each .usm file, plus cross-cutting aggregator docs (risks, roadmap, data model, AGENTS.md, etc.).
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Markdown is the primary human-readable output. Each .usm file gets a per-file doc, and aggregator generators produce cross-app docs like shared-services-index, packages-index, per-app-api-reference, and AGENTS.md.
+
+flows:
+  - id: per-file-md
+    name: Generate per-file markdown
+    description: Generate an overview.md for each service and feature .usm file
+    steps:
+      - id: s1
+        action: parse
+        target: single .usm file
+      - id: s2
+        action: generate
+        target: markdown with headings, tables, flows, contracts, tests
+      - id: s3
+        action: submit
+        target: write to .agents-workspace/docs/<area>/overview.md
+
+contracts:
+  - id: markdown-gfm
+    description: Markdown output must be valid GitHub-flavored markdown
+    must_have:
+      - "H1 heading matches the .usm $id or name"
+      - "Tables for flows, contracts, tests"
+      - "No broken links"
+
+tests:
+  - id: md-service-file
+    setup:
+      valid_service_usm: true
+    expect:
+      - assertion: overview.md written with identity, modules, decisions sections
+  - id: md-feature-file
+    setup:
+      valid_feature_usm: true
+    expect:
+      - assertion: overview.md written with flows, contracts, tests sections
+
+implementation:
+  primary: src/generators/markdown.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"

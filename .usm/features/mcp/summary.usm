@@ -1,0 +1,51 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-summary
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP summary tool — returns a quick summary of a .usm file with id, type, version, summary, and type-specific counts.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Agents need a lightweight overview of a .usm file without reading the full content. Summary returns just the key metadata — id, type, version, summary, and counts (features, services, flows, contracts, tests) — for rapid triage.
+
+flows:
+  - id: get-summary
+    name: Get file summary
+    description: Agent gets a quick summary of a .usm file
+    steps:
+      - id: s1
+        action: get
+        target: file path
+      - id: s2
+        action: parse
+        target: extract metadata and counts
+      - id: s3
+        action: observe
+        target: summary result with type-specific fields
+
+contracts:
+  - id: summary-lightweight
+    description: Summary must return only metadata — not the full file content
+    must_have:
+      - "Includes id, type, version, last_updated, summary"
+      - "System files include featureCount, serviceCount"
+      - "Feature files include flowCount, contractCount, testCount"
+      - "Service files include runtime, port, depends_on"
+
+tests:
+  - id: summary-feature
+    setup:
+      valid_feature_usm: true
+    expect:
+      - assertion: response includes flowCount, contractCount, testCount
+      - assertion: response does not include full flows/contracts data
+
+implementation:
+  primary: src/mcp/summary.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp-read"

@@ -1,0 +1,55 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-validate
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP validate tool — validates a .usm file by path or inline YAML content against the v1 JSON Schema.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Agents modifying .usm files need to validate their changes before writing. The validate tool checks a file path or inline YAML string against the schema, returning valid/errors without the agent needing to call the CLI.
+
+flows:
+  - id: validate-path
+    name: Validate by path
+    description: Agent validates an existing .usm file
+    steps:
+      - id: s1
+        action: get
+        target: file path
+      - id: s2
+        action: parse
+        target: YAML content
+      - id: s3
+        action: observe
+        target: validation result (valid + errors)
+
+contracts:
+  - id: validate-inline-or-path
+    description: Validate must accept either a file path or inline YAML content
+    must_have:
+      - "Returns { valid, errors } structure"
+      - "Errors include path and message"
+      - "File-not-found returns valid: false"
+
+tests:
+  - id: validate-valid-path
+    setup:
+      valid_usm_file: true
+    expect:
+      - assertion: result.valid is true
+  - id: validate-inline
+    setup:
+      inline_yaml: "summary: too short"
+    expect:
+      - assertion: result.valid is false
+      - assertion: errors list non-empty
+
+implementation:
+  primary: src/mcp/validate.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-validate"

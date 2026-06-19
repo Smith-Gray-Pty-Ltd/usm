@@ -1,0 +1,56 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-agentsmd
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: AGENTS.md generator — produces AI agent context files with USM-augmented system descriptions, smart-merged with existing hand-written content.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  AI coding agents (Claude, Cursor, Codex) read AGENTS.md for project context. The generator augments existing AGENTS.md files with USM-derived sections (apps, shared packages, key patterns) between USM:START/USM:END markers, preserving all hand-written content.
+
+flows:
+  - id: gen-agents-md
+    name: Generate AGENTS.md
+    description: Augment AGENTS.md with USM content using smart merge
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm and service files
+      - id: s2
+        action: generate
+        target: USM section with apps, packages, patterns, config
+      - id: s3
+        action: merge
+        target: insert between USM:START/USM:END markers or after first H1
+
+contracts:
+  - id: agents-md-preserve
+    description: AGENTS.md generator must never destroy hand-written content
+    must_have:
+      - "Content between USM:START and USM:END replaced with generated content"
+      - "Content outside markers preserved exactly"
+      - "If no markers exist, insert after first H1 heading"
+
+tests:
+  - id: agents-md-with-markers
+    setup:
+      agents_md_with_usm_markers: true
+    expect:
+      - assertion: Only content between markers replaced
+      - assertion: Content before and after markers unchanged
+  - id: agents-md-no-markers
+    setup:
+      agents_md_handwritten: true
+    expect:
+      - assertion: USM section inserted after first H1
+      - assertion: Original content preserved below
+
+implementation:
+  primary: src/generators/agentsMd.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"

@@ -1,0 +1,28 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp
+$type: service
+$version: 1
+$last_updated: "2026-06-19"
+summary: |
+  The USM MCP server — an stdio-based Model Context Protocol server exposing 8 tools for AI agents to navigate, search, validate, and reference .usm data. Entry point: src/cli/mcp.ts, compiled to dist/cli/mcp.js.
+
+$system: usm/system
+name: USM MCP Server
+type: api
+runtime: node
+paths:
+  - src/mcp
+  - src/cli/mcp.ts
+depends_on: []
+
+dev:
+  command: "node dist/cli/mcp.js"
+  env: {}
+
+modules:
+  - name: mcp-sdk
+    purpose: "@modelcontextprotocol/sdk for MCP server registration and stdio transport"
+    paths: [src/cli/mcp.ts]
+  - name: mcp-tools
+    purpose: "8 tool implementations: list, read, search, validate, summary, references, contracts, flows"
+    paths: [src/mcp]

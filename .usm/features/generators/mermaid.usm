@@ -1,0 +1,53 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-mermaid
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: Mermaid diagram generator — produces architecture, ER, sequence, and service-dependency diagrams from .usm data.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Visual diagrams make the system structure immediately understandable. Mermaid diagrams render natively on GitHub and in most markdown viewers, providing zero-cost visualization of services, data models, and user flows.
+
+flows:
+  - id: arch-diagram
+    name: Generate architecture diagram
+    description: Produce a C4-style architecture diagram from system + service .usm files
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm and all service files
+      - id: s2
+        action: generate
+        target: architecture.mmd showing services and dependencies
+      - id: s3
+        action: submit
+        target: write to docs/diagrams/architecture.mmd
+
+contracts:
+  - id: mermaid-valid-syntax
+    description: Generated Mermaid files must parse without syntax errors
+    must_have:
+      - "Special characters escaped (colons, pipes, brackets)"
+      - "Each diagram in its own .mmd file"
+
+tests:
+  - id: arch-diagram-valid
+    setup:
+      system_with_services: true
+    expect:
+      - assertion: architecture.mmd contains valid Mermaid flowchart syntax
+  - id: er-diagram-valid
+    setup:
+      data_models_present: true
+    expect:
+      - assertion: er-diagram.mmd contains erDiagram syntax
+
+implementation:
+  primary: src/generators/mermaid.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"
