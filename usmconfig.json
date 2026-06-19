@@ -1,0 +1,48 @@
+{
+  "$schema": "https://usm.dev/schema/usmconfig-v1.json",
+  "version": "1",
+  "name": "@usm/core",
+  "sources": {
+    "root": ".",
+    "include": ["src/**/*"],
+    "exclude": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/build/**",
+      "**/.usm/**",
+      "**/tests/**"
+    ],
+    "package_manifests": ["**/package.json"],
+    "code_globs": ["**/*.ts"]
+  },
+  "shared": [],
+  "services": [
+    {
+      "id": "cli",
+      "match": "src/cli",
+      "kind": "service",
+      "summary": "usm CLI — init, scan, validate, generate, enrich commands"
+    },
+    {
+      "id": "mcp",
+      "match": "src/mcp",
+      "kind": "service",
+      "summary": "usm MCP server — 8 tools for AI agents"
+    }
+  ],
+  "data": [],
+  "outputs": {
+    "usm_source": ".usm/",
+    "agent_context": "AGENTS.md",
+    "design_docs": "docs/"
+  },
+  "generation": {
+    "merge_with_existing": "smart",
+    "preserve_comments": true,
+    "format": "github-flavored-markdown"
+  },
+  "enrichment": {
+    "enabled": false
+  }
+}
