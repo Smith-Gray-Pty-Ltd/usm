@@ -1,15 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { validateUsm, validateUsmFile } from "../src/validate.js";
+import { validateUsm } from "../src/validate.js";
 import { parseUsm, parseUsmFile } from "../src/parse.js";
 import path from "node:path";
+import { existsSync } from "node:fs";
 
 const FIXTURES = path.resolve(__dirname, "../examples");
 // SPEC_DIR points at this repo's own .usm/ scope (dogfooding).
 // Falls back to the examples/ fixtures if .usm/ doesn't exist yet (e.g. CI before first scan).
 const SPEC_DIR = path.resolve(__dirname, "../.usm");
-const HAS_USM_SCOPE =
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require("node:fs").existsSync(SPEC_DIR);
+const HAS_USM_SCOPE = existsSync(SPEC_DIR);
 
 describe("validateUsm", () => {
   it("validates a correct system file", () => {
@@ -103,29 +102,29 @@ summary: "Missing identity"
 
 describe("validateUsmFile", () => {
   it("validates the example system.usm", () => {
-    const result = validateUsmFile(path.join(FIXTURES, "system.usm"));
+    const result = validateUsm(parseUsmFile(path.join(FIXTURES, "system.usm")));
     expect(result.valid).toBe(true);
   });
 
   it("validates the example service.usm", () => {
-    const result = validateUsmFile(path.join(FIXTURES, "service.usm"));
+    const result = validateUsm(parseUsmFile(path.join(FIXTURES, "service.usm")));
     expect(result.valid).toBe(true);
   });
 
   it("validates the example feature.usm", () => {
-    const result = validateUsmFile(path.join(FIXTURES, "feature.usm"));
+    const result = validateUsm(parseUsmFile(path.join(FIXTURES, "feature.usm")));
     expect(result.valid).toBe(true);
   });
 });
 
 describe("validateUsmFile — real spec files (dogfooded from this repo's .usm/)", () => {
   it.skipIf(!HAS_USM_SCOPE)("validates .usm/system.usm", () => {
-    const result = validateUsmFile(path.join(SPEC_DIR, "system.usm"));
+    const result = validateUsm(parseUsmFile(path.join(SPEC_DIR, "system.usm")));
     expect(result.valid).toBe(true);
   });
 
   it.skipIf(!HAS_USM_SCOPE)("validates .usm/features/cli/init.usm", () => {
-    const result = validateUsmFile(path.join(SPEC_DIR, "features/cli/init.usm"));
+    const result = validateUsm(parseUsmFile(path.join(SPEC_DIR, "features/cli/init.usm")));
     expect(result.valid).toBe(true);
   });
 });

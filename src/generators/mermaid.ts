@@ -400,7 +400,8 @@ export function generateERDiagram(dataFiles: DataUsm[], root: string, serviceFil
 
   // Now read the existing models.md and append the ER diagram section
   const existingPath = `${root}/.agents-workspace/docs/data/models.md`;
-  let existingContent = "";
+  // Existing content is always set in try/catch below; declare without initializer
+  let existingContent: string;
   try {
     existingContent = fs.readFileSync(existingPath, "utf-8");
   } catch {

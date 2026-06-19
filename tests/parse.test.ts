@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseUsm, parseUsmFile, isSystemFile, isServiceFile, isFeatureFile } from "../src/parse.js";
 import path from "node:path";
 
-const FIXTURES = path.resolve(__dirname, "examples");
+const FIXTURES = path.resolve(__dirname, "../examples");
 
 describe("parseUsm", () => {
   it("parses a system .usm string", () => {
