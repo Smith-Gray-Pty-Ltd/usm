@@ -1,0 +1,23 @@
+$schema: https://usm.dev/schema/v1.json
+$id: example/svc-1
+$type: service
+$version: 1
+$last_updated: "2026-01-01"
+summary: "Example service for testing the USM parser and validator."
+
+$system: example/system
+type: web-app
+runtime: nextjs
+port: 3000
+paths:
+  - apps/svc-1
+depends_on: []
+
+dev:
+  command: "npm run dev"
+  url: "http://localhost:3000"
+
+decisions:
+  - id: d1
+    decision: "Use Next.js"
+    rationale: "It's popular"

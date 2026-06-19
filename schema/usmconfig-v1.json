@@ -1,0 +1,446 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://usm.dev/schema/usmconfig-v1.json",
+  "title": "usmconfig v1",
+  "description": "Scanner configuration — tells usm what to look for, where to look, and where to put output.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://usm.dev/schema/usmconfig-v1.json",
+      "description": "Schema reference URI"
+    },
+    "version": {
+      "type": "string",
+      "const": "1",
+      "description": "Config schema version"
+    },
+    "name": {
+      "type": "string",
+      "description": "Project name (used in generated $id namespaces)",
+      "minLength": 1
+    },
+    "sources": {
+      "$ref": "#/$defs/sources",
+      "description": "Where to scan for code and manifests"
+    },
+    "shared": {
+      "type": "array",
+      "description": "Packages that aren't services (shared libraries, utilities, etc.)",
+      "items": {
+        "$ref": "#/$defs/sharedPackage"
+      }
+    },
+    "services": {
+      "type": "array",
+      "description": "Explicit service detection rules",
+      "items": {
+        "$ref": "#/$defs/serviceRule"
+      }
+    },
+    "apis": {
+      "type": "array",
+      "description": "API detection rules",
+      "items": {
+        "$ref": "#/$defs/apiRule"
+      }
+    },
+    "data": {
+      "type": "array",
+      "description": "Data model detection rules",
+      "items": {
+        "$ref": "#/$defs/dataRule"
+      }
+    },
+    "features": {
+      "$ref": "#/$defs/featureConfig",
+      "description": "Feature detection configuration"
+    },
+    "outputs": {
+      "$ref": "#/$defs/outputs",
+      "description": "Where to write generated artifacts"
+    },
+    "generation": {
+      "$ref": "#/$defs/generation",
+      "description": "Generation behavior settings"
+    },
+    "llm": {
+      "$ref": "#/$defs/llmConfig",
+      "description": "LLM configuration for future semantic scan (optional)"
+    },
+    "enrichment": {
+      "$ref": "#/$defs/enrichmentConfig",
+      "description": "LLM-based semantic enrichment configuration (optional)"
+    }
+  },
+  "required": ["$schema", "version", "name"],
+
+  "$defs": {
+    "globArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of glob patterns"
+    },
+
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "type": "string",
+          "default": ".",
+          "description": "Repository root directory (relative to config file location)"
+        },
+        "include": {
+          "$ref": "#/$defs/globArray",
+          "default": ["apps/*", "packages/*"],
+          "description": "Glob patterns for directories to include in scanning"
+        },
+        "exclude": {
+          "$ref": "#/$defs/globArray",
+          "default": ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/build/**"],
+          "description": "Glob patterns for directories to exclude from scanning"
+        },
+        "package_manifests": {
+          "$ref": "#/$defs/globArray",
+          "default": ["**/package.json"],
+          "description": "Glob patterns for package manifest files"
+        },
+        "code_globs": {
+          "$ref": "#/$defs/globArray",
+          "default": ["**/*.ts", "**/*.tsx", "**/*.js"],
+          "description": "Glob patterns for source code files"
+        }
+      }
+    },
+
+    "sharedPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this shared package"
+        },
+        "match": {
+          "type": "string",
+          "description": "Glob pattern to match this package's directory"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["ui-kit", "orm", "auth-lib", "llm-wrapper", "shared-util", "config", "types", "other"],
+          "description": "Classification of the shared package"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable summary of this package's purpose"
+        }
+      },
+      "required": ["id", "match", "kind"]
+    },
+
+    "serviceRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "type": "string",
+          "description": "Glob pattern to match service directories"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["web-app", "api-server", "worker", "mobile-app", "desktop-app", "database", "cache", "queue", "other"],
+          "description": "Service type classification"
+        },
+        "port_from": {
+          "type": "string",
+          "description": "Hint for port extraction (e.g. 'package.json:scripts.start', '.env:PORT')"
+        },
+        "framework_detect": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns for files that indicate this framework"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable summary of what this service does"
+        }
+      },
+      "required": ["match", "kind"]
+    },
+
+    "extractConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract route definitions"
+        },
+        "request_types": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract request type schemas"
+        },
+        "response_types": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract response type schemas"
+        },
+        "auth_required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract auth requirements per endpoint"
+        }
+      }
+    },
+
+    "apiRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "type": "string",
+          "description": "Glob pattern to match API directories or files"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["rest", "graphql", "grpc", "nextjs-route", "other"],
+          "description": "API type classification"
+        },
+        "extract": {
+          "$ref": "#/$defs/extractConfig",
+          "description": "What to extract from the API definitions"
+        }
+      },
+      "required": ["match", "kind"]
+    },
+
+    "dataExtractConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "models": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extract model/entity names"
+        },
+        "relations": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract model relations"
+        },
+        "enums": {
+          "type": "boolean",
+          "default": false,
+          "description": "Extract enum definitions"
+        }
+      }
+    },
+
+    "dataRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "match": {
+          "type": "string",
+          "description": "Glob pattern to match schema files"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["prisma", "drizzle", "typeorm", "sql", "other"],
+          "description": "ORM/database type"
+        },
+        "extract": {
+          "$ref": "#/$defs/dataExtractConfig",
+          "description": "What to extract from the schema"
+        }
+      },
+      "required": ["match", "kind"]
+    },
+
+    "featureConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detect_from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns for files that contain feature definitions"
+        },
+        "group_by": {
+          "type": "string",
+          "enum": ["directory", "file", "tag"],
+          "default": "directory",
+          "description": "How to group detected features"
+        },
+        "exclude_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns for files/directories to exclude from feature detection"
+        }
+      }
+    },
+
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "usm_source": {
+          "type": "string",
+          "default": ".usm/",
+          "description": "Directory for generated .usm source files"
+        },
+        "design_docs": {
+          "type": "string",
+          "default": "docs/design/",
+          "description": "Directory for generated design documents"
+        },
+        "help_docs": {
+          "type": "string",
+          "default": "docs/help/",
+          "description": "Directory for generated help documents"
+        },
+        "api_docs": {
+          "type": "string",
+          "default": "docs/api/",
+          "description": "Directory for generated API documentation"
+        },
+        "agent_context": {
+          "type": "string",
+          "default": ".agents-workspace/",
+          "description": "Directory for generated agent context files"
+        },
+        "tests": {
+          "type": "string",
+          "default": "tests/auto-generated/",
+          "description": "Directory for generated test files"
+        },
+        "diagrams": {
+          "type": "string",
+          "default": "docs/diagrams/",
+          "description": "Directory for generated diagram files"
+        }
+      }
+    },
+
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "merge_with_existing": {
+          "type": "string",
+          "enum": ["smart", "overwrite", "skip", "fail"],
+          "default": "smart",
+          "description": "How to handle existing files: smart (preserve decisions), overwrite, skip, or fail"
+        },
+        "preserve_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve YAML comments in existing files when merging"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["github-flavored-markdown", "commonmark"],
+          "default": "github-flavored-markdown",
+          "description": "Markdown format for generated documentation"
+        }
+      }
+    },
+
+    "llmConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["anthropic", "openai", "google"],
+          "description": "LLM provider for semantic scanning"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier (e.g. 'claude-sonnet-4-20250514')"
+        },
+        "api_key_env": {
+          "type": "string",
+          "description": "Environment variable name holding the API key"
+        }
+      }
+    },
+
+    "enrichmentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether enrichment is enabled"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["litellm", "openai", "anthropic", "ollama"],
+          "default": "litellm",
+          "description": "LLM provider for semantic enrichment"
+        },
+        "url": {
+          "type": "string",
+          "default": "http://localhost:4000",
+          "description": "Base URL for the LLM API endpoint"
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API key for the LLM provider (optional for local providers like Ollama)"
+        },
+        "model": {
+          "type": "string",
+          "default": "siliconflow/auto",
+          "description": "Model identifier for the LLM"
+        },
+        "temperature": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Temperature for LLM generation"
+        },
+        "max_tokens_per_file": {
+          "type": "integer",
+          "default": 4000,
+          "minimum": 100,
+          "description": "Maximum tokens per file enrichment call"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["summary", "intent", "decisions", "flows", "contracts", "tests"]
+          },
+          "default": ["summary", "intent", "decisions", "flows", "contracts", "tests"],
+          "description": "Which fields to enrich (only fields with TODO: describe will be filled)"
+        },
+        "preserve_human_edits": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to preserve hand-written content during merge"
+        },
+        "max_source_file_chars": {
+          "type": "integer",
+          "default": 2000,
+          "minimum": 100,
+          "description": "Maximum characters to read from each source file (keeps context manageable)"
+        }
+      }
+    }
+  }
+}

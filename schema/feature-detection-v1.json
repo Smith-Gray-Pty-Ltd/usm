@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://usm.dev/schema/feature-detection-v1.json",
+  "title": "usm feature detection result v1",
+  "description": "Schema for the intermediate detection result produced by usm scan route extraction, before generating .usm feature files",
+  "type": "object",
+  "properties": {
+    "area": {
+      "type": "string",
+      "description": "First directory segment under app/ (e.g. settings, projects, tickets)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Feature name in kebab-case (e.g. memory, projects)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable title (e.g. Memory, Projects)"
+    },
+    "apps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Apps that contain routes for this feature"
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "URL path (e.g. /settings/memory, /api/projects)"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["page", "api"],
+            "description": "Route type: page (user-facing) or api (endpoint)"
+          },
+          "http_methods": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "HTTP methods exported by the route (GET, POST, etc.)"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "Absolute file path to the route file"
+          },
+          "app": {
+            "type": "string",
+            "description": "App name (e.g. the-architect, tenant)"
+          },
+          "area": {
+            "type": "string",
+            "description": "Area grouping for this route"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name derived from the path"
+          },
+          "request_types": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Request type references (zod schemas or TypeScript types)"
+          },
+          "response_types": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Response type references"
+          },
+          "auth_required": {
+            "type": "boolean",
+            "description": "Whether the route requires authentication"
+          }
+        },
+        "required": ["path", "type", "http_methods", "file_path", "app", "area", "name"]
+      }
+    },
+    "outputPath": {
+      "type": "string",
+      "description": "Relative path for the .usm feature file (e.g. features/settings/memory.usm)"
+    }
+  },
+  "required": ["area", "name", "title", "apps", "routes", "outputPath"]
+}

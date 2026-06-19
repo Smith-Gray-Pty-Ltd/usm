@@ -1,0 +1,45 @@
+$schema: https://usm.dev/schema/v1.json
+$id: example/login
+$type: feature
+$version: 1
+$last_updated: "2026-01-01"
+summary: "Example login feature for testing the USM parser and validator."
+
+$system: example/system
+$service: example/svc-1
+intent: "Users need to log in to access protected routes."
+
+flows:
+  - id: happy-path
+    name: "Happy Path"
+    steps:
+      - id: s1
+        action: navigate
+        target: "/login"
+        expect:
+          - { visible: true }
+      - id: s2
+        action: fill
+        target: "input[type=email]"
+      - id: s3
+        action: click
+        target: "button[type=submit]"
+
+contracts:
+  - id: session-cookie
+    description: "Session cookie must be set"
+    must_have:
+      - "Cookie is HttpOnly"
+
+tests:
+  - id: test-login
+    setup:
+      no_session: true
+    expect:
+      - { cookie_set: "session" }
+
+implementation:
+  test_code_status: none
+
+see_also:
+  - "example/system"

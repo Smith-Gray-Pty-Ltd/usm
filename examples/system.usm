@@ -1,0 +1,29 @@
+$schema: https://usm.dev/schema/v1.json
+$id: example/system
+$type: system
+$version: 1
+$last_updated: "2026-01-01"
+summary: "Example system for testing the USM parser and validator."
+
+identity:
+  name: "Example System"
+  domain: "example.com"
+
+index:
+  - id: feat-1
+    name: "Feature One"
+    ref: ".usm/features/feat-1.usm"
+    status: active
+    tags: [core]
+
+services:
+  - id: svc-1
+    name: "Service One"
+    ref: ".usm/services/svc-1.usm"
+    port: 3000
+
+apis: []
+data: []
+infrastructure:
+  cloud: "local"
+  region: "us-east-1"

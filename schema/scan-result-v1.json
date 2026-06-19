@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://usm.dev/schema/scan-result-v1.json",
+  "title": "usm scan result v1",
+  "description": "Shape of what usm scan returns — used for CLI output and programmatic consumers.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "files_written": {
+      "type": "array",
+      "description": "List of .usm files that were written during the scan",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path from the repo root to the written file"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["service", "feature", "api", "data", "system", "policy", "operations"],
+            "description": "The .usm file type that was written"
+          },
+          "source": {
+            "type": "string",
+            "description": "What triggered this file (e.g. 'package.json', 'prisma schema', 'docker-compose')"
+          }
+        },
+        "required": ["path", "type"]
+      }
+    },
+    "files_skipped": {
+      "type": "array",
+      "description": "List of .usm files that were skipped (already existed)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path from the repo root to the skipped file"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the file was skipped (e.g. 'already exists')"
+          }
+        },
+        "required": ["path", "reason"]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Warnings encountered during the scan",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Scan statistics",
+      "properties": {
+        "duration_ms": {
+          "type": "number",
+          "description": "Time taken for the scan in milliseconds"
+        },
+        "services_found": {
+          "type": "number",
+          "description": "Number of services detected"
+        },
+        "packages_found": {
+          "type": "number",
+          "description": "Number of shared packages detected"
+        },
+        "data_models_found": {
+          "type": "number",
+          "description": "Number of data model schemas detected"
+        }
+      }
+    }
+  },
+  "required": ["files_written", "files_skipped"]
+}

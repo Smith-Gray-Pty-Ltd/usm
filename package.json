@@ -1,0 +1,80 @@
+{
+  "name": "@usm/core",
+  "version": "1.0.0",
+  "description": "Universal System Map — structured source of truth for agentic systems. CLI + MCP server + JSON Schema + generators (markdown, Mermaid, OpenAPI, ArchiMate, TOGAF).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Smith-Gray-Pty-Ltd/usm.git"
+  },
+  "homepage": "https://usm.dev",
+  "bugs": {
+    "url": "https://github.com/Smith-Gray-Pty-Ltd/usm/issues"
+  },
+  "keywords": [
+    "usm",
+    "universal-system-map",
+    "agentic",
+    "ai",
+    "system-design",
+    "mcp",
+    "model-context-protocol",
+    "archimate",
+    "togaf",
+    "openapi",
+    "mermaid",
+    "schema-driven"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./schema/v1.json": "./schema/v1.json"
+  },
+  "bin": {
+    "usm": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "usm": "node dist/cli/index.js",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "commander": "^13.1.0",
+    "fast-glob": "^3.3.3",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22",
+    "eslint": "^10.5.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5",
+    "typescript-eslint": "^8.61.1",
+    "vitest": "^3.2.1"
+  }
+}
