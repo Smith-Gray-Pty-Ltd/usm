@@ -1,0 +1,55 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-scaffold
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: The usm scaffold command creates a new .usm file with a template for system, service, or feature types.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Users need a quick way to create a new .usm file with the correct structure. Scaffold writes a template with all required fields and placeholder values, so the file immediately validates.
+
+flows:
+  - id: scaffold-file
+    name: Scaffold a .usm file
+    description: User creates a new .usm file from a template
+    steps:
+      - id: s1
+        action: setup
+        target: file path and type (system, service, feature)
+      - id: s2
+        action: generate
+        target: template YAML with all required fields
+      - id: s3
+        action: submit
+        target: write template to file path
+
+contracts:
+  - id: scaffold-valid-template
+    description: Scaffold must produce a file that validates against v1.json
+    must_have:
+      - "All required fields present"
+      - "File not overwritten if it already exists"
+
+tests:
+  - id: scaffold-system
+    setup:
+      new_directory: true
+    expect:
+      - assertion: "file created with $type: system and identity block"
+      - assertion: file validates
+  - id: scaffold-existing
+    setup:
+      existing_file: true
+    expect:
+      - assertion: error "File already exists"
+      - assertion: exit code 1
+
+implementation:
+  primary: src/cli/index.ts (scaffold command)
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-scaffold-project"

@@ -1,0 +1,66 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/schema-v1
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: The v1 JSON Schema — the validation contract for all .usm files, defining system, service, and feature file types with required fields and constraints.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  The v1.json schema is the single source of truth for what constitutes a valid .usm file. It defines three file types (system, service, feature), their required fields, and the structure of flows, contracts, tests, and other complex types. All validation (CLI and MCP) runs against this schema.
+
+flows:
+  - id: schema-validate
+    name: Schema validation flow
+    description: A .usm file is validated against the v1 schema
+    steps:
+      - id: s1
+        action: parse
+        target: .usm YAML content into JS object
+      - id: s2
+        action: observe
+        target: $type discriminator selects systemFile, serviceFile, or featureFile
+      - id: s3
+        action: observe
+        target: Ajv validates against selected definition
+      - id: s4
+        action: submit
+        target: validation result with errors
+
+contracts:
+  - id: schema-three-types
+    description: "The schema must support exactly three file types: system, service, feature"
+    must_have:
+      - "oneOf selects systemFile, serviceFile, or featureFile"
+      - "Common fields: $schema, $id, $type, $version, summary"
+      - "$id pattern: ^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$"
+      - "Flow steps require id and action"
+      - "Contracts require id and description"
+      - "Tests require id and expect"
+  - id: schema-additional-properties-false
+    description: "Each file type must set additionalProperties: false to prevent undocumented fields"
+    must_have:
+      - "systemFile.additionalProperties is false"
+      - "serviceFile.additionalProperties is false"
+      - "featureFile.additionalProperties is false"
+
+tests:
+  - id: schema-rejects-unknown-type
+    setup:
+      usm_with_type_widget: true
+    expect:
+      - assertion: validation fails with enum error for $type
+  - id: schema-rejects-extra-fields
+    setup:
+      feature_with_extra_top_level_field: true
+    expect:
+      - assertion: validation fails with additionalProperties error
+
+implementation:
+  primary: schema/v1.json
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-validate"

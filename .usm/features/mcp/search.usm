@@ -1,0 +1,50 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-search
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP search tool — searches all .usm files for a query string, returning matching files with excerpts and relevance scores.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Agents need to find .usm files related to a concept (e.g. "authentication", "billing") without knowing exact file paths. Search scans all files for the query, scores by occurrence count, and returns the top 10 results with excerpts.
+
+flows:
+  - id: search-files
+    name: Search .usm files
+    description: Agent searches for a term across all .usm files
+    steps:
+      - id: s1
+        action: get
+        target: query string and optional directory
+      - id: s2
+        action: parse
+        target: each .usm file, serialize to JSON for searching
+      - id: s3
+        action: observe
+        target: top 10 results sorted by score
+
+contracts:
+  - id: search-top-10
+    description: Search returns the top 10 most relevant results
+    must_have:
+      - "Case-insensitive by default"
+      - "Score based on occurrence count"
+      - "Excerpt from summary around first match"
+
+tests:
+  - id: search-finds-match
+    setup:
+      usm_files_with_auth_keyword: true
+    expect:
+      - assertion: search for "auth" returns relevant files
+      - assertion: max 10 results returned
+
+implementation:
+  primary: src/mcp/search.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp"

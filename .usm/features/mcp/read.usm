@@ -1,0 +1,50 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-read
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP read tool — reads and parses a .usm file, returning the full object plus metadata (id, type, version, summary, type-specific counts).
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Agents need to read the full content of a specific .usm file to understand a service, feature, or system. The read tool parses the file and returns both the complete data and extracted metadata for quick agent scanning.
+
+flows:
+  - id: read-file
+    name: Read a .usm file
+    description: Agent reads a specific .usm file
+    steps:
+      - id: s1
+        action: get
+        target: file path
+      - id: s2
+        action: parse
+        target: YAML content into typed object
+      - id: s3
+        action: observe
+        target: metadata (type-specific counts for features/flows/contracts/tests)
+
+contracts:
+  - id: read-returns-full-data
+    description: Read must return both the full parsed object and metadata
+    must_have:
+      - "Metadata includes id, type, version, summary"
+      - "System files include featureCount, serviceCount"
+      - "Feature files include flowCount, contractCount, testCount"
+
+tests:
+  - id: read-feature-file
+    setup:
+      valid_feature_usm: true
+    expect:
+      - assertion: response includes full parsed data
+      - assertion: metadata includes flowCount, contractCount, testCount
+
+implementation:
+  primary: src/mcp/read.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp"

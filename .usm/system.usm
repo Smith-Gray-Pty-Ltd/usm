@@ -1,0 +1,185 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/system
+$type: system
+$version: 1
+$last_updated: "2026-06-19"
+summary: |
+  Universal System Map — a structured source of truth for agentic systems. A single .usm/ directory describes apps, services, features, flows, contracts, and decisions in YAML validated by a JSON Schema, and generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md, and Vitest specs.
+
+identity:
+  name: USM
+  domain: usm.dev
+  contact: james@smith-gray.com
+
+index:
+  - id: cli-init
+    name: Init Command
+    ref: .usm/features/cli/init.usm
+    status: active
+    tags: [cli, config]
+  - id: cli-scan
+    name: Scan Command
+    ref: .usm/features/cli/scan.usm
+    status: active
+    tags: [cli, scanner]
+  - id: cli-validate
+    name: Validate Command
+    ref: .usm/features/cli/validate.usm
+    status: active
+    tags: [cli, schema]
+  - id: cli-generate
+    name: Generate Command
+    ref: .usm/features/cli/generate.usm
+    status: active
+    tags: [cli, docs]
+  - id: cli-enrich
+    name: Enrich Command
+    ref: .usm/features/cli/enrich.usm
+    status: active
+    tags: [cli, llm]
+  - id: cli-scaffold
+    name: Scaffold Command
+    ref: .usm/features/cli/scaffold.usm
+    status: active
+    tags: [cli, templates]
+  - id: cli-scaffold-project
+    name: Scaffold Project Command
+    ref: .usm/features/cli/scaffold-project.usm
+    status: active
+    tags: [cli, project-setup]
+  - id: gen-markdown
+    name: Markdown Generator
+    ref: .usm/features/generators/markdown.usm
+    status: active
+    tags: [generator, docs]
+  - id: gen-mermaid
+    name: Mermaid Generator
+    ref: .usm/features/generators/mermaid.usm
+    status: active
+    tags: [generator, diagrams]
+  - id: gen-openapi
+    name: OpenAPI Generator
+    ref: .usm/features/generators/openapi.usm
+    status: active
+    tags: [generator, api]
+  - id: gen-archimate
+    name: ArchiMate Generator
+    ref: .usm/features/generators/archimate.usm
+    status: active
+    tags: [generator, enterprise-arch]
+  - id: gen-togaf
+    name: TOGAF Generator
+    ref: .usm/features/generators/togaf.usm
+    status: active
+    tags: [generator, enterprise-arch]
+  - id: gen-agentsmd
+    name: AGENTS.md Generator
+    ref: .usm/features/generators/agentsMd.usm
+    status: active
+    tags: [generator, agent-context]
+  - id: gen-testspecs
+    name: Test Specs Generator
+    ref: .usm/features/generators/testSpecs.usm
+    status: active
+    tags: [generator, testing]
+  - id: mcp-list
+    name: MCP List Tool
+    ref: .usm/features/mcp/list.usm
+    status: active
+    tags: [mcp, discovery]
+  - id: mcp-read
+    name: MCP Read Tool
+    ref: .usm/features/mcp/read.usm
+    status: active
+    tags: [mcp, data]
+  - id: mcp-search
+    name: MCP Search Tool
+    ref: .usm/features/mcp/search.usm
+    status: active
+    tags: [mcp, search]
+  - id: mcp-validate
+    name: MCP Validate Tool
+    ref: .usm/features/mcp/validate.usm
+    status: active
+    tags: [mcp, schema]
+  - id: mcp-contracts
+    name: MCP Contracts Tool
+    ref: .usm/features/mcp/contracts.usm
+    status: active
+    tags: [mcp, contracts]
+  - id: mcp-flows
+    name: MCP Flows Tool
+    ref: .usm/features/mcp/flows.usm
+    status: active
+    tags: [mcp, flows]
+  - id: mcp-references
+    name: MCP References Tool
+    ref: .usm/features/mcp/references.usm
+    status: active
+    tags: [mcp, impact-analysis]
+  - id: mcp-summary
+    name: MCP Summary Tool
+    ref: .usm/features/mcp/summary.usm
+    status: active
+    tags: [mcp, overview]
+  - id: schema-v1
+    name: V1 JSON Schema
+    ref: .usm/features/schema/v1.usm
+    status: active
+    tags: [schema, validation]
+  - id: data-usmconfig
+    name: USM Config Shape
+    ref: .usm/data/usm-config.usm
+    status: active
+    tags: [config, data]
+
+services:
+  - id: cli
+    name: USM CLI
+    ref: .usm/services/cli.usm
+  - id: mcp
+    name: USM MCP Server
+    ref: .usm/services/mcp.usm
+
+apis: []
+data:
+  - id: usm-config
+    name: USM Config
+    ref: .usm/data/usm-config.usm
+
+infrastructure:
+  cloud: ""
+  region: ""
+  terraform_ref: ""
+  dns: usm.dev
+  ssl: ""
+
+principles:
+  - key: structured-source-of-truth
+    name: Structured Source of Truth
+    statement: Every system artifact is captured in YAML validated by a JSON Schema — no scattered, stale docs.
+    rationale: Agents and humans need a single, machine-checkable source. Free-form docs drift; schema-validated YAML stays consistent.
+    implications:
+      - All system descriptions must live in .usm/ YAML files
+      - The v1 JSON Schema is the contract — no undocumented fields
+  - key: agent-first
+    name: Agent First
+    statement: USM files are designed for AI agent consumption via MCP tools before human readability.
+    rationale: The MCP server exposes 8 tools that let agents navigate, search, and reference USM data without reading raw YAML.
+    implications:
+      - Every .usm field must be parseable and queryable by agents
+      - The MCP server must stay in sync with the schema
+  - key: idempotent-generation
+    name: Idempotent Generation
+    statement: Scan and generate are safe to run repeatedly; smart-merge preserves human edits.
+    rationale: Re-running usm scan or usm generate should never destroy hand-written content. The smart-merge strategy preserves human-edited fields and updates mechanical ones.
+    implications:
+      - Smart-merge distinguishes human-edited from scan-derived fields
+      - --force bypasses merge for intentional overwrite
+  - key: one-source-many-outputs
+    name: One Source, Many Outputs
+    statement: A single .usm/ directory generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md, and Vitest specs.
+    rationale: Maintaining 6+ doc formats independently is unsustainable. Derive all from one source so they stay in sync.
+    implications:
+      - Generators must read .usm files — never write docs from other docs
+      - Each generator is independent and composable

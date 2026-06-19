@@ -1,0 +1,61 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-validate
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: The usm validate command checks .usm files against the v1 JSON Schema and reports errors.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Users need to verify that their .usm files conform to the schema before generating docs. Validate catches missing required fields, wrong types, and invalid enum values.
+
+flows:
+  - id: run-validate
+    name: Run usm validate
+    description: User runs usm validate on one or more .usm files
+    steps:
+      - id: s1
+        action: parse
+        target: each .usm file path
+      - id: s2
+        action: observe
+        target: v1 JSON Schema via Ajv
+        expect:
+          - valid: true
+      - id: s3
+        action: submit
+        target: validation result per file
+      - id: s4
+        action: observe
+        target: exit code 0 if all pass, 1 if any fail
+
+contracts:
+  - id: validate-against-v1-schema
+    description: Validate must use the v1.json schema with Ajv and report all errors
+    must_have:
+      - "Uses Ajv with allErrors: true"
+      - "Reports path and message for each error"
+      - "Exit code 1 if any file fails"
+
+tests:
+  - id: validate-valid-file
+    setup:
+      valid_usm_file: true
+    expect:
+      - assertion: output shows ✓ for the file
+      - assertion: exit code 0
+  - id: validate-invalid-file
+    setup:
+      usm_missing_required_fields: true
+    expect:
+      - assertion: output shows ✗ with error details
+      - assertion: exit code 1
+
+implementation:
+  primary: src/validate.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/schema-v1"

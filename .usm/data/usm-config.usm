@@ -1,0 +1,41 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/usm-config
+$type: service
+$version: 1
+$last_updated: "2026-06-19"
+summary: |
+  The usmconfig.json shape — the project-level configuration file that drives usm init and usm scan. Defines services, shared packages, data sources, features, output paths, and LLM enrichment settings.
+
+$system: usm/system
+name: USM Config
+type: api
+runtime: json-config
+paths:
+  - src/scan/types.ts
+depends_on: []
+
+dev:
+  command: "cat usmconfig.json"
+  env: {}
+
+modules:
+  - name: sources
+    purpose: Defines include/exclude globs, package manifests, and code globs for scanning
+  - name: services
+    purpose: Array of service match rules with kind (web-app, api-server, worker, etc.)
+  - name: shared
+    purpose: Array of shared package rules with kind (ui-kit, orm, auth-lib, etc.)
+  - name: data
+    purpose: Array of data extraction rules (prisma, drizzle, etc.)
+  - name: outputs
+    purpose: Output directory mappings for usm_source, design_docs, help_docs, etc.
+  - name: generation
+    purpose: "Generation settings: merge strategy, comment preservation, format"
+  - name: enrichment
+    purpose: "LLM enrichment config: provider, model, temperature, fields to enrich"
+
+decisions:
+  - id: json-over-yaml
+    decision: Use JSON for usmconfig (not YAML) because it is machine-generated and machine-read
+    rationale: Config is produced by usm init and consumed by usm scan — no hand-editing required for initial creation
+    date: "2026-01-01"

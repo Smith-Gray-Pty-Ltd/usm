@@ -1,0 +1,48 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-flows
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP flows tool — extracts the flows array from a feature .usm file, including id, name, description, and steps.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Agents need to understand user journeys described in feature files. The flows tool returns the complete flows array with step details, enabling agents to reason about the feature's behavior.
+
+flows:
+  - id: get-flows
+    name: Get feature flows
+    description: Agent retrieves all flows for a feature
+    steps:
+      - id: s1
+        action: get
+        target: feature .usm file path
+      - id: s2
+        action: parse
+        target: flows array with steps
+      - id: s3
+        action: observe
+        target: flow count and step details
+
+contracts:
+  - id: flows-feature-only
+    description: Flows tool only works on feature files
+    must_have:
+      - "Returns error if file is not a feature"
+      - "Each flow includes id, name, description, stepCount, steps"
+
+tests:
+  - id: flows-from-feature
+    setup:
+      feature_with_flows: true
+    expect:
+      - assertion: flows array returned with correct count and step details
+
+implementation:
+  primary: src/mcp/flows.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp-contracts"

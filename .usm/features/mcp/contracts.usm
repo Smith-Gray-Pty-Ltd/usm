@@ -1,0 +1,54 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-contracts
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP contracts tool — extracts the contracts array from a feature .usm file, including id, description, applies_after, and must_have.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Agents need to review a feature's contracts to plan tests or verify guarantees. The contracts tool returns the full contracts array from a feature file, formatted for easy agent consumption.
+
+flows:
+  - id: get-contracts
+    name: Get feature contracts
+    description: Agent retrieves all contracts for a feature
+    steps:
+      - id: s1
+        action: get
+        target: feature .usm file path
+      - id: s2
+        action: parse
+        target: contracts array
+      - id: s3
+        action: observe
+        target: contract count and details
+
+contracts:
+  - id: contracts-feature-only
+    description: Contracts tool only works on feature files
+    must_have:
+      - "Returns error if file is not a feature"
+      - "Returns contractCount and full contracts array"
+      - "Each contract includes id, description, must_have"
+
+tests:
+  - id: contracts-from-feature
+    setup:
+      feature_with_contracts: true
+    expect:
+      - assertion: contracts array returned with correct count
+  - id: contracts-from-service
+    setup:
+      service_usm_file: true
+    expect:
+      - assertion: error returned "not a feature file"
+
+implementation:
+  primary: src/mcp/contracts.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp-flows"

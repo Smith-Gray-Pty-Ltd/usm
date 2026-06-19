@@ -1,0 +1,58 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-testspecs
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: Vitest test specs generator — produces per-feature and aggregated Vitest test files from flows[] and tests[] definitions.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Feature .usm files define flows and tests in a structured format. The test specs generator converts these into executable Vitest test files, producing both per-feature specs and aggregated test bundles per app.
+
+flows:
+  - id: gen-test-specs
+    name: Generate Vitest test specs
+    description: Convert flows and tests from .usm into Vitest describe/it blocks
+    steps:
+      - id: s1
+        action: parse
+        target: all feature .usm files with tests and flows
+      - id: s2
+        action: generate
+        target: per-feature .test.ts files with describe blocks
+      - id: s3
+        action: generate
+        target: aggregated test bundles per app
+      - id: s4
+        action: submit
+        target: write to tests/auto-generated/
+
+contracts:
+  - id: test-specs-runnable
+    description: Generated test specs must be syntactically valid Vitest files
+    must_have:
+      - "Each flow maps to a describe block"
+      - "Each test maps to an it block with setup and expect"
+      - "Aggregated specs import per-feature files"
+
+tests:
+  - id: test-specs-per-feature
+    setup:
+      feature_with_tests: true
+    expect:
+      - assertion: .test.ts file generated with valid syntax
+      - assertion: Contains describe and it blocks
+  - id: test-specs-aggregated
+    setup:
+      multiple_features: true
+    expect:
+      - assertion: Aggregated test file imports per-feature specs
+
+implementation:
+  primary: src/generators/testSpecs.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"

@@ -1,0 +1,50 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-references
+$type: feature
+$version: 1
+$last_updated: "2026-06-19"
+summary: MCP references tool — finds all .usm files that reference a target $id, useful for impact analysis.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  Before modifying a service or feature, agents need to know what else depends on it. The references tool searches all .usm files for a target $id (e.g. smith-gray/zitadel) and returns every file and field that references it.
+
+flows:
+  - id: find-references
+    name: Find references to a $id
+    description: Agent searches for all files referencing a specific $id
+    steps:
+      - id: s1
+        action: get
+        target: target_id string
+      - id: s2
+        action: parse
+        target: each .usm file, recursively walk object for target_id
+      - id: s3
+        action: observe
+        target: hits with path, id, type, and context (field path)
+
+contracts:
+  - id: references-deep-walk
+    description: References must walk the entire object tree, not just top-level fields
+    must_have:
+      - "Finds references in $system, $service, depends_on, see_also, and nested objects"
+      - "Returns context field showing where the reference was found"
+      - "Results sorted by path"
+
+tests:
+  - id: references-find-system
+    setup:
+      files_referencing_system_id: true
+    expect:
+      - assertion: All files with $system matching target returned
+      - assertion: context includes the field name (e.g. "$system")
+
+implementation:
+  primary: src/mcp/references.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp"
