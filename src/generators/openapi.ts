@@ -38,7 +38,7 @@ function pathToTypeId(urlPath: string): string {
     .map((segment) => {
       // :id → ById, :modelId → ByModelId, :...path → ByPath
       if (segment.startsWith(":")) {
-        const name = segment.replace(/^\:/, "").replace(/^\.\.\./, "");
+        const name = segment.replace(/^:/, "").replace(/^\.\.\./, "");
         return "By" + kebabToPascal(name);
       }
       return kebabToPascal(segment);

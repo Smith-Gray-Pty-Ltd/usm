@@ -271,7 +271,7 @@ function generatePhaseBBusiness(system: SystemUsm, features: FeatureUsm[], root:
     lines.push("```mermaid");
     lines.push("graph TD");
     for (const [svc, feats] of serviceGroups) {
-      const svcId = svc.replace(/[\/\-]/g, "_");
+      const svcId = svc.replace(/[-/]/g, "_");
       lines.push(`    subgraph "${svc}"`);
       for (const f of feats.slice(0, 8)) {
         const fId = (f.$id.split("/").pop() || f.$id).replace(/-/g, "_");

@@ -3,8 +3,10 @@ import { parseUsmFile } from "../src/parse.js";
 import { validateUsm } from "../src/validate.js";
 import { generate } from "../src/generate.js";
 import path from "node:path";
+import { existsSync } from "node:fs";
 
-const SPEC_DIR = path.resolve(__dirname, "../../.usm");
+const SPEC_DIR = path.resolve(__dirname, "../.usm");
+const HAS_USM_SCOPE = existsSync(SPEC_DIR);
 
 /**
  * Round-trip test: prove the format is viable.
@@ -18,7 +20,7 @@ const SPEC_DIR = path.resolve(__dirname, "../../.usm");
  * generator execution, and structural consistency. Byte-perfect markdown
  * conversion is a future goal.
  */
-describe("roundtrip", () => {
+describe.skipIf(!HAS_USM_SCOPE)("roundtrip", () => {
   const specFiles = [
     { name: "system.usm", path: path.join(SPEC_DIR, "system.usm") },
     { name: "the-architect.usm", path: path.join(SPEC_DIR, "services/the-architect.usm") },
