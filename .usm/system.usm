@@ -145,7 +145,7 @@ index:
   - id: mcp-write
     name: MCP Write Tools
     ref: .usm/features/mcp/write.usm
-    status: planned
+    status: built
     tags: [mcp, authoring, spec-first]
   - id: schema-v1
     name: V1 JSON Schema
@@ -249,8 +249,9 @@ roadmap:
   - id: agent-authoring-tools
     title: MCP write tools
     description: "draft_feature, update_feature_status — close the spec-first loop so agents can author .usm files"
-    status: in-progress
+    status: shipped
     feature: usm/mcp-write
+    shipped_in: "1.1.0"
   - id: rules-file-generation
     title: Tool-specific rules files
     description: "Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow instructions"
@@ -272,7 +273,7 @@ principles:
   - key: agent-first
     name: Agent First
     statement: USM files are designed for AI agent consumption via MCP tools before human readability.
-    rationale: The MCP server exposes 8 tools that let agents navigate, search, and reference USM data without reading raw YAML.
+    rationale: The MCP server exposes 12 tools (8 read + 4 write) that let agents navigate, search, reference, and author USM data without reading raw YAML.
     implications:
       - Every .usm field must be parseable and queryable by agents
       - The MCP server must stay in sync with the schema

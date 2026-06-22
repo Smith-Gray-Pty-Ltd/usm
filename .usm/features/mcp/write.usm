@@ -25,6 +25,12 @@ decisions:
       command requires the agent to shell out, parse output, and handle errors
       externally. An MCP tool returns structured JSON the agent can reason about
       directly. CLI wrappers can be added later for human use.
+    alternatives:
+      - option: CLI commands only (usm feature draft, usm feature update)
+        rejected_because: "Agents must shell out, parse stdout, handle errors externally — MCP returns structured JSON directly"
+      - option: File system writes only (agent writes YAML directly)
+        rejected_because: "No validation, no markdown preview, no status transition enforcement — agents would produce invalid .usm files"
+    consequences: "MCP server gains write capability — needs careful validation to prevent corruption"
     status: accepted
   - id: draft-returns-preview
     decision: draft_feature returns both YAML and generated markdown
@@ -33,6 +39,7 @@ decisions:
       show the human the readable preview immediately without a separate generate
       step. The agent can also iterate on the draft based on feedback before
       writing to disk.
+    consequences: "draft_feature is heavier than a pure YAML generator, but the review step is the whole point"
     status: accepted
   - id: validate-before-write
     decision: All write operations validate against the v1 schema before persisting
@@ -40,6 +47,7 @@ decisions:
       An invalid .usm file breaks downstream generators and MCP read tools.
       Validation at write time prevents corruption. The tool returns structured
       validation errors so the agent can fix them before retrying.
+    consequences: "Write operations are slower due to validation, but prevent corrupt .usm files from entering the system"
     status: accepted
 
 flows:

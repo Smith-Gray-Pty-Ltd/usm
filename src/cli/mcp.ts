@@ -11,6 +11,10 @@ import { referencesSchema, referencesTool } from "../mcp/references.js";
 import { searchSchema, searchTool } from "../mcp/search.js";
 import { contractsSchema, contractsTool } from "../mcp/contracts.js";
 import { flowsSchema, flowsTool } from "../mcp/flows.js";
+import { draftFeatureSchema, draftFeatureTool } from "../mcp/write.js";
+import { writeFeatureSchema, writeFeatureTool } from "../mcp/write.js";
+import { updateFeatureSchema, updateFeatureTool } from "../mcp/write.js";
+import { updateFeatureStatusSchema, updateFeatureStatusTool } from "../mcp/write.js";
 
 const server = new McpServer({
   name: "usm-mcp",
@@ -79,6 +83,38 @@ server.tool(
   "Get the flows array from a feature .usm file. Each flow has id, name, description, and steps. For understanding user journeys.",
   flowsSchema,
   flowsTool,
+);
+
+// Tool 9: usm_draft_feature (write)
+server.tool(
+  "usm_draft_feature",
+  "Draft a feature .usm spec from structured fields. Validates against the v1 schema and returns YAML + markdown preview. Does NOT write to disk — show the markdown to the human for review, then call usm_write_feature to persist.",
+  draftFeatureSchema,
+  draftFeatureTool,
+);
+
+// Tool 10: usm_write_feature (write)
+server.tool(
+  "usm_write_feature",
+  "Write a feature .usm file to disk. Validates the YAML against the v1 schema before writing atomically. Returns { written, path } or { errors }.",
+  writeFeatureSchema,
+  writeFeatureTool,
+);
+
+// Tool 11: usm_update_feature (write)
+server.tool(
+  "usm_update_feature",
+  "Update fields on an existing feature .usm file. Provide 'id' (feature $id) or 'path', and 'fields' (JSON object of fields to update). Arrays are replaced, scalars updated. $id, $type, $schema are immutable. Validates before writing.",
+  updateFeatureSchema,
+  updateFeatureTool,
+);
+
+// Tool 12: usm_update_feature_status (write)
+server.tool(
+  "usm_update_feature_status",
+  "Update the status of a feature (planned → in-progress → built → deprecated). Enforces valid transitions. Optionally update implementation paths. Validates before writing atomically.",
+  updateFeatureStatusSchema,
+  updateFeatureStatusTool,
 );
 
 export async function startMcpServer() {

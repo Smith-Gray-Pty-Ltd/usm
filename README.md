@@ -124,9 +124,10 @@ USM is a single Node.js package with three entry points:
 - **`usm` CLI** — `init`, `scan`, `validate`, `generate`, `enrich`, `scaffold`,
   `scaffold-project`, `roundtrip`, `info`, `mcp serve`, `generate:togaf`,
   `generate:archimate`
-- **MCP server** — 8 tools (`list`, `read`, `search`, `validate`, `summary`,
-  `references`, `contracts`, `flows`) for AI agents to navigate your system
-  without reading raw YAML
+- **MCP server** — 12 tools (`list`, `read`, `search`, `validate`, `summary`,
+  `references`, `contracts`, `flows`, `draft_feature`, `write_feature`,
+  `update_feature`, `update_feature_status`) for AI agents to navigate, search,
+  and author your system
 - **Generators** — markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md,
   Vitest specs — all derived from the same `.usm` source
 
