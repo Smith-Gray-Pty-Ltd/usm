@@ -12,7 +12,7 @@ interface SidebarItem {
 interface SidebarGroup {
   text: string;
   collapsed?: boolean;
-  items: SidebarItem[];
+  items: (SidebarItem | SidebarGroup)[];
 }
 
 /**
@@ -236,26 +236,34 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
     }
   }
 
-  // Add feature groups to sidebar (sorted alphabetically by area name)
+  // Add feature groups nested under a "Features" parent group (sorted alphabetically)
   // Within each group, sort by status (active first, planned last)
-  for (const [area, items] of [...featuresByArea.entries()].sort()) {
-    // Sort items by status priority, then alphabetically
-    items.sort((a, b) => {
-      const aStatus = a.text.includes("[planned]") ? STATUS_ORDER["planned"]
-        : a.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
-        : a.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
-        : STATUS_ORDER["active"];
-      const bStatus = b.text.includes("[planned]") ? STATUS_ORDER["planned"]
-        : b.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
-        : b.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
-        : STATUS_ORDER["active"];
-      if (aStatus !== bStatus) return aStatus - bStatus;
-      return a.text.localeCompare(b.text);
-    });
+  if (featuresByArea.size > 0) {
+    const featureSubGroups: SidebarGroup[] = [];
+    for (const [area, items] of [...featuresByArea.entries()].sort()) {
+      // Sort items by status priority, then alphabetically
+      items.sort((a, b) => {
+        const aStatus = a.text.includes("[planned]") ? STATUS_ORDER["planned"]
+          : a.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
+          : a.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
+          : STATUS_ORDER["active"];
+        const bStatus = b.text.includes("[planned]") ? STATUS_ORDER["planned"]
+          : b.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
+          : b.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
+          : STATUS_ORDER["active"];
+        if (aStatus !== bStatus) return aStatus - bStatus;
+        return a.text.localeCompare(b.text);
+      });
+      featureSubGroups.push({
+        text: area,
+        collapsed: true,
+        items,
+      });
+    }
     sidebar.push({
-      text: area,
+      text: "Features",
       collapsed: true,
-      items,
+      items: featureSubGroups,
     });
   }
 
