@@ -188,9 +188,18 @@ export function generateSequenceDiagrams(feature: FeatureUsm): string {
   const flows = feature.flows || [];
   if (flows.length === 0) return "";
 
+  // Only generate diagrams for flows with web-interaction patterns.
+  // Internal processing flows (validate, generate, parse, etc.) don't benefit
+  // from sequence diagrams — the numbered steps in the markdown convey the
+  // procedure clearly.
+  const webActions = new Set(["navigate", "click", "fill", "submit", "authenticate"]);
+
   const blocks: string[] = [];
 
   for (const flow of flows) {
+    const hasWebInteraction = flow.steps.some(s => webActions.has(s.action));
+    if (!hasWebInteraction) continue;
+
     const lines: string[] = [];
     lines.push("```mermaid");
     lines.push("sequenceDiagram");

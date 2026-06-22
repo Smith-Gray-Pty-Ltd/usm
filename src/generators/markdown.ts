@@ -2769,11 +2769,26 @@ function renderDecisions(lines: string[], decisions: Decision[]): void {
     lines.push(`**Decision**: ${d.decision}`);
     lines.push("");
     lines.push(`**Rationale**: ${d.rationale}`);
-    if (d.date) {
-      lines.push("");
-      lines.push(`*Date: ${d.date}*`);
-    }
     lines.push("");
+
+    if (d.alternatives && d.alternatives.length > 0) {
+      lines.push("**Alternatives considered**:");
+      lines.push("");
+      for (const alt of d.alternatives) {
+        lines.push(`- ${alt.option} — *rejected*: ${alt.rejected_because}`);
+      }
+      lines.push("");
+    }
+
+    if (d.consequences) {
+      lines.push(`**Consequences**: ${d.consequences}`);
+      lines.push("");
+    }
+
+    if (d.date) {
+      lines.push(`*Date: ${d.date}*`);
+      lines.push("");
+    }
   }
 }
 
@@ -2795,18 +2810,17 @@ function renderFlow(lines: string[], flow: Flow): void {
     lines.push(flow.description);
     lines.push("");
   }
-  lines.push("| Step | Action | Target | Expects |");
-  lines.push("|------|--------|--------|---------|");
-  for (const step of flow.steps) {
-    const target = step.target || "—";
-    const expects = (step.expect || [])
-      .map((e) => {
-        const entries = Object.entries(e);
-        return entries.map(([k, v]) => `${k}: ${v}`).join(", ");
-      })
-      .join("; ");
-    lines.push(`| ${step.id} | ${step.action} | ${target} | ${expects || "—"} |`);
-  }
+  flow.steps.forEach((step, i) => {
+    const target = step.target ? ` → ${step.target}` : "";
+    lines.push(`${i + 1}. **${step.action}**${target}`);
+    if (step.expect && step.expect.length > 0) {
+      for (const exp of step.expect) {
+        const entries = Object.entries(exp);
+        const expectStr = entries.map(([k, v]) => `${k}: ${v}`).join(", ");
+        lines.push(`   - *expects*: ${expectStr}`);
+      }
+    }
+  });
   lines.push("");
 }
 
@@ -2850,14 +2864,14 @@ function renderContract(lines: string[], contract: Contract): void {
   }
 
   if (contract.must_have && contract.must_have.length > 0) {
-    lines.push("**Must have**:");
+    lines.push("**Acceptance criteria**:");
     lines.push("");
     for (const item of contract.must_have) {
       if (typeof item === "string") {
-        lines.push(`- ${item}`);
+        lines.push(`- [ ] ${item}`);
       } else {
         const entries = Object.entries(item);
-        lines.push(`- ${entries.map(([k, v]) => `${k}: ${v}`).join(", ")}`);
+        lines.push(`- [ ] ${entries.map(([k, v]) => `${k}: ${v}`).join(", ")}`);
       }
     }
     lines.push("");
@@ -2868,21 +2882,9 @@ function renderTest(lines: string[], test: FeatureTest): void {
   lines.push(`### \`${test.id}\``);
   lines.push("");
 
-  if (test.flow) {
-    if (typeof test.flow === "string") {
-      lines.push(`**Flow**: ${test.flow}`);
-    } else {
-      let desc = `**Flow**: ${test.flow.ref}`;
-      if (test.flow.steps_until) {
-        desc += ` (until step ${test.flow.steps_until})`;
-      }
-      lines.push(desc);
-    }
-    lines.push("");
-  }
-
+  // Given (setup)
   if (test.setup && Object.keys(test.setup).length > 0) {
-    lines.push("**Setup**:");
+    lines.push("**Given**:");
     lines.push("");
     for (const [key, val] of Object.entries(test.setup)) {
       lines.push(`- ${key}: ${JSON.stringify(val)}`);
@@ -2890,7 +2892,22 @@ function renderTest(lines: string[], test: FeatureTest): void {
     lines.push("");
   }
 
-  lines.push("**Expect**:");
+  // When (flow reference)
+  if (test.flow) {
+    if (typeof test.flow === "string") {
+      lines.push(`**When**: ${test.flow}`);
+    } else {
+      let desc = test.flow.ref;
+      if (test.flow.steps_until) {
+        desc += ` (until step ${test.flow.steps_until})`;
+      }
+      lines.push(`**When**: ${desc}`);
+    }
+    lines.push("");
+  }
+
+  // Then (expectations)
+  lines.push("**Then**:");
   lines.push("");
   for (const exp of test.expect) {
     const entries = Object.entries(exp);
