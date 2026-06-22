@@ -1,133 +1,143 @@
 # USM — Universal System Map
 
-> Structured source of truth for agentic systems.
+> A shared map that humans and AI agents maintain together.
 >
-> **🌐 Live docs site: <https://usm.dev>**
+> **🌐 <https://usm.dev>**
 
-A single `.usm/` directory describes your whole system — apps, services,
-features, flows, contracts, decisions — in YAML files validated by a JSON
-Schema. From that one source, USM generates:
+## The Problem
 
-- **Markdown docs** (renders natively on GitHub / GitHub Pages)
+Agentic coding has no shared artifact between human intent and agent output. The
+human describes what they want in chat. The agent writes code. The code is the
+only artifact. If the agent gets it wrong, you iterate in chat — and the
+discussion is lost. Meanwhile, docs go stale because nobody updates them after
+the code changes.
+
+## The Workflow
+
+USM inverts the loop. **Write the spec first, then build from it.**
+
+```
+Discuss feature → Agent writes .usm spec → Human reviews docs → Agent builds → Documented
+```
+
+The `.usm` file is:
+- **The spec** — the agent writes it before coding, so the human reviews
+  intent, not implementation
+- **The contract** — flows, contracts, and tests define what "done" means
+- **The documentation** — it persists after the code is written, automatically
+- **The onboarding** — the next agent session reads it and understands context
+
+No stale docs. No lost discussions. One source of truth.
+
+## What USM Generates
+
+A single `.usm/` directory of YAML files (validated by a JSON Schema) produces:
+
+- **Markdown docs** for human review
 - **Mermaid diagrams** (architecture, sequence, ER, dependencies)
 - **OpenAPI 3.1** specs
-- **ArchiMate 3.1 / XMI 2.1** for enterprise-architecture tools (Archi, BiZZdesign, Orbus iServer)
-- **TOGAF deliverables** (Principles, Architecture Vision, etc.)
-- **Vitest test specs** from `tests[]` and `flows[]`
+- **ArchiMate 3.1** / **TOGAF** deliverables for enterprise architecture
+- **Vitest test specs** from feature `tests[]` and `flows[]`
 - **AGENTS.md** with USM-augmented context for AI coding agents
-- **MCP server** for Claude, Cursor, Codex, and other AI agents
-
-## Why
-
-Traditional docs are scattered, stale, and unreadable to agents. USM is:
-
-- **Structured** — every field is in a JSON Schema, validated on every change
-- **Agent-first** — the same files feed an MCP server that lets AI agents navigate your system
-- **Human-readable** — the same files generate GitHub-flavored markdown
-- **Idempotent** — `usm scan` and `usm generate` are safe to run repeatedly; smart-merge preserves human edits
 
 ## Quick Start
 
 ```bash
 # Install
 npm install -g @~usm/core
-# or
-pnpm add -g @~usm/core
 
-# Initialize a new USM scope in the current directory
+# Initialize a .usm/ scope in your project
 usm init
 
-# Scan your codebase for routes, methods, and components
+# Scan your codebase for routes, services, and structure
 usm scan
 
-# Enrich with LLM (optional, requires LiteLLM or similar proxy)
-usm enrich
-
-# Generate everything: markdown, OpenAPI, Mermaid, ArchiMate, etc.
+# Generate markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, test specs
 usm generate
 
-# Validate the current scope
+# Validate .usm files against the schema
 usm validate
 
-# Browse via the MCP server (for AI agents)
+# Start the MCP server (for AI agents — Claude, Cursor, Codex)
 usm mcp serve
 ```
 
 ## Example
 
-A minimal `system.usm`:
+A feature spec that an agent would draft for human review:
 
 ```yaml
+# .usm/features/auth/login.usm
 $schema: https://usm.dev/schema/v1.json
-$id: my-app/system
-$type: system
-$version: 1
-$last_updated: 2026-06-19
-summary: My application — a simple REST API
-identity:
-  name: My App
-  domain: my-app.com
-  contact: team@my-app.com
-index: []
-services: []
-apis: []
-data: []
-```
-
-A feature file `features/agent/events.usm`:
-
-```yaml
-$schema: https://usm.dev/schema/v1.json
-$id: my-app/agent-events
+$id: my-app/login
 $type: feature
 $version: 1
-$last_updated: 2026-06-19
-summary: Emit and subscribe to real-time events
+$last_updated: 2026-06-22
+summary: Login flow — authentication entry point for the app.
 $system: my-app/system
-$service: my-app/api
+$service: my-app/web
 intent: |
-  Clients need to broadcast events to subscribers in real time.
+  Users need to authenticate before accessing protected resources.
+
 flows:
-  - id: emit-event
-    name: Emit an event
+  - id: login-with-email
+    name: Login with email and password
     steps:
       - id: s1
-        action: post
-        target: POST /api/agent/events
+        action: navigate
+        target: /login
       - id: s2
-        action: validate
-        target: event payload against schema
+        action: fill
+        target: email and password fields
       - id: s3
-        action: broadcast
-        target: to all subscribers
+        action: submit
+        target: login form
+      - id: s4
+        action: observe
+        target: redirect to dashboard
+
 contracts:
-  - id: event-must-be-valid
-    description: Invalid events are rejected
+  - id: invalid-credentials-rejected
+    description: Invalid credentials show an error, not a redirect
     must_have:
-      - "Returns 400 for malformed payload"
-      - "Returns 202 for valid payload"
+      - "Returns 401 for wrong password"
+      - "Returns 404 for unknown email"
+      - "No session token set on failure"
+
 tests:
-  - id: valid-event-accepted
+  - id: valid-login-succeeds
     setup:
-      valid_payload: true
+      user_exists: true
+      correct_password: true
     expect:
-      - assertion: server returns 202 Accepted
+      - assertion: response is 302 redirect to /dashboard
+      - assertion: session cookie set
 ```
+
+The human reviews the generated markdown. The agent builds from the spec. The
+spec becomes the docs.
 
 ## Architecture
 
-USM is a single Node.js package with multiple entry points:
+USM is a single Node.js package with three entry points:
 
-- **`@~usm/core`** — the main library, JSON Schema, parsers, validators
-- **`usm` CLI** — `init`, `scan`, `validate`, `generate`, `enrich`, `scaffold`, `scaffold-project`, `roundtrip`, `info`, `mcp serve`, `generate:togaf`, `generate:archimate`
-- **Generators** — markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md, Vitest specs
-- **MCP server** — 8 tools for AI agents to navigate, search, and reference USM data
+- **`usm` CLI** — `init`, `scan`, `validate`, `generate`, `enrich`, `scaffold`,
+  `scaffold-project`, `roundtrip`, `info`, `mcp serve`, `generate:togaf`,
+  `generate:archimate`
+- **MCP server** — 8 tools (`list`, `read`, `search`, `validate`, `summary`,
+  `references`, `contracts`, `flows`) for AI agents to navigate your system
+  without reading raw YAML
+- **Generators** — markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md,
+  Vitest specs — all derived from the same `.usm` source
+
+USM distributes as an **MCP server plus rules files** — it integrates with the
+tools you already use (Cursor, Claude Code, Codex, GitHub Copilot) rather than
+replacing them.
 
 ## Documentation
 
-Full docs: <https://usm.dev> (generated from this repo's `.usm/` files and deployed via Cloudflare Pages).
-
-For the scanner design, see [`docs/SCANNER-DESIGN.md`](docs/SCANNER-DESIGN.md).
+Full docs: **<https://usm.dev>** (generated from this repo's own `.usm/` files —
+USM describes itself).
 
 ## Contributing
 
