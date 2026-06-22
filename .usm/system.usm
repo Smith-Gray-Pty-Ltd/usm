@@ -232,3 +232,46 @@ principles:
     implications:
       - Generators must read .usm files — never write docs from other docs
       - Each generator is independent and composable
+
+roles:
+  - name: Human Developer
+    description: |
+      Reviews feature specs before approving implementation. Discusses features
+      with an AI agent, reviews the generated markdown, and approves or requests
+      changes before the agent builds.
+    needs:
+      - "Readable feature specs with clear intent, flows, and contracts"
+      - "Checklist-format acceptance criteria for quick review"
+      - "Given/When/Then test format to verify coverage"
+  - name: AI Agent
+    description: |
+      Reads .usm files via MCP tools to understand system context before
+      implementing features. Drafts feature specs from human discussion.
+    needs:
+      - "MCP tools to query system structure without reading raw YAML"
+      - "Write tools to draft and update feature specs"
+      - "Rules files that teach the spec-first workflow"
+  - name: New Visitor
+    description: |
+      Finds USM on GitHub or npm and visits usm.dev to evaluate whether to use
+      it in their project.
+    needs:
+      - "Clear value proposition and workflow description"
+      - "Quick start guide"
+      - "Example feature specs"
+  - name: Team Member
+    description: |
+      Joins a project that uses USM and needs to understand the system
+      architecture, services, and feature inventory.
+    needs:
+      - "System overview with architecture diagram"
+      - "Service descriptions with links to features"
+      - "Local development setup guide"
+  - name: Technical Lead
+    description: |
+      Reviews system design, tracks risks and roadmap, ensures architectural
+      consistency across features.
+    needs:
+      - "Cross-cutting views — decisions, risks, roadmap"
+      - "Architecture diagrams"
+      - "Feature status overview (planned vs built)"

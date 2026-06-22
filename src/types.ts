@@ -96,6 +96,7 @@ export interface SystemUsm extends UsmCommon {
   mandatory_reading?: MandatoryReadingItem[];
   nextjs_breaking_changes?: string;
   principles?: Principle[];
+  roles?: Role[];
   local_development?: LocalDevelopment;
 }
 
@@ -105,6 +106,12 @@ export interface Principle {
   statement: string;
   rationale: string;
   implications?: string[];
+}
+
+export interface Role {
+  name: string;
+  description: string;
+  needs?: string[];
 }
 
 export interface MandatoryReadingItem {

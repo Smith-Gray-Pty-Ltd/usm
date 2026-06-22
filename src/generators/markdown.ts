@@ -148,52 +148,59 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   lines.push(`| Roadmap Items | ${roadmapCount} |`);
   lines.push("");
 
-  // App Services — links to per-app docs
-  lines.push("## App Services");
-  lines.push("");
-
-  // Build app service map from system.usm services array
-  // Dynamically derived — only services classified as "app" appear here
+  // App Services — links to per-app docs (only if any exist)
   const appServicesFromSystem = allServiceRefs.filter(s => appServiceIds.has(s.id));
-
-  // Also collect port/runtime info from parsed service files for richer output
-  for (const svc of appServicesFromSystem) {
-    const port = svc.port ? `, port ${svc.port}` : "";
-    const slug = svc.id;
-    const svcName = svc.name || slugToTitle(slug);
-    lines.push(`- [${svcName}](apps/${slug}/.usm-workspace/docs/README.md) —${port}`);
+  if (appServiceIds.size > 0) {
+    lines.push("## App Services");
+    lines.push("");
+    for (const svc of appServicesFromSystem) {
+      const port = svc.port ? `, port ${svc.port}` : "";
+      const slug = svc.id;
+      const svcName = svc.name || slugToTitle(slug);
+      lines.push(`- [${svcName}](apps/${slug}/.usm-workspace/docs/README.md) —${port}`);
+    }
+    lines.push("");
   }
-  lines.push("");
 
-  // Shared Services — links to shared-services docs
-  lines.push("## Shared Services");
-  lines.push("");
+  // Shared Services — links to shared-services docs (only if any exist)
   const sharedServicesFromSystem = allServiceRefs.filter(s => sharedServiceIds.has(s.id));
-  for (const svc of sharedServicesFromSystem) {
-    const slug = svc.id;
-    const svcName = svc.name || slugToTitle(slug);
-    lines.push(`- [${svcName}](shared-services/${slug}/README.md)`);
+  if (sharedServiceIds.size > 0) {
+    lines.push("## Shared Services");
+    lines.push("");
+    for (const svc of sharedServicesFromSystem) {
+      const slug = svc.id;
+      const svcName = svc.name || slugToTitle(slug);
+      lines.push(`- [${svcName}](shared-services/${slug}/overview.md)`);
+    }
+    lines.push("");
   }
-  lines.push("");
 
-  // Packages — links to package docs
-  lines.push("## Packages");
-  lines.push("");
+  // Packages — links to package docs (only if any exist)
   const packagesFromSystem = allServiceRefs.filter(s => packageIds.has(s.id));
-  for (const pkg of packagesFromSystem) {
-    const slug = pkg.id;
-    const pkgName = pkg.name || slugToTitle(slug);
-    lines.push(`- [${pkgName}](packages/${slug}/README.md)`);
+  if (packageIds.size > 0) {
+    lines.push("## Packages");
+    lines.push("");
+    for (const pkg of packagesFromSystem) {
+      const slug = pkg.id;
+      const pkgName = pkg.name || slugToTitle(slug);
+      lines.push(`- [${pkgName}](shared-services/${slug}/overview.md)`);
+    }
+    lines.push("");
   }
-  lines.push("");
 
-  // Platform-Level
+  // Platform-Level — only show links for content that exists
+  const platformLinks: string[] = [];
+  platformLinks.push("- [Architecture](architecture/architecture.md)");
+  platformLinks.push("- [Data Models](data/models.md)");
+  if (riskCount > 0) {
+    platformLinks.push("- [Risks](risks.md)");
+  }
+  if (roadmapCount > 0) {
+    platformLinks.push("- [Roadmap](roadmap.md)");
+  }
   lines.push("## Platform-Level");
   lines.push("");
-  lines.push("- [Risks](risks.md)");
-  lines.push("- [Roadmap](roadmap.md)");
-  lines.push("- [Data Models](data/models.md)");
-  lines.push("- [Shared Patterns](packages/db/patterns.md)");
+  lines.push(...platformLinks);
   lines.push("");
 
   // Agent Context — from system.usm agent_context field
@@ -956,20 +963,14 @@ function buildServiceOverview(file: ServiceUsm, slug: string): string {
   lines.push("");
 
   // Surface — placeholder tables that will be filled by generateSurfaceTables()
-  lines.push("## Surface");
-  lines.push("");
-  lines.push("### UI Pages");
-  lines.push("");
+  // Only rendered if features have UI pages or API endpoints
+  lines.push("<!-- USM:SURFACE:SECTION_START -->");
   lines.push("<!-- USM:SURFACE:UI_START -->");
-  lines.push("_Surface table populated by generator from feature interfaces._");
   lines.push("<!-- USM:SURFACE:UI_END -->");
   lines.push("");
-
-  lines.push("### API Endpoints");
-  lines.push("");
   lines.push("<!-- USM:SURFACE:API_START -->");
-  lines.push("_Surface table populated by generator from feature routes._");
   lines.push("<!-- USM:SURFACE:API_END -->");
+  lines.push("<!-- USM:SURFACE:SECTION_END -->");
   lines.push("");
 
   // Properties
@@ -1487,7 +1488,6 @@ function injectSurfaceTables(
     }
     uiTableLines.push("");
   } else {
-    uiTableLines.push("No UI pages documented in this service's features.");
     uiTableLines.push("");
   }
 
@@ -1507,14 +1507,26 @@ function injectSurfaceTables(
     }
     apiTableLines.push("");
   } else {
-    apiTableLines.push("No API endpoints documented in this service's features.");
     apiTableLines.push("");
   }
 
-  // Replace between markers
+  // Build the full section content — only include headers when there's data
+  const hasUi = uiPages.length > 0;
+  const hasApi = apiEndpoints.length > 0;
+  let sectionContent = "";
+  if (hasUi || hasApi) {
+    sectionContent = "## Surface\n\n";
+    if (hasUi) {
+      sectionContent += "### UI Pages\n\n" + uiTableLines.join("\n") + "\n";
+    }
+    if (hasApi) {
+      sectionContent += "### API Endpoints\n\n" + apiTableLines.join("\n") + "\n";
+    }
+  }
+
+  // Replace the entire section between SECTION_START and SECTION_END
   let result = existing;
-  result = replaceBetweenMarkers(result, "USM:SURFACE:UI_START", "USM:SURFACE:UI_END", uiTableLines.join("\n"));
-  result = replaceBetweenMarkers(result, "USM:SURFACE:API_START", "USM:SURFACE:API_END", apiTableLines.join("\n"));
+  result = replaceBetweenMarkers(result, "USM:SURFACE:SECTION_START", "USM:SURFACE:SECTION_END", sectionContent);
 
   return result;
 }
@@ -1621,27 +1633,26 @@ export function generatePackagesIndex(services: ServiceUsm[], root: string): Gen
  * Generate docs/risks.md — from system.risks
  */
 export function generateRisksDoc(system: SystemUsm, root: string): GenerationResult {
+  if (!system.risks || system.risks.length === 0) {
+    return { outputs: [] };
+  }
+
   const lines: string[] = [];
   lines.push("# Risks");
   lines.push("");
   lines.push("Source: `.usm/system.usm` → `risks`");
   lines.push("");
 
-  if (system.risks && system.risks.length > 0) {
-    lines.push("| ID | Title | Severity | Status | Description | Mitigation |");
-    lines.push("|----|-------|----------|--------|-------------|------------|");
-    for (const risk of system.risks) {
-      const severity = risk.severity || "—";
-      const status = risk.status || "—";
-      const desc = risk.description || "—";
-      const mitigation = risk.mitigation || "—";
-      lines.push(`| ${risk.id} | ${risk.title} | ${severity} | ${status} | ${desc} | ${mitigation} |`);
-    }
-    lines.push("");
-  } else {
-    lines.push("No risks defined in system.usm.");
-    lines.push("");
+  lines.push("| ID | Title | Severity | Status | Description | Mitigation |");
+  lines.push("|----|-------|----------|--------|-------------|------------|");
+  for (const risk of system.risks) {
+    const severity = risk.severity || "—";
+    const status = risk.status || "—";
+    const desc = risk.description || "—";
+    const mitigation = risk.mitigation || "—";
+    lines.push(`| ${risk.id} | ${risk.title} | ${severity} | ${status} | ${desc} | ${mitigation} |`);
   }
+  lines.push("");
 
   return {
     outputs: [{
@@ -1655,26 +1666,25 @@ export function generateRisksDoc(system: SystemUsm, root: string): GenerationRes
  * Generate docs/roadmap.md — from system.roadmap
  */
 export function generateRoadmapDoc(system: SystemUsm, root: string): GenerationResult {
+  if (!system.roadmap || system.roadmap.length === 0) {
+    return { outputs: [] };
+  }
+
   const lines: string[] = [];
   lines.push("# Roadmap");
   lines.push("");
   lines.push("Source: `.usm/system.usm` → `roadmap`");
   lines.push("");
 
-  if (system.roadmap && system.roadmap.length > 0) {
-    lines.push("| ID | Title | Status | Target Date | Description |");
-    lines.push("|----|-------|--------|-------------|-------------|");
-    for (const item of system.roadmap) {
-      const status = item.status || "—";
-      const target = item.target_date || "—";
-      const desc = item.description || "—";
-      lines.push(`| ${item.id} | ${item.title} | ${status} | ${target} | ${desc} |`);
-    }
-    lines.push("");
-  } else {
-    lines.push("No roadmap items defined in system.usm.");
-    lines.push("");
+  lines.push("| ID | Title | Status | Target Date | Description |");
+  lines.push("|----|-------|--------|-------------|-------------|");
+  for (const item of system.roadmap) {
+    const status = item.status || "—";
+    const target = item.target_date || "—";
+    const desc = item.description || "—";
+    lines.push(`| ${item.id} | ${item.title} | ${status} | ${target} | ${desc} |`);
   }
+  lines.push("");
 
   return {
     outputs: [{

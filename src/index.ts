@@ -79,6 +79,8 @@ export type {
   FeatureRoute,
   FeatureStatus,
   Implementation,
+  Principle,
+  Role,
   ValidationResult,
   GenerationResult,
 } from "./types.js";

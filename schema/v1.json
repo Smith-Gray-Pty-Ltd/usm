@@ -378,6 +378,20 @@
             "required": ["key", "name", "statement", "rationale"]
           }
         },
+        "roles": {
+          "type": "array",
+          "description": "User roles — who uses this system and what they need from the docs and tools.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Role name (e.g. Human Developer, AI Agent, New Team Member)" },
+              "description": { "type": "string", "description": "Who this role is and when they interact with the system" },
+              "needs": { "type": "array", "items": { "type": "string" }, "description": "What this role needs from the docs/tools (e.g. 'Readable feature specs for review')" }
+            },
+            "required": ["name", "description"],
+            "additionalProperties": false
+          }
+        },
         "local_development": {
           "type": "object",
           "description": "Local development workflow — commands, quirks, log locations, and external services required to run the platform on a developer's machine.",
