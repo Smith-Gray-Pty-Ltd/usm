@@ -189,7 +189,6 @@ export function generateRootAgentsMd(
   const outputPath = `${root}/AGENTS.md`;
 
   const lines: string[] = [];
-  const APP_DIRS = ["the-architect", "tenant", "platform", "marketing", "mobile", "desktop"];
 
   lines.push(`<!-- USM:START -->`);
   lines.push(`# ${system.identity.name} — Agent Context`);
@@ -199,47 +198,53 @@ export function generateRootAgentsMd(
   lines.push(system.summary || "");
   lines.push("");
 
-  // The 6 Apps
+  // App Services — dynamically from parsed services
   const appServices = services.filter(s =>
     s.paths?.some(p => p.startsWith("apps/"))
   );
 
-  lines.push("## The 6 Apps");
-  lines.push("");
-  lines.push("| App | Directory | Port | Role |");
-  lines.push("|-----|-----------|------|------|");
-  for (const svc of appServices) {
-    const slug = svc.$id.split("/").pop() || "";
-    const port = svc.port ? String(svc.port) : "—";
-    const name = svc.name || slug;
-    lines.push(`| ${name} | \`apps/${slug}\` | ${port} | ${svc.summary?.split(".")[0] || ""} |`);
+  if (appServices.length > 0) {
+    const heading = appServices.length === 1 ? "App" : `The ${appServices.length} Apps`;
+    lines.push(`## ${heading}`);
+    lines.push("");
+    lines.push("| App | Directory | Port | Role |");
+    lines.push("|-----|-----------|------|------|");
+    for (const svc of appServices) {
+      const slug = svc.$id.split("/").pop() || "";
+      const port = svc.port ? String(svc.port) : "—";
+      const name = svc.name || slug;
+      lines.push(`| ${name} | \`apps/${slug}\` | ${port} | ${svc.summary?.split(".")[0] || ""} |`);
+    }
+    lines.push("");
   }
-  lines.push("");
 
-  // Shared Packages
+  // Shared Packages — dynamically from parsed services
   const pkgServices = services.filter(s =>
     s.paths?.some(p => p.startsWith("packages/"))
   );
 
-  lines.push("## Shared Packages");
-  lines.push("");
-  lines.push("| Package | Purpose |");
-  lines.push("|---------|---------|");
-  for (const pkg of pkgServices) {
-    const slug = pkg.$id.split("/").pop() || "";
-    const purpose = pkg.summary?.split("—")[1]?.trim() || pkg.summary || "";
-    lines.push(`| \`@smith-gray/${slug}\` | ${purpose} |`);
+  if (pkgServices.length > 0) {
+    lines.push("## Shared Packages");
+    lines.push("");
+    lines.push("| Package | Purpose |");
+    lines.push("|---------|---------|");
+    for (const pkg of pkgServices) {
+      const slug = pkg.$id.split("/").pop() || "";
+      const purpose = pkg.summary?.split("—")[1]?.trim() || pkg.summary || "";
+      lines.push(`| \`${slug}\` | ${purpose} |`);
+    }
+    lines.push("");
   }
-  lines.push("");
 
-  // Key Cross-App Patterns
-  lines.push("## Key Cross-App Patterns");
-  lines.push("");
-  lines.push("- **Auth**: Zitadel OIDC — single identity provider for all protected apps");
-  lines.push("- **Database**: Prisma singleton with globalThis + RDS Proxy");
-  lines.push("- **LLM Proxy**: LiteLLM on port 4000 — routes to multiple providers");
-  lines.push("- **RBAC**: OWNER / SUPERADMIN / TENANT_ADMIN / USER / ARCHITECT_* roles");
-  lines.push("");
+  // Key Cross-App Patterns — dynamically from system.usm
+  if (system.principles && system.principles.length > 0) {
+    lines.push("## Key Principles");
+    lines.push("");
+    for (const p of system.principles) {
+      lines.push(`- **${p.name}**: ${p.statement}`);
+    }
+    lines.push("");
+  }
 
   // Rules for Agents
   lines.push("## Rules for Agents");
@@ -276,9 +281,16 @@ export function generateAllAppAgentsMd(
 ): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  const APP_DIRS = ["the-architect", "tenant", "platform", "marketing", "mobile", "desktop"];
+  // Dynamically discover app services from paths (apps/* directories)
+  const appServiceSlugs = new Set<string>();
+  for (const svc of serviceFiles) {
+    for (const p of svc.paths || []) {
+      const match = p.match(/^apps\/([^/]+)/);
+      if (match) appServiceSlugs.add(match[1]);
+    }
+  }
 
-  for (const app of APP_DIRS) {
+  for (const app of appServiceSlugs) {
     const svc = serviceFiles.find(s =>
       s.paths?.some(p => p.startsWith(`apps/${app}`))
     );
@@ -294,9 +306,9 @@ export function generateAllAppAgentsMd(
   );
   for (const pkg of pkgServices) {
     const slug = pkg.$id.split("/").pop() || "";
-    const pkgPath = `${root}/packages/${slug}/AGENTS.md`;
     // Skip packages that don't have .agents-workspace directories
     // (they get a lighter docs shape)
+    void slug; // no-op for now
   }
 
   return { outputs };

@@ -26,7 +26,7 @@ import { generateSequenceDiagrams } from "./mermaid.js";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Known app directories in the monorepo (kind: web-app, mobile-app, desktop-app) */
-const APP_DIRS = ["the-architect", "tenant", "platform", "marketing", "mobile", "desktop"];
+const APP_DIRS: string[] = [];
 
 /** Service kinds that map to shared services (full shape) */
 const SHARED_SERVICE_KINDS = new Set(["idp", "llm-gateway", "agent-flows", "database", "cache", "queue", "api"]);
@@ -42,6 +42,20 @@ function isSeedDataFile(file: ServiceUsm): boolean {
 
 /** Service kinds that map to packages (light shape) */
 const PACKAGE_KINDS = new Set(["ui-kit", "shared-util", "auth-lib", "orm", "llm-wrapper", "config", "types"]);
+
+/**
+ * Classify a service reference from system.usm services[] (lightweight —
+ * only id, name, ref, port) into app, shared-service, or package.
+ * Uses the service `id` and `ref` to determine classification.
+ */
+function classifyServiceById(svc: { id: string; name?: string; ref?: string; port?: number }): "app" | "shared-service" | "package" {
+  // Services with refs pointing to apps/* are app services
+  if (svc.ref?.includes("apps/")) return "app";
+  // Services whose id matches known infrastructure patterns are shared services
+  if (SHARED_SERVICE_KINDS.has(svc.id)) return "shared-service";
+  // Default: treat as package
+  return "package";
+}
 
 // ─── Main Entry Point ─────────────────────────────────────────────────────────
 
@@ -98,14 +112,26 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   lines.push("");
 
   // Quick Stats — derived from services, features, etc.
-  const appServiceIdSet = new Set(APP_DIRS);
-  const appServicesFromSystem = (file.services || []).filter(s => appServiceIdSet.has(s.id));
-  const appCount = new Set(appServicesFromSystem.map(s => s.id)).size;
-  const sharedSvcCount = (file.services || []).filter(s =>
-    s.id === "zitadel" || s.id === "litellm" || s.id === "langflow" ||
-    s.id === "nango" || s.id === "postgres"
-  ).length;
-  const packageCount = (file.services || []).length - appCount - sharedSvcCount;
+  // Dynamically classify services from system.usm services[] into apps, shared-services, packages
+  const allServiceRefs = file.services || [];
+  const appServiceIds = new Set<string>();
+  const sharedServiceIds = new Set<string>();
+  const packageIds = new Set<string>();
+
+  for (const svc of allServiceRefs) {
+    const classification = classifyServiceById(svc);
+    if (classification === "app") {
+      appServiceIds.add(svc.id);
+    } else if (classification === "shared-service") {
+      sharedServiceIds.add(svc.id);
+    } else {
+      packageIds.add(svc.id);
+    }
+  }
+
+  const appCount = appServiceIds.size;
+  const sharedSvcCount = sharedServiceIds.size;
+  const packageCount = packageIds.size;
   const featureCount = (file.index || []).length;
   const riskCount = (file.risks || []).length;
   const roadmapCount = (file.roadmap || []).length;
@@ -127,58 +153,37 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   lines.push("");
 
   // Build app service map from system.usm services array
-  // The app service IDs are the known apps that produce per-app docs
-  // (appServicesFromSystem already computed above for Quick Stats)
+  // Dynamically derived — only services classified as "app" appear here
+  const appServicesFromSystem = allServiceRefs.filter(s => appServiceIds.has(s.id));
 
   // Also collect port/runtime info from parsed service files for richer output
   for (const svc of appServicesFromSystem) {
     const port = svc.port ? `, port ${svc.port}` : "";
     const slug = svc.id;
-    // Use the display name from the system.usm entry (which should match service file's `name` field)
     const svcName = svc.name || slugToTitle(slug);
-    // Derive runtime from slug conventions
-    const runtime = slug === "mobile" ? ", react-native" : slug === "desktop" ? ", tauri" : ", nextjs";
-    lines.push(`- [${svcName}](apps/${slug}/.agents-workspace/docs/README.md) —${port}${runtime}`);
+    lines.push(`- [${svcName}](apps/${slug}/.agents-workspace/docs/README.md) —${port}`);
   }
   lines.push("");
 
   // Shared Services — links to shared-services docs
   lines.push("## Shared Services");
   lines.push("");
-  const sharedServiceLabels: Record<string, string> = {
-    "zitadel": "OIDC identity provider",
-    "litellm": "LLM gateway",
-    "langflow": "Flow editor",
-    "nango": "Third-party integrations",
-    "postgres": "PostgreSQL database",
-  };
-  for (const [id, label] of Object.entries(sharedServiceLabels)) {
-    lines.push(`- [${id.charAt(0).toUpperCase() + id.slice(1)}](shared-services/${id}/README.md) — ${label}`);
+  const sharedServicesFromSystem = allServiceRefs.filter(s => sharedServiceIds.has(s.id));
+  for (const svc of sharedServicesFromSystem) {
+    const slug = svc.id;
+    const svcName = svc.name || slugToTitle(slug);
+    lines.push(`- [${svcName}](shared-services/${slug}/README.md)`);
   }
   lines.push("");
 
   // Packages — links to package docs
   lines.push("## Packages");
   lines.push("");
-  const packageLabels: Record<string, string> = {
-    "ui": "shadcn components",
-    "auth": "auth helpers",
-    "db": "Prisma client",
-    "usm": "Universal System Map tooling",
-    "zitadel": "Zitadel OIDC helpers",
-    "llm-sdk": "LLM wrapper",
-    "agent-smith": "Embedded assistant",
-    "ai-ui": "AI UI components",
-    "embeddings": "Embedding utilities",
-    "config": "Roles, ports, constants",
-    "theme": "shadcn gray theme",
-    "types": "Shared TypeScript types",
-    "utils": "Shared utility functions",
-    "api": "Shared API utilities",
-  };
-  for (const [id, label] of Object.entries(packageLabels)) {
-    const title = id.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    lines.push(`- [${title}](packages/${id}/README.md) — ${label}`);
+  const packagesFromSystem = allServiceRefs.filter(s => packageIds.has(s.id));
+  for (const pkg of packagesFromSystem) {
+    const slug = pkg.id;
+    const pkgName = pkg.name || slugToTitle(slug);
+    lines.push(`- [${pkgName}](packages/${slug}/README.md)`);
   }
   lines.push("");
 
@@ -295,9 +300,7 @@ function classifyService(file: ServiceUsm): "app" | "shared-service" | "package"
   }
 
   // If paths point to apps/*, it's an app
-  if (appName !== "unknown" && APP_DIRS.includes(appName)) {
-    return "app";
-  }
+  if (appName !== "unknown") return "app";
 
   // If paths point to packages/*, it's a package
   if (file.paths?.some(p => p.startsWith("packages/"))) {
@@ -313,8 +316,7 @@ function classifyService(file: ServiceUsm): "app" | "shared-service" | "package"
     return "shared-service";
   }
 
-  const serviceName = file.$id.split("/")[1] || "";
-  if (["zitadel", "litellm", "langflow", "nango", "postgres"].includes(serviceName)) {
+  if (SHARED_SERVICE_KINDS.has(file.type)) {
     return "shared-service";
   }
 
@@ -1771,7 +1773,7 @@ export function generateDataModelDoc(dataFiles: DataUsm[], root: string, service
   if (allDataSources.length > 0) {
     const mainData = allDataSources[0];
     const totalModels = allDataSources.reduce((sum, d) => sum + (d.models?.length ?? d.modules?.length ?? 0), 0);
-    lines.push(`Source: \`.usm/data/*.usm\` + \`packages/db/prisma/schema.prisma\` (${totalModels} models)`);
+    lines.push(`Source: \`.usm/data/*.usm\` (${totalModels} models)`);
     lines.push("");
     lines.push(mainData.summary);
     lines.push("");
@@ -1867,8 +1869,7 @@ export function generateDataIndex(root: string): GenerationResult {
   lines.push("");
   lines.push("Cross-cutting data documentation.");
   lines.push("");
-  lines.push("- [Data Models](models.md) — Prisma schema with 19 models");
-  lines.push("- [Seed Users & Test Data](seed_users.md) — Canonical test users and seeding standards");
+  lines.push("- [Data Models](models.md)");
   lines.push("");
 
   return {
@@ -1968,15 +1969,15 @@ export function generateSeedDataDoc(serviceFiles: ServiceUsm[], root: string): G
   if (file.modules && file.modules.length > 0) {
     lines.push("## Canonical Test Users");
     lines.push("");
-    lines.push("| Email | Zitadel ID | Roles | Password | Purpose |");
-    lines.push("|-------|-----------|-------|----------|---------|");
+    lines.push("| Email | User ID | Roles | Password | Purpose |");
+    lines.push("|-------|---------|-------|----------|---------|");
     for (const mod of file.modules) {
       const meta = parsePathsEntries(mod.paths || []);
       const email = meta.email || "—";
-      const zitadelId = meta.zitadel_id || "—";
+      const userId = meta.user_id || meta.zitadel_id || "—";
       const roles = meta.roles || "—";
       const password = meta.password || "—";
-      lines.push(`| \`${email}\` | \`${zitadelId}\` | ${roles} | \`${password}\` | ${mod.purpose} |`);
+      lines.push(`| \`${email}\` | \`${userId}\` | ${roles} | \`${password}\` | ${mod.purpose} |`);
     }
     lines.push("");
 
@@ -2410,10 +2411,9 @@ function buildArchSystemArchitecture(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push(file.summary);
   lines.push("");
-  lines.push("This app is part of the Smith & Gray platform. For the full system architecture, see:");
+  lines.push("For the full system architecture, see:");
   lines.push("");
   lines.push("- [Platform System Architecture](../../../../.agents-workspace/docs/architecture/system-architecture.md)");
-  lines.push("- [Platform Overview](../../../../.agents-workspace/docs/architecture/overview.md)");
   lines.push("");
 
   // Modules summary
@@ -2453,43 +2453,10 @@ function buildArchSecurity(file: ServiceUsm, slug: string): string {
     }
     lines.push("");
   } else {
-    // Default security model based on slug
-    if (slug === "the-architect") {
       lines.push("## Authentication");
       lines.push("");
-      lines.push("- **Auth method**: Zitadel OIDC (via `@smith-gray/zitadel` package)");
-      lines.push("- **Token storage**: HttpOnly cookie (ID token), not localStorage");
-      lines.push("- **Flow**: Authorization Code + PKCE");
+      lines.push("See the service's .usm file for auth configuration details.");
       lines.push("");
-      lines.push("## RBAC");
-      lines.push("");
-      lines.push("Enforced at two layers:");
-      lines.push("");
-      lines.push("1. **Edge** — `proxy.ts` validates Zitadel ID tokens and enforces role-based access");
-      lines.push("2. **API** — Per-route auth helpers check granular permissions");
-      lines.push("");
-      lines.push("| Role | Access Level | Auth Helper |");
-      lines.push("|------|-------------|-------------|");
-      lines.push("| `OWNER` | Full access (all operations) | Any helper passes |");
-      lines.push("| `SUPERADMIN` | Full access (all operations) | Any helper passes |");
-      lines.push("| `ARCHITECT_ADMIN` | Admin (projects, agents, settings, credentials) | `requireArchitectAdmin()` |");
-      lines.push("| `ARCHITECT_USER` | Write (run agents, create tickets) | `requireArchitectWrite()` |");
-      lines.push("| `ARCHITECT_VIEWER` | Read-only (view projects, activity) | `requireArchitectAccess()` |");
-      lines.push("");
-      lines.push("## Helpers");
-      lines.push("");
-      lines.push("- `requireArchitectAccess()` — minimum read access (VIEWER+)");
-      lines.push("- `requireArchitectWrite()` — write access (USER+)");
-      lines.push("- `requireArchitectAdmin()` — admin access (ADMIN+)");
-      lines.push("");
-    } else {
-      lines.push("## Authentication");
-      lines.push("");
-      lines.push("Auth is handled by Zitadel OIDC via the shared `@smith-gray/zitadel` package.");
-      lines.push("");
-      lines.push("For platform-wide security details, see [Platform Security Model](../../../../.agents-workspace/docs/architecture/security-model.md).");
-      lines.push("");
-    }
   }
 
   // Cross-link to platform security
@@ -2510,7 +2477,7 @@ function buildArchDataModel(file: ServiceUsm, slug: string): string {
 
   lines.push(`# ${title} — Data Model`);
   lines.push("");
-  lines.push(`This app uses the shared Prisma schema from \`@smith-gray/db\`.`);
+  lines.push(`This app uses the shared data model.`);
   lines.push("");
   lines.push("For the full data model documentation, see [Data Models](../../../../.agents-workspace/docs/data/models.md).");
   lines.push("");
@@ -2594,16 +2561,12 @@ function buildDeployLocalDev(file: ServiceUsm, slug: string): string {
   lines.push("");
 
   // Database
-  lines.push("## Database");
-  lines.push("");
-  lines.push("```bash");
-  lines.push("# Generate Prisma client (from monorepo root)");
-  lines.push("npx prisma generate --schema ./packages/db/prisma/schema.prisma");
-  lines.push("");
-  lines.push("# Run migrations (from monorepo root)");
-  lines.push("npx prisma migrate dev --schema ./packages/db/prisma/schema.prisma");
-  lines.push("```");
-  lines.push("");
+  if (file.type === "web-app" || file.type === "api") {
+    lines.push("## Database");
+    lines.push("");
+    lines.push("See the service's .usm file for database configuration.");
+    lines.push("");
+  }
 
   return lines.join("\n");
 }

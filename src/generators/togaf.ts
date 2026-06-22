@@ -144,12 +144,9 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
     lines.push("```mermaid");
     lines.push("graph TD");
 
-    const appIds = new Set(["the-architect", "tenant", "platform", "marketing", "desktop", "mobile"]);
-    const sharedIds = new Set(["zitadel", "litellm", "langflow", "postgres", "nango"]);
-
-    const appServices = system.services.filter(s => appIds.has(s.id));
-    const sharedServices = system.services.filter(s => sharedIds.has(s.id));
-    const packageServices = system.services.filter(s => !appIds.has(s.id) && !sharedIds.has(s.id));
+    const appServices = system.services.filter(s => s.ref?.includes("apps/"));
+    const sharedServices = system.services.filter(s => ["idp", "llm-gateway", "agent-flows", "database"].includes(s.id));
+    const packageServices = system.services.filter(s => !appServices.some(a => a.id === s.id) && !sharedServices.some(ss => ss.id === s.id));
 
     if (appServices.length > 0) {
       lines.push("    subgraph \"App Services\"");
@@ -252,8 +249,8 @@ function generatePhaseBBusiness(system: SystemUsm, features: FeatureUsm[], root:
     lines.push("## Actors\n\n");
     lines.push("| Actor | Type |");
     lines.push("|-------|------|");
-    const appIds = new Set(["the-architect", "tenant", "platform", "marketing", "desktop", "mobile"]);
-    const sharedIds = new Set(["zitadel", "litellm", "langflow", "postgres", "nango"]);
+    const appIds = new Set<string>();
+    const sharedIds = new Set<string>();
     for (const s of system.services) {
       const role = appIds.has(s.id)
         ? "Application"
@@ -377,16 +374,11 @@ function generatePhaseC2Application(system: SystemUsm, services: ServiceUsm[], f
   lines.push("```mermaid");
   lines.push("graph TD");
 
-  const appIds = new Set(["the-architect", "tenant", "platform", "marketing", "desktop", "mobile"]);
-  const sharedIds = new Set(["zitadel", "litellm", "langflow", "postgres", "nango"]);
-
   const appServices = services.filter(s => {
-    const slug = s.$id.split("/").pop() || "";
-    return s.type === "web-app" || appIds.has(slug);
+    return s.type === "web-app" || s.paths?.some(p => p.startsWith("apps/"));
   });
   const sharedServices = services.filter(s => {
-    const slug = s.$id.split("/").pop() || "";
-    return sharedIds.has(slug) || ["idp", "llm-gateway", "agent-flows", "database"].includes(s.type);
+    return ["idp", "llm-gateway", "agent-flows", "database"].includes(s.type);
   });
 
   if (appServices.length > 0) {

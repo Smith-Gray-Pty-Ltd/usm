@@ -43,30 +43,17 @@ function escapeMermaidText(s: string | undefined | null): string {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Known app directories in the monorepo */
-const APP_DIRS = ["the-architect", "tenant", "platform", "marketing", "mobile", "desktop"];
+/** Known app directories — populated dynamically from system.usm services[] */
+const APP_DIRS: string[] = [];
 
 /** Service kinds that map to shared services */
 const SHARED_SERVICE_KINDS = new Set(["idp", "llm-gateway", "agent-flows", "database", "cache", "queue", "api"]);
 
 // ─── Color palette for Mermaid style directives ──────────────────────────────
 
-const APP_COLORS: Record<string, string> = {
-  "the-architect": "#6366f1",  // Indigo
-  "tenant": "#8b5cf6",         // Purple
-  "platform": "#3b82f6",       // Blue
-  "marketing": "#10b981",      // Emerald
-  "mobile": "#f59e0b",         // Amber
-  "desktop": "#ef4444",        // Red
-};
+const APP_COLORS: Record<string, string> = {};
 
-const SHARED_SERVICE_COLORS: Record<string, string> = {
-  "zitadel": "#f97316",    // Orange
-  "litellm": "#06b6d4",    // Cyan
-  "langflow": "#a855f7",   // Violet
-  "postgres": "#22c55e",   // Green
-  "nango": "#ec4899",      // Pink
-};
+const SHARED_SERVICE_COLORS: Record<string, string> = {};
 
 const PACKAGE_COLOR = "#64748b";  // Slate
 
@@ -81,17 +68,13 @@ const PACKAGE_COLOR = "#64748b";  // Slate
 export function generateArchitectureDiagram(system: SystemUsm, root: string): GenerationResult {
   const services = system.services || [];
 
-  // Categorize services from system.usm
-  const appServices = services.filter(s => APP_DIRS.includes(s.id));
-  const sharedServices = services.filter(s =>
-    SHARED_SERVICE_KINDS.has(s.id) ||
-    ["zitadel", "litellm", "langflow", "postgres", "nango"].includes(s.id)
-  );
+  // Categorize services from system.usm — dynamically based on service kind and ref
+  const appServices = services.filter(s => s.ref?.includes("apps/") || !SHARED_SERVICE_KINDS.has(s.id));
+  const sharedServices = services.filter(s => SHARED_SERVICE_KINDS.has(s.id));
   // Everything else is a package/internal dependency
   const packageServices = services.filter(s =>
-    !APP_DIRS.includes(s.id) &&
-    !SHARED_SERVICE_KINDS.has(s.id) &&
-    !["zitadel", "litellm", "langflow", "postgres", "nango"].includes(s.id)
+    !appServices.some(a => a.id === s.id) &&
+    !sharedServices.some(ss => ss.id === s.id)
   );
 
   // Also read service .usm files for richer runtime info
@@ -265,7 +248,7 @@ function inferParticipants(flow: Flow): Participant[] {
   }
 
   if (hasAuth) {
-    participants.push({ id: "Zitadel", alias: "Zitadel OIDC" });
+    participants.push({ id: "IdP", alias: "Identity Provider" });
   }
 
   return participants;
@@ -279,7 +262,7 @@ function inferParticipants(flow: Flow): Participant[] {
  * - click → User->>Browser: click <target>
  * - fill → User->>Browser: fill <target>
  * - observe → Browser-->>User: shows <target>
- * - authenticate → Browser->>Zitadel: OIDC flow <target>
+ * - authenticate → Browser->>IdP: OIDC flow <target>
  * - setup → Note over Server,Browser: setup <target>
  */
 function mapStepToMermaid(step: FlowStep): { arrow: string } {
@@ -308,7 +291,7 @@ function mapStepToMermaid(step: FlowStep): { arrow: string } {
       return { arrow: `    Browser-->>User: shows ${escapeMermaidText(target)}` };
 
     case "authenticate":
-      return { arrow: `    Browser->>Zitadel: OIDC flow — ${escapeMermaidText(target)}` };
+      return { arrow: `    Browser->>IdP: OIDC flow — ${escapeMermaidText(target)}` };
 
     case "setup":
       return { arrow: `    Note over Server,Browser: setup — ${escapeMermaidText(target)}` };
@@ -564,9 +547,7 @@ function classifyServiceById(
   id: string,
   serviceUsmMap: Map<string, ServiceUsm>
 ): "app" | "shared-service" | "package" {
-  if (APP_DIRS.includes(id)) return "app";
-
-  if (SHARED_SERVICE_KINDS.has(id) || ["zitadel", "litellm", "langflow", "postgres", "nango"].includes(id)) {
+  if (SHARED_SERVICE_KINDS.has(id)) {
     return "shared-service";
   }
 

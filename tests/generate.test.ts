@@ -40,36 +40,32 @@ describe("generate markdown", () => {
     const result = generate(parsed, ["markdown"], "/tmp/test-root");
     expect(result.outputs.length).toBe(1);
     const content = result.outputs[0].content;
-    expect(content).toContain("Smith & Gray AI Platform");
-    expect(content).toContain("## Services");
-    expect(content).toContain("the-architect");
-    expect(content).toContain("## Infrastructure");
-    expect(content).toContain("AWS");
+    expect(content).toContain("Universal System Map");
+    expect(content).toContain("## Identity");
+    expect(content).toContain("usm.dev");
   });
 
-  it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real the-architect.usm", () => {
-    const parsed = parseUsmFile(path.join(SPEC_DIR, "services/the-architect.usm"));
+  it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real cli.usm", () => {
+    const parsed = parseUsmFile(path.join(SPEC_DIR, "services/cli.usm"));
     const result = generate(parsed, ["markdown"], "/tmp/test-root");
-    expect(result.outputs.length).toBe(1);
+    expect(result.outputs.length).toBeGreaterThanOrEqual(1);
     const content = result.outputs[0].content;
-    expect(content).toContain("Control Plane for Agentic Development");
-    expect(content).toContain("## Decisions");
-    expect(content).toContain("adr-001");
-    expect(content).toContain("## Modules");
-    expect(content).toContain("Agent Runtime");
+    expect(content).toContain("USM CLI");
+    // Modules appear in the architecture/modules.md output, not the README
+    const allContent = result.outputs.map(o => o.content).join("\n");
+    expect(allContent).toContain("commander");
   });
 
-  it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real login.usm", () => {
-    const parsed = parseUsmFile(path.join(SPEC_DIR, "features/auth/login.usm"));
+  it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real init.usm", () => {
+    const parsed = parseUsmFile(path.join(SPEC_DIR, "features/cli/init.usm"));
     const result = generate(parsed, ["markdown"], "/tmp/test-root");
     expect(result.outputs.length).toBe(1);
     const content = result.outputs[0].content;
     expect(content).toContain("## Intent");
     expect(content).toContain("## Flows");
-    expect(content).toContain("happy-path");
+    expect(content).toContain("run-init");
     expect(content).toContain("## Contracts");
-    expect(content).toContain("session-cookie");
-    expect(content).toContain("no-email-enumeration");
+    expect(content).toContain("init-creates-config");
     expect(content).toContain("## Tests");
   });
 

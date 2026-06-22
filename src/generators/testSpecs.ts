@@ -10,7 +10,7 @@ import type {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const KNOWN_APP_DIRS = ["the-architect", "tenant", "platform", "marketing", "mobile", "desktop"];
+const KNOWN_APP_DIRS: string[] = [];
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 

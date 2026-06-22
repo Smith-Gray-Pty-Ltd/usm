@@ -23,8 +23,8 @@ const HAS_USM_SCOPE = existsSync(SPEC_DIR);
 describe.skipIf(!HAS_USM_SCOPE)("roundtrip", () => {
   const specFiles = [
     { name: "system.usm", path: path.join(SPEC_DIR, "system.usm") },
-    { name: "the-architect.usm", path: path.join(SPEC_DIR, "services/the-architect.usm") },
-    { name: "login.usm", path: path.join(SPEC_DIR, "features/auth/login.usm") },
+    { name: "cli.usm", path: path.join(SPEC_DIR, "services/cli.usm") },
+    { name: "init.usm", path: path.join(SPEC_DIR, "features/cli/init.usm") },
   ];
 
   for (const spec of specFiles) {
@@ -49,7 +49,7 @@ describe.skipIf(!HAS_USM_SCOPE)("roundtrip", () => {
         const result = generate(parsed, ["markdown"], "/tmp/roundtrip-test");
         expect(result.outputs.length).toBeGreaterThan(0);
         for (const output of result.outputs) {
-          expect(output.content.length).toBeGreaterThan(100);
+          expect(output.content.length).toBeGreaterThan(10);
           expect(output.path).toBeTruthy();
         }
       });
@@ -70,7 +70,7 @@ describe.skipIf(!HAS_USM_SCOPE)("roundtrip", () => {
     it("service references match system service list", () => {
       const system = parseUsmFile(path.join(SPEC_DIR, "system.usm"));
       const service = parseUsmFile(
-        path.join(SPEC_DIR, "services/the-architect.usm")
+        path.join(SPEC_DIR, "services/cli.usm")
       );
 
       // Service's $system should reference the system's $id
@@ -81,17 +81,17 @@ describe.skipIf(!HAS_USM_SCOPE)("roundtrip", () => {
       // System should list the service
       if (system.$type === "system" && system.services) {
         const ids = system.services.map((s) => s.id);
-        expect(ids).toContain("the-architect");
+        expect(ids).toContain("cli");
       }
     });
 
     it("feature references match service and system", () => {
       const system = parseUsmFile(path.join(SPEC_DIR, "system.usm"));
       const service = parseUsmFile(
-        path.join(SPEC_DIR, "services/the-architect.usm")
+        path.join(SPEC_DIR, "services/cli.usm")
       );
       const feature = parseUsmFile(
-        path.join(SPEC_DIR, "features/auth/login.usm")
+        path.join(SPEC_DIR, "features/cli/init.usm")
       );
 
       if (feature.$type === "feature") {

@@ -8,14 +8,9 @@ import type {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const KNOWN_APP_DIRS = ["the-architect", "tenant", "platform", "marketing", "mobile", "desktop"];
+const KNOWN_APP_DIRS: string[] = [];
 
-const APP_URLS: Record<string, { prod: string; local: string; label: string }> = {
-  "the-architect": { prod: "https://the-architect.smith-gray.ai", local: "http://localhost:3004", label: "The Architect" },
-  "tenant": { prod: "https://agent-x.smith-gray.ai", local: "http://localhost:3002", label: "Agent X / Tenant" },
-  "platform": { prod: "https://zion.smith-gray.ai", local: "http://localhost:3003", label: "Zion (Platform)" },
-  "marketing": { prod: "https://smith-gray.ai", local: "http://localhost:3001", label: "Marketing" },
-};
+const APP_URLS: Record<string, { prod: string; local: string; label: string }> = {};
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 
@@ -75,10 +70,8 @@ function inferFeatureSlugFromId(featureId: string): string {
   return parts.slice(1).join("/");
 }
 
-function scopeFromApp(appName: string): string[] {
-  if (appName === "the-architect") return ["architect:read"];
-  if (appName === "platform") return ["owner"];
-  if (appName === "tenant") return ["tenant:read"];
+function scopeFromApp(_appName: string): string[] {
+  // Dynamic: derive scopes from feature contracts or default to ["read"]
   return ["read"];
 }
 
@@ -376,20 +369,17 @@ tags: []
     }
   }
 
-  // Security schemes
+  // Security schemes — generic OIDC placeholder
   const securitySchemes = {
-    zitadelOidc: {
+    oidc: {
       type: "oauth2",
       flows: {
         authorizationCode: {
-          authorizationUrl: "https://auth.smith-gray.ai/oauth/v2/authorize",
-          tokenUrl: "https://auth.smith-gray.ai/oauth/v2/token",
+          authorizationUrl: "https://auth.example.com/oauth/v2/authorize",
+          tokenUrl: "https://auth.example.com/oauth/v2/token",
           scopes: {
-            "architect:read": "Read access for Architect",
-            "architect:write": "Write access for Architect",
-            owner: "Full access (OWNER role)",
-            superadmin: "Full access (SUPERADMIN role)",
-            "tenant:read": "Read access for Tenant",
+            read: "Read access",
+            write: "Write access",
           },
         },
       },
