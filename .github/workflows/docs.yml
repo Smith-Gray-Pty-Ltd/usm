@@ -34,22 +34,22 @@ jobs:
 
       - name: Generate docs
         # Generate the docs site from this repo's own .usm/ scope (dogfooding)
-        # This repo's .usm/ is generated at first run via `usm init` (see init script below).
         run: |
           if [ ! -d ".usm" ]; then
             echo "No .usm/ found — running usm init"
-            node dist/cli/index.js init --name "Universal System Map"
+            node dist/cli/index.js init
           fi
-          node dist/cli/index.js scan --merge
-          node dist/cli/index.js generate --output ./docs
+          node dist/cli/index.js generate
 
-      - name: Publish to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+      - name: Verify docs directory
+        run: |
+          ls -la .agents-workspace/docs/ | head -10
+          echo "---"
+          echo "Total files: $(find .agents-workspace/docs -type f | wc -l)"
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: usm-dev
-          directory: ./docs
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          # Clean deploy on every push (the docs/ folder is regenerated)
-          wranglerVersion: "3"
+          command: pages deploy .agents-workspace/docs --project-name=usm-dev --branch=main --commit-dirty=true --commit-message="${{ github.event.head_commit.message }}"
