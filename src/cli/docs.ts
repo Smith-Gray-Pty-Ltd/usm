@@ -257,15 +257,17 @@ function generateVitePressConfig(root: string, docsRoot: string): string {
   const sidebarJson = JSON.stringify(sidebar, null, 2);
 
   return `import { defineConfig } from 'vitepress'
-import { withMermaid } from 'vitepress-plugin-mermaid'
 
-export default withMermaid(
-  defineConfig({
+export default defineConfig({
   title: ${JSON.stringify(title)},
   description: ${JSON.stringify(description)},
   cleanUrls: true,
   ignoreDeadLinks: true,
   outDir: '.vitepress/dist',
+  head: [
+    ['script', { src: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js' }],
+    ['script', {}, 'if (typeof mermaid !== "undefined") { mermaid.initialize({ startOnLoad: true, theme: "default" }); }']
+  ],
   themeConfig: {
     sidebar: ${sidebarJson},
     socialLinks: [
@@ -276,7 +278,6 @@ export default withMermaid(
     }
   }
 })
-)
 `;
 }
 
