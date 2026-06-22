@@ -1,6 +1,8 @@
 # USM — Universal System Map
 
 > Structured source of truth for agentic systems.
+>
+> **🌐 Live docs site: <https://usm.dev>**
 
 A single `.usm/` directory describes your whole system — apps, services,
 features, flows, contracts, decisions — in YAML files validated by a JSON
@@ -28,9 +30,9 @@ Traditional docs are scattered, stale, and unreadable to agents. USM is:
 
 ```bash
 # Install
-npm install -g @usm/core
+npm install -g @~usm/core
 # or
-pnpm add -g @usm/core
+pnpm add -g @~usm/core
 
 # Initialize a new USM scope in the current directory
 usm init
@@ -94,7 +96,7 @@ tests:
 
 USM is a single Node.js package with multiple entry points:
 
-- **`@usm/core`** — the main library, JSON Schema, parsers, validators
+- **`@~usm/core`** — the main library, JSON Schema, parsers, validators
 - **`usm` CLI** — `init`, `scan`, `enrich`, `generate`, `validate`
 - **Generators** — markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md, Vitest specs
 - **MCP server** — 12 tools for AI agents to navigate, search, and reference USM data
