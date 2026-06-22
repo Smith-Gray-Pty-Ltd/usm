@@ -42,6 +42,9 @@ export {
 export {
   generateArchiMateModel,
 } from "./generators/archimate.js";
+export {
+  generateRulesFiles,
+} from "./generators/rulesFiles.js";
 export type {
   UsmCommon,
   UsmFile,

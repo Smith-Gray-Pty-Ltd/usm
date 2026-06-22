@@ -95,7 +95,7 @@ index:
   - id: gen-rules-files
     name: Rules Files Generator
     ref: .usm/features/generators/rules-files.usm
-    status: planned
+    status: built
     tags: [generator, agent-rules, plugin]
   - id: gen-roadmap
     name: Roadmap Generator
@@ -255,8 +255,9 @@ roadmap:
   - id: rules-file-generation
     title: Tool-specific rules files
     description: "Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow instructions"
-    status: planned
+    status: shipped
     feature: usm/gen-rules-files
+    shipped_in: "1.1.0"
   - id: marketing-site
     title: Marketing site
     description: "Next.js + shadcn landing page at usm.dev with spec-first workflow story"

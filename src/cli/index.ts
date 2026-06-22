@@ -51,6 +51,9 @@ import {
 import {
   generateArchiMateModel,
 } from "../generators/archimate.js";
+import {
+  generateRulesFiles,
+} from "../generators/rulesFiles.js";
 import type { MergeStrategy } from "../scan/types.js";
 import type { SystemUsm, ServiceUsm, FeatureUsm, DataUsm } from "../types.js";
 
@@ -725,6 +728,7 @@ program
         // AGENTS.md generation
         { name: "app-agents-md", fn: () => generateAllAppAgentsMd(serviceFiles, root) },
         { name: "root-agents-md", fn: () => generateRootAgentsMd(systemFile, serviceFiles, root) },
+        { name: "rules-files", fn: () => generateRulesFiles(systemFile, serviceFiles, root) },
         // OpenAPI + TypeScript types (Phase D)
         { name: "openapi-spec", fn: () => generateOpenApiSpec(featureFiles, root) },
         { name: "openapi-types", fn: () => generateOpenApiTypes(featureFiles, root) },

@@ -3,7 +3,7 @@ $id: usm/gen-rules-files
 $type: feature
 $version: 1
 $last_updated: "2026-06-22"
-status: planned
+status: built
 summary: |
   Tool-specific rules file generator — produces instruction files for AI coding tools (Cursor, Claude Code, Codex, GitHub Copilot) that teach agents the USM spec-first workflow. Each file tells the agent when to read .usm, when to write specs, and how to update them after implementation.
 
