@@ -1,5 +1,5 @@
 {
-  "name": "@usm/core",
+  "name": "@~usm/core",
   "version": "1.0.0",
   "description": "Universal System Map — structured source of truth for agentic systems. CLI + MCP server + JSON Schema + generators (markdown, Mermaid, OpenAPI, ArchiMate, TOGAF).",
   "license": "MIT",
