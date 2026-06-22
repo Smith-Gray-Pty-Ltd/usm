@@ -1838,17 +1838,71 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
   lines.push(system.summary);
   lines.push("");
 
-  // Roles summary
+  // Quick Start — practical commands (generic, works for any USM project)
+  lines.push("## Quick Start");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("# Install USM globally");
+  lines.push("npm install -g @~usm/core");
+  lines.push("");
+  lines.push("# Initialize a .usm/ scope in your project");
+  lines.push("usm init");
+  lines.push("");
+  lines.push("# Scan your codebase for structure");
+  lines.push("usm scan");
+  lines.push("");
+  lines.push("# Generate docs (markdown, Mermaid, OpenAPI, etc.)");
+  lines.push("usm generate");
+  lines.push("");
+  lines.push("# Serve docs locally with VitePress");
+  lines.push("usm docs serve");
+  lines.push("");
+  lines.push("# Start the MCP server for AI agents");
+  lines.push("usm mcp serve");
+  lines.push("```");
+  lines.push("");
+
+  // Example — show a real .usm file from this project (generic — any project has features)
+  if (system.index && system.index.length > 0) {
+    // Find the first built/active feature to use as an example
+    const exampleFeature = system.index.find(
+      (f) => f.status === "built" || f.status === "active" || !f.status
+    );
+    if (exampleFeature) {
+      const usmPath = path.resolve(root, exampleFeature.ref);
+      if (fs.existsSync(usmPath)) {
+        const usmContent = fs.readFileSync(usmPath, "utf-8");
+        // Show first ~40 lines as an example
+        const exampleLines = usmContent.split("\n").slice(0, 40);
+        const truncated = usmContent.split("\n").length > 40;
+        lines.push("## Example");
+  lines.push("");
+        lines.push(`Here's a feature spec from this project (\`${exampleFeature.ref}\`):`);
+        lines.push("");
+        lines.push("```yaml");
+        lines.push(exampleLines.join("\n"));
+        if (truncated) lines.push("# ... (truncated)");
+        lines.push("```");
+        lines.push("");
+        lines.push("Run `usm generate` to produce markdown, Mermaid diagrams, OpenAPI specs,");
+        lines.push("and test specs from this file. Run `usm docs serve` to view the rendered docs.");
+        lines.push("");
+      }
+    }
+  }
+
+  // Who uses this? — brief roles summary
   if (system.roles && system.roles.length > 0) {
     lines.push("## Who Uses This System");
     lines.push("");
     for (const role of system.roles) {
-      lines.push(`**${role.name}** — ${role.description.split("\n")[0]}`);
-      lines.push("");
+      const firstLine = role.description.split("\n")[0].trim();
+      lines.push(`- **${role.name}** — ${firstLine}`);
     }
+    lines.push("");
   }
 
-  // Local development
+  // Local development — from system.usm (if present)
   if (system.local_development) {
     const ld = system.local_development;
     lines.push("## Local Development");
@@ -1907,20 +1961,23 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
     }
   }
 
-  // Quick links
-  lines.push("## Explore");
+  // Next steps
+  lines.push("## Next Steps");
   lines.push("");
   const featureCount = (system.index || []).length;
   const serviceCount = (system.services || []).length;
   if (serviceCount > 0) {
-    lines.push(`- [Services](/) — ${serviceCount} service(s)`);
+    lines.push(`- Browse the [Services](/) — ${serviceCount} service(s)`);
   }
   if (featureCount > 0) {
-    lines.push(`- [Features](/) — ${featureCount} feature(s)`);
+    lines.push(`- Read the [Features](/) — ${featureCount} feature spec(s)`);
   }
-  lines.push("- [Architecture](architecture/architecture.md)");
+  lines.push("- View the [Architecture](architecture/architecture.md)");
   if (system.roadmap && system.roadmap.length > 0) {
-    lines.push("- [Roadmap](roadmap.md)");
+    lines.push("- Check the [Roadmap](roadmap.md)");
+  }
+  if (system.identity?.repository) {
+    lines.push(`- [View on GitHub](${system.identity.repository})`);
   }
   lines.push("");
 

@@ -10,6 +10,7 @@ identity:
   name: USM
   domain: usm.dev
   contact: james@smith-gray.com
+  repository: https://github.com/Smith-Gray-Pty-Ltd/usm
 
 index:
   - id: cli-init

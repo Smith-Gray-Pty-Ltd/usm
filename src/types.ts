@@ -13,6 +13,7 @@ export interface SystemIdentity {
   name: string;
   domain: string;
   contact?: string;
+  repository?: string;
 }
 
 export interface FeatureRef {

@@ -98,20 +98,12 @@
         "identity": {
           "type": "object",
           "properties": {
-            "name": {
-              "type": "string"
-            },
-            "domain": {
-              "type": "string"
-            },
-            "contact": {
-              "type": "string"
-            }
+            "name": { "type": "string" },
+            "domain": { "type": "string" },
+            "contact": { "type": "string" },
+            "repository": { "type": "string", "description": "GitHub repository URL (e.g. https://github.com/owner/repo)" }
           },
-          "required": [
-            "name",
-            "domain"
-          ],
+          "required": ["name", "domain"],
           "additionalProperties": false
         },
         "index": {
