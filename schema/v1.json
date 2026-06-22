@@ -133,6 +133,8 @@
                 "enum": [
                   "active",
                   "planned",
+                  "in-progress",
+                  "built",
                   "deprecated",
                   "experimental"
                 ]
@@ -332,7 +334,9 @@
               "title": { "type": "string" },
               "description": { "type": "string" },
               "status": { "type": "string", "enum": ["planned", "in-progress", "shipped", "cancelled"] },
-              "target_date": { "type": "string" }
+              "target_date": { "type": "string" },
+              "feature": { "type": "string", "description": "Feature $id this roadmap item corresponds to (optional)" },
+              "shipped_in": { "type": "string", "description": "Package version this item shipped in (e.g. '1.1.0')" }
             },
             "additionalProperties": false
           }

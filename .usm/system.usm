@@ -97,6 +97,11 @@ index:
     ref: .usm/features/generators/rules-files.usm
     status: planned
     tags: [generator, agent-rules, plugin]
+  - id: gen-roadmap
+    name: Roadmap Generator
+    ref: .usm/features/generators/roadmap.usm
+    status: in-progress
+    tags: [generator, roadmap, schema]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm
@@ -202,6 +207,59 @@ operations:
     5. Add custom domain usm.dev (CNAME auto-added by Cloudflare)
   monitoring: "Cloudflare Pages dashboard — build status and deploy logs"
   alerts: "GitHub Actions workflow failure notifications"
+
+roadmap:
+  - id: vitepress-docs
+    title: VitePress docs integration
+    description: "usm docs serve and usm docs build with auto-generated sidebar, angle bracket escaping, and index page"
+    status: shipped
+    target_date: "2026-06-22"
+    feature: usm/cli-docs
+    shipped_in: "1.1.0"
+  - id: review-quality-markdown
+    title: Review-quality feature markdown
+    description: "Flows as numbered steps, contracts as checklists, tests as Given/When/Then, decisions with alternatives"
+    status: shipped
+    target_date: "2026-06-22"
+    feature: usm/gen-feature-review
+    shipped_in: "1.1.0"
+  - id: empty-section-suppression
+    title: Suppress empty sections in generated docs
+    description: "No more empty App Services, No UI pages documented, or No risks defined pages"
+    status: shipped
+    target_date: "2026-06-22"
+    shipped_in: "1.1.0"
+  - id: roles-schema
+    title: Roles field in system schema
+    description: "Any project can describe who uses their system and what they need"
+    status: shipped
+    target_date: "2026-06-22"
+    shipped_in: "1.1.0"
+  - id: adr-schema-enrichment
+    title: ADR schema enrichment
+    description: "Alternatives and consequences fields on decisions for proper ADR-style recording"
+    status: shipped
+    target_date: "2026-06-22"
+    shipped_in: "1.1.0"
+  - id: roadmap-improvements
+    title: Roadmap with feature links and delivery tracking
+    description: "Roadmap items link to feature specs, show shipped_in version, sidebar dead links fixed, mermaid rendering"
+    status: in-progress
+    feature: usm/gen-roadmap
+  - id: agent-authoring-tools
+    title: MCP write tools
+    description: "draft_feature, update_feature_status — close the spec-first loop so agents can author .usm files"
+    status: in-progress
+    feature: usm/mcp-write
+  - id: rules-file-generation
+    title: Tool-specific rules files
+    description: "Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow instructions"
+    status: planned
+    feature: usm/gen-rules-files
+  - id: marketing-site
+    title: Marketing site
+    description: "Next.js + shadcn landing page at usm.dev with spec-first workflow story"
+    status: planned
 
 principles:
   - key: structured-source-of-truth

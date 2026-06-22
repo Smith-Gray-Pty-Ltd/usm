@@ -135,10 +135,16 @@ function escapeAllMarkdown(docsRoot: string): number {
 
 /**
  * Generate a VitePress sidebar from the system.usm index and feature files.
+ * Only includes links to files that actually exist in the docs directory.
  */
-function generateSidebar(root: string): SidebarGroup[] {
+function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
   const sidebar: SidebarGroup[] = [];
+
+  // Helper: check if a doc file exists
+  function docExists(relPath: string): boolean {
+    return fs.existsSync(path.join(docsRoot, relPath + ".md"));
+  }
 
   // System overview
   sidebar.push({
@@ -146,65 +152,81 @@ function generateSidebar(root: string): SidebarGroup[] {
     items: [{ text: "Overview", link: "/" }],
   });
 
-  // Services
-  if (fs.existsSync(systemPath)) {
-    const system = parseUsmFile(systemPath) as SystemUsm;
-    const serviceItems: SidebarItem[] = [];
+  if (!fs.existsSync(systemPath)) return sidebar;
 
-    if (system.services) {
-      for (const svc of system.services) {
-        const slug = svc.id;
-        const link = `/shared-services/${slug}/overview`;
-        serviceItems.push({ text: svc.name || svc.id, link });
+  const system = parseUsmFile(systemPath) as SystemUsm;
+
+  // Services — check if overview.md exists for each
+  const serviceItems: SidebarItem[] = [];
+  if (system.services) {
+    for (const svc of system.services) {
+      const slug = svc.id;
+      const relPath = `shared-services/${slug}/overview`;
+      if (docExists(relPath)) {
+        serviceItems.push({ text: svc.name || svc.id, link: `/${relPath}` });
       }
     }
+  }
+  if (serviceItems.length > 0) {
+    sidebar.push({ text: "Services", items: serviceItems });
+  }
 
-    if (serviceItems.length > 0) {
-      sidebar.push({
-        text: "Services",
-        items: serviceItems,
-      });
-    }
+  // Features grouped by area — derive slug from ref path to preserve case
+  const featuresByArea = new Map<string, SidebarItem[]>();
+  if (system.index) {
+    for (const feat of system.index) {
+      // Determine area and slug from the ref path
+      // e.g., .usm/features/generators/agentsMd.usm → area="generators", slug="agentsMd"
+      const refMatch = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
+      if (!refMatch) continue; // Skip entries that don't match feature ref pattern (e.g., data files)
 
-    // Features grouped by area (from index)
-    const featuresByArea = new Map<string, SidebarItem[]>();
-    if (system.index) {
-      for (const feat of system.index) {
-        // Determine area from the ref path: .usm/features/<area>/<name>.usm
-        const refMatch = feat.ref.match(/\.usm\/features\/([^/]+)\//);
-        const area = refMatch ? refMatch[1] : "other";
-        // Convert area to display name
-        const areaDisplay = area.charAt(0).toUpperCase() + area.slice(1);
+      const area = refMatch[1];
+      const slug = refMatch[2];
+      const areaDisplay = area.charAt(0).toUpperCase() + area.slice(1);
 
-        if (!featuresByArea.has(areaDisplay)) {
-          featuresByArea.set(areaDisplay, []);
-        }
+      // Check if the feature doc exists
+      const relPath = `features/${area}/${slug}`;
+      if (!docExists(relPath)) continue;
 
-        // Build the link path
-        const featureSlug = feat.id.replace(/^[^-]+-/, "");
-        const statusBadge = feat.status === "planned" ? " [planned]" : feat.status === "deprecated" ? " [deprecated]" : "";
-        featuresByArea.get(areaDisplay)!.push({
-          text: `${feat.name}${statusBadge}`,
-          link: `/features/${area}/${featureSlug}`,
-        });
+      if (!featuresByArea.has(areaDisplay)) {
+        featuresByArea.set(areaDisplay, []);
       }
-    }
 
-    // Add feature groups to sidebar (sorted)
-    for (const [area, items] of [...featuresByArea.entries()].sort()) {
-      sidebar.push({
-        text: area,
-        collapsed: true,
-        items,
+      const statusBadge = feat.status === "planned" ? " [planned]"
+        : feat.status === "deprecated" ? " [deprecated]"
+        : feat.status === "in-progress" ? " [in-progress]"
+        : "";
+      featuresByArea.get(areaDisplay)!.push({
+        text: `${feat.name}${statusBadge}`,
+        link: `/${relPath}`,
       });
     }
+  }
 
-    // Cross-cutting
-    const crossCutting: SidebarItem[] = [];
+  // Add feature groups to sidebar (sorted)
+  for (const [area, items] of [...featuresByArea.entries()].sort()) {
+    sidebar.push({
+      text: area,
+      collapsed: true,
+      items,
+    });
+  }
+
+  // Cross-cutting — only include links to files that exist
+  const crossCutting: SidebarItem[] = [];
+  if (docExists("architecture/architecture")) {
     crossCutting.push({ text: "Architecture", link: "/architecture/architecture" });
+  }
+  if (docExists("data/models")) {
     crossCutting.push({ text: "Data Models", link: "/data/models" });
+  }
+  if (docExists("risks")) {
     crossCutting.push({ text: "Risks", link: "/risks" });
+  }
+  if (docExists("roadmap")) {
     crossCutting.push({ text: "Roadmap", link: "/roadmap" });
+  }
+  if (crossCutting.length > 0) {
     sidebar.push({
       text: "Platform",
       collapsed: true,
@@ -218,7 +240,7 @@ function generateSidebar(root: string): SidebarGroup[] {
 /**
  * Generate the VitePress config file.
  */
-function generateVitePressConfig(root: string): string {
+function generateVitePressConfig(root: string, docsRoot: string): string {
   const systemPath = path.join(root, ".usm", "system.usm");
   let title = "USM";
   let description = "Universal System Map";
@@ -229,14 +251,16 @@ function generateVitePressConfig(root: string): string {
     description = system.summary?.split("\n")[0]?.slice(0, 120) || description;
   }
 
-  const sidebar = generateSidebar(root);
+  const sidebar = generateSidebar(root, docsRoot);
 
   // Generate the config as a string
   const sidebarJson = JSON.stringify(sidebar, null, 2);
 
   return `import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
-export default defineConfig({
+export default withMermaid(
+  defineConfig({
   title: ${JSON.stringify(title)},
   description: ${JSON.stringify(description)},
   cleanUrls: true,
@@ -252,6 +276,7 @@ export default defineConfig({
     }
   }
 })
+)
 `;
 }
 
@@ -297,7 +322,7 @@ export async function docsBuild(root: string): Promise<void> {
   // Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
-  const configContent = generateVitePressConfig(root);
+  const configContent = generateVitePressConfig(root, docsRoot);
   fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
   console.log("Generated .vitepress/config.mts");
 
@@ -352,7 +377,7 @@ export async function docsServe(root: string, port: number): Promise<void> {
   // Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
-  const configContent = generateVitePressConfig(root);
+  const configContent = generateVitePressConfig(root, docsRoot);
   fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
   console.log("Generated .vitepress/config.mts");
 

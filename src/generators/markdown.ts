@@ -269,6 +269,28 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
     }
   }
 
+  // Roles — from system.usm roles field
+  if (file.roles && file.roles.length > 0) {
+    lines.push("## Roles");
+    lines.push("");
+    lines.push("Who uses this system and what they need.");
+    lines.push("");
+    for (const role of file.roles) {
+      lines.push(`### ${role.name}`);
+      lines.push("");
+      lines.push(role.description);
+      lines.push("");
+      if (role.needs && role.needs.length > 0) {
+        lines.push("**Needs**:");
+        lines.push("");
+        for (const need of role.needs) {
+          lines.push(`- ${need}`);
+        }
+        lines.push("");
+      }
+    }
+  }
+
   // Local Development — from system.usm local_development field
   if (file.local_development) {
     renderLocalDevelopment(lines, file.local_development);
@@ -1670,19 +1692,48 @@ export function generateRoadmapDoc(system: SystemUsm, root: string): GenerationR
     return { outputs: [] };
   }
 
+  // Build a map from feature id to doc path for linking
+  // Index ids are short (e.g. "cli-docs"), roadmap feature refs are full $ids (e.g. "usm/cli-docs")
+  const featureDocPaths = new Map<string, string>();
+  if (system.index) {
+    for (const feat of system.index) {
+      const refMatch = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
+      if (refMatch) {
+        featureDocPaths.set(feat.id, `features/${refMatch[1]}/${refMatch[2]}`);
+      }
+    }
+  }
+
   const lines: string[] = [];
   lines.push("# Roadmap");
   lines.push("");
   lines.push("Source: `.usm/system.usm` → `roadmap`");
   lines.push("");
 
-  lines.push("| ID | Title | Status | Target Date | Description |");
-  lines.push("|----|-------|--------|-------------|-------------|");
+  // Summary counts by status
+  const shipped = system.roadmap.filter(r => r.status === "shipped").length;
+  const inProgress = system.roadmap.filter(r => r.status === "in-progress").length;
+  const planned = system.roadmap.filter(r => r.status === "planned").length;
+  lines.push(`**${shipped} shipped** · **${inProgress} in progress** · **${planned} planned**`);
+  lines.push("");
+
+  lines.push("| Status | Title | Shipped In | Target Date | Description |");
+  lines.push("|--------|-------|------------|-------------|-------------|");
   for (const item of system.roadmap) {
     const status = item.status || "—";
     const target = item.target_date || "—";
     const desc = item.description || "—";
-    lines.push(`| ${item.id} | ${item.title} | ${status} | ${target} | ${desc} |`);
+    const shippedIn = item.shipped_in || "—";
+    // Link title to feature spec if feature field is set and we have a doc path
+    let title = item.title;
+    if (item.feature) {
+      // Strip system prefix from $id to get the index id (e.g. "usm/cli-docs" → "cli-docs")
+      const featureId = item.feature.replace(/^[^/]+\//, "");
+      if (featureDocPaths.has(featureId)) {
+        title = `[${item.title}](${featureDocPaths.get(featureId)})`;
+      }
+    }
+    lines.push(`| ${status} | ${title} | ${shippedIn} | ${target} | ${desc} |`);
   }
   lines.push("");
 

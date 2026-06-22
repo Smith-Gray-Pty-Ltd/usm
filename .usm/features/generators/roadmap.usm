@@ -1,0 +1,185 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-roadmap
+$type: feature
+$version: 1
+$last_updated: "2026-06-22"
+status: in-progress
+summary: |
+  Roadmap improvements — add feature links and shipped_in version to roadmap items, fill in USM's own roadmap with real delivery items, and render the roadmap page with status badges and feature cross-links. Also fixes sidebar dead links and mermaid rendering.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  The roadmap page was empty because we treated it as "future plans only." A
+  roadmap should show the full delivery arc — what shipped, what's in progress,
+  what's next. Roadmap items should link to their corresponding feature specs
+  so a visitor can click through from "shipped: VitePress docs" to the feature
+  detail. Additionally, the sidebar has dead links (risks, roadmap, usmconfig,
+  case-mismatched agentsMd/testSpecs) and mermaid diagrams don't render in
+  VitePress. These are all fixed together.
+
+decisions:
+  - id: roadmap-links-to-features
+    decision: Roadmap items can optionally reference a feature $id via a feature field
+    rationale: |
+      Not every roadmap item is a feature (some are refactors, infra, etc.),
+      but when a roadmap item corresponds to a feature, linking them lets the
+      generated roadmap page cross-link to the feature spec. The feature field
+      is optional — roadmap items without a feature link still work.
+    status: accepted
+  - id: shipped-in-optional
+    decision: Add optional shipped_in field to roadmap items for version tracking
+    rationale: |
+      When a roadmap item ships, recording which package version it shipped in
+      gives a release history without complex versioning machinery. The
+      CHANGELOG already tracks release contents — shipped_in just annotates the
+      roadmap item with the version number.
+    status: accepted
+  - id: sidebar-checks-file-existence
+    decision: Sidebar generation should only include links to files that exist
+    rationale: |
+      The sidebar currently includes links to /risks and /roadmap even when
+      those pages aren't generated (empty content suppressed). The sidebar
+      generator should check if the target file exists before adding the link.
+      Same for feature links — only include features whose docs files exist.
+    status: accepted
+  - id: mermaid-via-vitepress-plugin
+    decision: Use VitePress mermaid plugin instead of relying on native mermaid rendering
+    rationale: |
+      VitePress doesn't render mermaid code blocks by default — they show as
+      raw text. The vitepress-plugin-mermaid plugin (or MermaidMarkdown plugin)
+      enables mermaid rendering. This is configured in the VitePress config.
+    status: accepted
+
+flows:
+  - id: generate-roadmap-with-links
+    name: Generate roadmap page with feature links and status badges
+    description: |
+      When usm generate runs, if the system has roadmap items, generate a
+      roadmap.md page with a table showing status badge, title (linked to
+      feature spec if feature field is set), shipped_in version, and target date.
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm roadmap array
+      - id: s2
+        action: generate
+        target: table with Status, Title, Shipped In, Target Date columns
+      - id: s3
+        action: link
+        target: feature $id to features/<area>/<slug> path if feature field set
+      - id: s4
+        action: write
+        target: .usm-workspace/docs/roadmap.md (only if roadmap items exist)
+
+  - id: fix-sidebar-dead-links
+    name: Fix sidebar to only include links to existing files
+    description: |
+      The sidebar generator in docs.ts should check if the target .md file
+      exists before adding a sidebar entry. This prevents dead links for
+      suppressed pages (risks, roadmap) and missing feature docs.
+    steps:
+      - id: s1
+        action: check
+        target: does risks.md exist in docs root?
+      - id: s2
+        action: check
+        target: does roadmap.md exist in docs root?
+      - id: s3
+        action: check
+        target: does each feature doc file exist before adding to sidebar?
+      - id: s4
+        action: skip
+        target: omit sidebar entries for non-existent files
+
+  - id: fix-sidebar-case-sensitivity
+    name: Fix sidebar slug case to match actual file names
+    description: |
+      The sidebar slug derivation uses feat.id.replace(/^[^-]+-/, "") which
+      produces lowercase slugs. But actual file names preserve case from the
+      source .usm file path (e.g., agentsMd.md not agentsmd.md). The sidebar
+      should derive the slug from the ref path, not the $id.
+    steps:
+      - id: s1
+        action: parse
+        target: feature ref path (e.g., .usm/features/generators/agentsMd.usm)
+      - id: s2
+        action: derive
+        target: slug from ref path preserving case (agentsMd, not agentsmd)
+      - id: s3
+        action: generate
+        target: sidebar link with correct case
+
+  - id: enable-mermaid-in-vitepress
+    name: Enable mermaid rendering in VitePress config
+    description: |
+      VitePress doesn't render mermaid code blocks by default. Add the
+      vitepress-plugin-mermaid to the VitePress config so architecture diagrams
+      and other mermaid blocks render properly.
+    steps:
+      - id: s1
+        action: install
+        target: vitepress-plugin-mermaid as dev dependency
+      - id: s2
+        action: configure
+        target: add MermaidMarkdown plugin to VitePress config.mts
+      - id: s3
+        action: verify
+        target: architecture diagram renders on the architecture page
+
+contracts:
+  - id: roadmap-only-generated-when-non-empty
+    description: Roadmap page is only generated when system.usm has roadmap items
+    must_have:
+      - "Empty roadmap array → no roadmap.md generated"
+      - "Non-empty roadmap → roadmap.md with table"
+  - id: sidebar-no-dead-links
+    description: Sidebar must not contain links to non-existent files
+    must_have:
+      - "Links to /risks only if risks.md exists"
+      - "Links to /roadmap only if roadmap.md exists"
+      - "Feature links only if the feature doc file exists"
+  - id: sidebar-case-matches-files
+    description: Sidebar links must match actual file name case
+    must_have:
+      - "agentsMd link matches agentsMd.md file"
+      - "testSpecs link matches testSpecs.md file"
+  - id: mermaid-renders-in-vitepress
+    description: Mermaid code blocks render as diagrams, not raw text
+    must_have:
+      - "Architecture page shows rendered diagram"
+      - "Other mermaid blocks render properly"
+
+tests:
+  - id: roadmap-with-items
+    setup:
+      system_with_roadmap_items: true
+    expect:
+      - assertion: roadmap.md generated with table
+      - assertion: shipped items show status badge
+      - assertion: items with feature field link to feature spec
+  - id: roadmap-empty
+    setup:
+      system_with_empty_roadmap: true
+    expect:
+      - assertion: roadmap.md not generated
+      - assertion: no roadmap link in sidebar
+  - id: sidebar-skips-missing-files
+    setup:
+      risks_md_does_not_exist: true
+    expect:
+      - assertion: no Risks link in sidebar
+  - id: sidebar-case-correct
+    setup:
+      feature_with_camelcase_filename: true
+    expect:
+      - assertion: sidebar link matches file name case exactly
+
+implementation:
+  primary: src/generators/markdown.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/gen-markdown"
+  - "usm/cli-docs"

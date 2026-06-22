@@ -19,7 +19,7 @@ export interface FeatureRef {
   id: string;
   name: string;
   ref: string;
-  status?: "active" | "planned" | "deprecated" | "experimental";
+  status?: "active" | "planned" | "in-progress" | "built" | "deprecated" | "experimental";
   tags?: string[];
 }
 
@@ -231,6 +231,8 @@ export interface RoadmapItem {
   description: string;
   status?: "planned" | "in-progress" | "shipped" | "cancelled";
   target_date?: string;
+  feature?: string;
+  shipped_in?: string;
 }
 
 export interface FeatureStatus {
