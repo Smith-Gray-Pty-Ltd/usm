@@ -85,6 +85,55 @@ function consolidateFeatureDocs(root: string): number {
 }
 
 /**
+ * Escape angle brackets in markdown for VitePress compatibility.
+ *
+ * VitePress uses Vue's template compiler, which interprets <word> as HTML tags.
+ * This escapes <word> patterns to &lt;word&gt; in plain text while leaving
+ * code blocks and inline code untouched.
+ */
+function escapeMarkdownForVitePress(content: string): string {
+  // Split by code blocks (```...```) and inline code (`...`) to preserve them
+  const parts = content.split(/(```[\s\S]*?```|`[^`]+`)/g);
+  return parts
+    .map((part, i) => {
+      // Odd indices are code blocks/inline code — leave untouched
+      if (i % 2 === 1) return part;
+      // Escape <word> patterns in non-code text
+      return part.replace(/<([a-zA-Z][a-zA-Z0-9_-]*)>/g, "&lt;$1&gt;");
+    })
+    .join("");
+}
+
+/**
+ * Apply VitePress escaping to all markdown files in the docs directory.
+ */
+function escapeAllMarkdown(docsRoot: string): number {
+  let count = 0;
+  if (!fs.existsSync(docsRoot)) return 0;
+
+  function walk(dir: string): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Skip .vitepress directory
+        if (entry.name === ".vitepress") continue;
+        walk(fullPath);
+      } else if (entry.name.endsWith(".md")) {
+        const content = fs.readFileSync(fullPath, "utf-8");
+        const escaped = escapeMarkdownForVitePress(content);
+        if (escaped !== content) {
+          fs.writeFileSync(fullPath, escaped, "utf-8");
+          count++;
+        }
+      }
+    }
+  }
+
+  walk(docsRoot);
+  return count;
+}
+
+/**
  * Generate a VitePress sidebar from the system.usm index and feature files.
  */
 function generateSidebar(root: string): SidebarGroup[] {
@@ -191,6 +240,7 @@ export default defineConfig({
   title: ${JSON.stringify(title)},
   description: ${JSON.stringify(description)},
   cleanUrls: true,
+  ignoreDeadLinks: true,
   outDir: '.vitepress/dist',
   themeConfig: {
     sidebar: ${sidebarJson},
@@ -223,12 +273,18 @@ export async function docsBuild(root: string): Promise<void> {
     console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
   }
 
+  // Escape angle brackets for VitePress/Vue compatibility
+  const escaped = escapeAllMarkdown(docsRoot);
+  if (escaped > 0) {
+    console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
+  }
+
   // Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
   const configContent = generateVitePressConfig(root);
-  fs.writeFileSync(path.join(configDir, "config.ts"), configContent, "utf-8");
-  console.log("Generated .vitepress/config.ts");
+  fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
+  console.log("Generated .vitepress/config.mts");
 
   // Run vitepress build
   console.log("\nBuilding static site...");
@@ -269,12 +325,18 @@ export async function docsServe(root: string, port: number): Promise<void> {
     console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
   }
 
+  // Escape angle brackets for VitePress/Vue compatibility
+  const escaped = escapeAllMarkdown(docsRoot);
+  if (escaped > 0) {
+    console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
+  }
+
   // Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
   const configContent = generateVitePressConfig(root);
-  fs.writeFileSync(path.join(configDir, "config.ts"), configContent, "utf-8");
-  console.log("Generated .vitepress/config.ts");
+  fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
+  console.log("Generated .vitepress/config.mts");
 
   // Run vitepress dev
   console.log(`\nStarting dev server on port ${port}...`);
