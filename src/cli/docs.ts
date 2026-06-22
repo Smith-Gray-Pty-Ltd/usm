@@ -1,8 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { parseUsmFile } from "../parse.js";
-import type { SystemUsm } from "../types.js";
+import { parseUsmFile, isFeatureFile } from "../parse.js";
+import type { SystemUsm, FeatureUsm } from "../types.js";
+
+type Audience = "developer" | "help";
 
 interface SidebarItem {
   text: string;
@@ -134,6 +136,140 @@ function escapeAllMarkdown(docsRoot: string): number {
 }
 
 /**
+ * Files/directories to exclude from help docs (developer-only content).
+ */
+const HELP_EXCLUDE_PATHS = [
+  "deployment.md",
+  "togaf",
+  "archimate",
+  "testing",
+  "api/openapi.yaml",
+  "api",
+];
+
+/**
+ * Check if a feature should be included in help docs.
+ * Include if: visibility is "public" OR status is "built" (and not explicitly "internal").
+ */
+function shouldIncludeInHelpDocs(featurePath: string): boolean {
+  try {
+    const parsed = parseUsmFile(featurePath);
+    if (!isFeatureFile(parsed)) return false;
+    const feature = parsed as FeatureUsm;
+    // Explicit visibility overrides everything
+    if (feature.visibility === "public") return true;
+    if (feature.visibility === "internal") return false;
+    // Include if built, active, or no status (legacy features)
+    // Exclude only planned, in-progress, and deprecated
+    if (feature.status === "planned" || feature.status === "in-progress" || feature.status === "deprecated") {
+      return false;
+    }
+    return true; // built, active, or undefined
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Simplify a feature doc for help audience — remove contracts, tests, implementation, decisions.
+ * Keep: title, summary, status, intent, flows (as numbered steps).
+ */
+function simplifyFeatureDoc(content: string): string {
+  const sectionsToRemove = [
+    "## Contracts",
+    "## Tests",
+    "## Implementation",
+    "## Decisions",
+    "## See Also",
+    "## Interfaces",
+    "## Flow Diagrams",
+  ];
+
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    // Check if this line starts a section to remove
+    if (sectionsToRemove.some((s) => line.startsWith(s))) {
+      skipping = true;
+      continue;
+    }
+    // Check if this line starts a new section (stops skipping)
+    if (skipping && line.startsWith("## ") && !sectionsToRemove.some((s) => line.startsWith(s))) {
+      skipping = false;
+    }
+    if (!skipping) {
+      result.push(line);
+    }
+  }
+
+  // Clean up trailing whitespace
+  return result.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+/**
+ * Copy and filter docs from docsRoot into helpRoot for the help audience.
+ * - Excludes developer-only pages (deployment, TOGAF, ArchiMate, testing, API)
+ * - Excludes features that aren't built (unless visibility: public)
+ * - Simplifies feature docs (removes contracts, tests, implementation, decisions)
+ */
+function filterForHelpAudience(root: string, docsRoot: string, helpRoot: string): number {
+  let copied = 0;
+
+  // Clean help root
+  if (fs.existsSync(helpRoot)) {
+    fs.rmSync(helpRoot, { recursive: true });
+  }
+  fs.mkdirSync(helpRoot, { recursive: true });
+
+  // Copy docs, excluding developer-only content and non-built features
+  function copyFiltered(srcDir: string, dstDir: string, relBase: string) {
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      const srcPath = path.join(srcDir, entry.name);
+      const relPath = path.join(relBase, entry.name);
+
+      // Skip excluded paths (deployment, TOGAF, ArchiMate, testing, API)
+      if (HELP_EXCLUDE_PATHS.some((p) => relPath === p || relPath.startsWith(p + "/"))) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        const dstPath = path.join(dstDir, entry.name);
+        fs.mkdirSync(dstPath, { recursive: true });
+        copyFiltered(srcPath, dstPath, relPath);
+      } else if (entry.name.endsWith(".md") || entry.name.endsWith(".yaml")) {
+        // For feature docs, check if the feature should be included in help docs
+        if (relPath.startsWith("features/") && entry.name !== "index.md") {
+          // Look up the .usm source to check status/visibility
+          const usmRelPath = relPath.replace(/\.md$/, ".usm");
+          const usmPath = path.join(root, ".usm", "features", usmRelPath.replace(/^features\//, ""));
+          if (fs.existsSync(usmPath)) {
+            if (!shouldIncludeInHelpDocs(usmPath)) {
+              continue; // Skip this feature
+            }
+          }
+        }
+
+        const dstPath = path.join(dstDir, entry.name);
+        let content = fs.readFileSync(srcPath, "utf-8");
+
+        // Simplify feature docs (remove contracts, tests, implementation, decisions)
+        if (relPath.startsWith("features/") && entry.name !== "index.md") {
+          content = simplifyFeatureDoc(content);
+        }
+
+        fs.writeFileSync(dstPath, content, "utf-8");
+        copied++;
+      }
+    }
+  }
+
+  copyFiltered(docsRoot, helpRoot, "");
+  return copied;
+}
+
+/**
  * Common acronyms for area display names.
  * Maps lowercase area directory names to proper display names.
  * Works for any codebase — extends the map with project-specific acronyms.
@@ -170,7 +306,7 @@ const STATUS_ORDER: Record<string, number> = {
  * Only includes links to files that actually exist in the docs directory.
  * All group names are derived from the .usm file structure — works for any codebase.
  */
-function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
+function generateSidebar(root: string, docsRoot: string, audience: Audience = "developer"): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
   const sidebar: SidebarGroup[] = [];
 
@@ -268,24 +404,30 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
   }
 
   // Architecture — technical reference (diagrams, data models)
-  const archItems: SidebarItem[] = [];
-  if (docExists("architecture/architecture")) {
-    archItems.push({ text: "System Architecture", link: "/architecture/architecture" });
-  }
-  if (docExists("data/models")) {
-    archItems.push({ text: "Data Models", link: "/data/models" });
-  }
-  if (archItems.length > 0) {
-    sidebar.push({ text: "Architecture", collapsed: true, items: archItems });
+  // Suppressed for help audience (too technical for public docs)
+  if (audience === "developer") {
+    const archItems: SidebarItem[] = [];
+    if (docExists("architecture/architecture")) {
+      archItems.push({ text: "System Architecture", link: "/architecture/architecture" });
+    }
+    if (docExists("data/models")) {
+      archItems.push({ text: "Data Models", link: "/data/models" });
+    }
+    if (archItems.length > 0) {
+      sidebar.push({ text: "Architecture", collapsed: true, items: archItems });
+    }
   }
 
   // Deployment & Operations — from system.usm deployment + operations
-  const deployItems: SidebarItem[] = [];
-  if (docExists("deployment")) {
-    deployItems.push({ text: "Deployment", link: "/deployment" });
-  }
-  if (deployItems.length > 0) {
-    sidebar.push({ text: "Deployment", collapsed: true, items: deployItems });
+  // Suppressed for help audience (internal infrastructure details)
+  if (audience === "developer") {
+    const deployItems: SidebarItem[] = [];
+    if (docExists("deployment")) {
+      deployItems.push({ text: "Deployment", link: "/deployment" });
+    }
+    if (deployItems.length > 0) {
+      sidebar.push({ text: "Deployment", collapsed: true, items: deployItems });
+    }
   }
 
   // Project — project management (roadmap, risks, principles)
@@ -306,7 +448,7 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
 /**
  * Generate the VitePress config file.
  */
-function generateVitePressConfig(root: string, docsRoot: string): string {
+function generateVitePressConfig(root: string, docsRoot: string, audience: Audience = "developer"): string {
   const systemPath = path.join(root, ".usm", "system.usm");
   let title = "USM";
   let description = "Universal System Map";
@@ -317,7 +459,7 @@ function generateVitePressConfig(root: string, docsRoot: string): string {
     description = system.summary?.split("\n")[0]?.slice(0, 120) || description;
   }
 
-  const sidebar = generateSidebar(root, docsRoot);
+  const sidebar = generateSidebar(root, docsRoot, audience);
 
   // Generate the config as a string
   const sidebarJson = JSON.stringify(sidebar, null, 2);
@@ -362,38 +504,48 @@ function ensureIndexPage(docsRoot: string): void {
 /**
  * Write the VitePress config and run vitepress build.
  */
-export async function docsBuild(root: string): Promise<void> {
+export async function docsBuild(root: string, audience: Audience = "developer"): Promise<void> {
   requireVitePress();
 
-  const docsRoot = path.join(root, ".usm-workspace", "docs");
-  if (!fs.existsSync(docsRoot)) {
+  const sourceDocsRoot = path.join(root, ".usm-workspace", "docs");
+  if (!fs.existsSync(sourceDocsRoot)) {
     console.error("No docs found. Run 'usm generate' first.");
     process.exit(1);
   }
 
-  // Consolidate feature docs into a single directory
+  // Step 1: Consolidate feature docs into source docs/ (always, for both audiences)
   const copied = consolidateFeatureDocs(root);
   if (copied > 0) {
     console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
   }
 
-  // Escape angle brackets for VitePress/Vue compatibility
-  const escaped = escapeAllMarkdown(docsRoot);
+  // Step 2: Escape angle brackets in source docs
+  const escaped = escapeAllMarkdown(sourceDocsRoot);
   if (escaped > 0) {
     console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
   }
 
-  // VitePress needs index.md, not README.md
-  ensureIndexPage(docsRoot);
+  // Step 3: Ensure index page in source docs
+  ensureIndexPage(sourceDocsRoot);
 
-  // Generate VitePress config
+  // Step 4: For help audience, filter from source docs into help-docs/
+  let docsRoot = sourceDocsRoot;
+  if (audience === "help") {
+    const helpRoot = path.join(root, ".usm-workspace", "help-docs");
+    console.log("Filtering docs for help audience...");
+    const count = filterForHelpAudience(root, sourceDocsRoot, helpRoot);
+    console.log(`  ${count} file(s) copied (developer-only content excluded)`);
+    docsRoot = helpRoot;
+  }
+
+  // Step 5: Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
-  const configContent = generateVitePressConfig(root, docsRoot);
+  const configContent = generateVitePressConfig(root, docsRoot, audience);
   fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
   console.log("Generated .vitepress/config.mts");
 
-  // Run vitepress build
+  // Step 6: Build
   console.log("\nBuilding static site...");
   const child = spawn("npx", ["vitepress", "build", docsRoot], {
     stdio: "inherit",
@@ -417,34 +569,44 @@ export async function docsBuild(root: string): Promise<void> {
 /**
  * Write the VitePress config and run vitepress dev server.
  */
-export async function docsServe(root: string, port: number): Promise<void> {
+export async function docsServe(root: string, port: number, audience: Audience = "developer"): Promise<void> {
   requireVitePress();
 
-  const docsRoot = path.join(root, ".usm-workspace", "docs");
-  if (!fs.existsSync(docsRoot)) {
+  const sourceDocsRoot = path.join(root, ".usm-workspace", "docs");
+  if (!fs.existsSync(sourceDocsRoot)) {
     console.error("No docs found. Run 'usm generate' first.");
     process.exit(1);
   }
 
-  // Consolidate feature docs into a single directory
+  // Step 1: Consolidate feature docs into source docs/ (always, for both audiences)
   const copied = consolidateFeatureDocs(root);
   if (copied > 0) {
     console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
   }
 
-  // Escape angle brackets for VitePress/Vue compatibility
-  const escaped = escapeAllMarkdown(docsRoot);
+  // Step 2: Escape angle brackets in source docs
+  const escaped = escapeAllMarkdown(sourceDocsRoot);
   if (escaped > 0) {
     console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
   }
 
-  // VitePress needs index.md, not README.md
-  ensureIndexPage(docsRoot);
+  // Step 3: Ensure index page in source docs
+  ensureIndexPage(sourceDocsRoot);
 
-  // Generate VitePress config
+  // Step 4: For help audience, filter from source docs into help-docs/
+  let docsRoot = sourceDocsRoot;
+  if (audience === "help") {
+    const helpRoot = path.join(root, ".usm-workspace", "help-docs");
+    console.log("Filtering docs for help audience...");
+    const count = filterForHelpAudience(root, sourceDocsRoot, helpRoot);
+    console.log(`  ${count} file(s) copied (developer-only content excluded)`);
+    docsRoot = helpRoot;
+  }
+
+  // Step 5: Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
-  const configContent = generateVitePressConfig(root, docsRoot);
+  const configContent = generateVitePressConfig(root, docsRoot, audience);
   fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
   console.log("Generated .vitepress/config.mts");
 

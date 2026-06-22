@@ -102,6 +102,11 @@ index:
     ref: .usm/features/generators/roadmap.usm
     status: in-progress
     tags: [generator, roadmap, schema]
+  - id: gen-docs-split
+    name: Docs Split (Help vs Developer)
+    ref: .usm/features/generators/docs-split.usm
+    status: built
+    tags: [generator, docs, audience]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm

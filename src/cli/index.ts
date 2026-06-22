@@ -1077,14 +1077,17 @@ program
   .description("Docs site commands (requires VitePress)")
   .arguments("<action>")
   .option("-p, --port <port>", "Dev server port (default: 5173)", "5173")
-  .action(async (action: string, options: { port: string }) => {
+  .option("-a, --audience <audience>", "Audience: developer (default) or help", "developer")
+  .action(async (action: string, options: { port: string; audience: string }) => {
     const root = path.resolve(process.cwd());
     const { docsBuild, docsServe } = await import("./docs.js");
 
+    const audience: "help" | "developer" = options.audience === "help" ? "help" : "developer";
+
     if (action === "build") {
-      await docsBuild(root);
+      await docsBuild(root, audience);
     } else if (action === "serve") {
-      await docsServe(root, parseInt(options.port, 10));
+      await docsServe(root, parseInt(options.port, 10), audience);
     } else {
       console.error(`Unknown docs action: ${action}. Use 'build' or 'serve'.`);
       process.exit(1);

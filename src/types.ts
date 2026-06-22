@@ -471,6 +471,7 @@ export interface FeatureUsm extends UsmCommon {
   $service: string;
   status?: "planned" | "in-progress" | "built" | "deprecated";
   intent: string;
+  visibility?: "public" | "internal";
   decisions?: Decision[];
   flows?: Flow[];
   interfaces?: Interface[];

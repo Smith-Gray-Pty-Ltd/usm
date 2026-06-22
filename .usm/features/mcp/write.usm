@@ -3,7 +3,7 @@ $id: usm/mcp-write
 $type: feature
 $version: 1
 $last_updated: "2026-06-22"
-status: planned
+status: built
 summary: |
   MCP write tools — let agents author and update .usm feature specs as part of the spec-first workflow. Adds draft_feature, update_feature, and update_feature_status tools to the MCP server, closing the loop between human discussion and agent implementation.
 

@@ -926,6 +926,11 @@
           "type": "string",
           "description": "1-3 sentences: the why behind this feature"
         },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "internal"],
+          "description": "Controls whether this feature appears in help docs (public) or only developer docs (internal). Default: internal."
+        },
         "decisions": {
           "type": "array",
           "items": {

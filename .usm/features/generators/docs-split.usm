@@ -1,0 +1,166 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-docs-split
+$type: feature
+$version: 1
+$last_updated: "2026-06-22"
+status: built
+summary: |
+  Split generated docs into help docs (public-facing, for visitors and new users) and developer docs (full technical detail, for the team). Adds visibility field to schema, --audience flag to docs serve/build, and filtered output for help docs.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Currently USM generates one combined doc set that serves both visitors and
+  developers. Visitors see implementation details, test expectations, and
+  deployment secrets they don't need. Developers see everything, which is
+  correct. By splitting into help docs (public, simplified) and developer
+  docs (full), each audience gets the right view from the same .usm source.
+
+decisions:
+  - id: post-process-filtering
+    decision: Generate full docs first, then filter for help audience
+    rationale: |
+      Rather than modifying the core markdown generator with audience-aware
+      logic, generate the full docs as usual then post-process for the help
+      audience. This keeps the generator simple and puts audience filtering
+      in the VitePress integration layer (docs.ts) where it belongs.
+    alternatives:
+      - option: Audience-aware generator (pass audience through to all render functions)
+        rejected_because: "Touches every render function, complex, hard to maintain"
+      - option: Separate generator functions for help vs developer
+        rejected_because: "Duplicates rendering logic, drifts over time"
+    consequences: "Full docs generated first (slight overhead), then filtered — but filtering is fast and the full docs are useful anyway"
+    status: accepted
+  - id: visibility-field-optional
+    decision: Add optional visibility field (public/internal) to features and services
+    rationale: |
+      Default visibility is internal (safe — nothing leaks unless explicitly
+      marked public). Features marked public appear in help docs. Features
+      with no visibility field appear in help docs only if status is built.
+    consequences: "Authors must opt-in features to public docs by setting visibility: public"
+    status: accepted
+  - id: help-docs-simplified-features
+    decision: Help docs show summary + intent + flows only, not contracts/tests/implementation
+    rationale: |
+      Visitors don't need acceptance criteria checklists or Given/When/Then
+      test cases. They need to understand what the feature does (summary),
+      why it exists (intent), and how it works (flows as steps). Contracts
+      and tests are developer concerns.
+    consequences: "Help docs are shorter and more readable for non-developers"
+    status: accepted
+
+flows:
+  - id: generate-both-doc-sets
+    name: Generate both help and developer docs
+    description: |
+      usm generate produces full docs in .usm-workspace/docs/ (developer).
+      usm docs build --audience help copies and filters into
+      .usm-workspace/help-docs/ with simplified content and a public-oriented
+      sidebar.
+    steps:
+      - id: s1
+        action: generate
+        target: full developer docs into .usm-workspace/docs/ (existing behaviour)
+      - id: s2
+        action: copy
+        target: docs to .usm-workspace/help-docs/ when audience is help
+      - id: s3
+        action: filter
+        target: remove non-built features, deployment, operations, TOGAF, ArchiMate
+      - id: s4
+        action: simplify
+        target: trim feature docs to summary + intent + flows only
+      - id: s5
+        action: generate
+        target: help-oriented sidebar (no deployment, no planned features)
+      - id: s6
+        action: build
+        target: VitePress build for the help docs directory
+
+  - id: serve-help-docs
+    name: Serve help docs locally
+    description: |
+      usm docs serve --audience help serves the filtered help docs on a
+      local VitePress dev server for review.
+    steps:
+      - id: s1
+        action: check
+        target: .usm-workspace/docs/ exists (run usm generate first)
+      - id: s2
+        action: copy-and-filter
+        target: into .usm-workspace/help-docs/
+      - id: s3
+        action: generate
+        target: help-oriented VitePress config
+      - id: s4
+        action: serve
+        target: VitePress dev server
+
+contracts:
+  - id: help-docs-only-built-features
+    description: Help docs only include features with status built (or visibility public)
+    must_have:
+      - "Features with status planned or in-progress are excluded from help docs"
+      - "Features with visibility: public are included regardless of status"
+      - "Features with visibility: internal are excluded from help docs"
+  - id: help-docs-simplified-content
+    description: Help docs feature pages show summary + intent + flows only
+    must_have:
+      - "No contracts section in help docs"
+      - "No tests section in help docs"
+      - "No implementation section in help docs"
+      - "No decisions section in help docs (or simplified to decision + rationale only)"
+  - id: help-docs-no-sensitive-info
+    description: Help docs exclude deployment details and operations runbooks
+    must_have:
+      - "No deployment.md in help docs"
+      - "No operations section"
+      - "No build commands or secrets in help docs"
+  - id: developer-docs-unchanged
+    description: Developer docs remain exactly as before (full detail)
+    must_have:
+      - "All features included (planned, in-progress, built)"
+      - "Full contracts, tests, decisions, implementation"
+      - "Deployment and operations pages"
+
+tests:
+  - id: help-docs-exclude-planned
+    setup:
+      feature_with_status_planned: true
+    expect:
+      - assertion: feature not present in help-docs/features/
+  - id: help-docs-include-built
+    setup:
+      feature_with_status_built: true
+    expect:
+      - assertion: feature present in help-docs/features/
+      - assertion: feature doc has summary and intent
+      - assertion: feature doc has no contracts section
+      - assertion: feature doc has no tests section
+  - id: help-docs-include-public-visibility
+    setup:
+      feature_with_visibility_public_and_status_planned: true
+    expect:
+      - assertion: feature present in help-docs/features/ (visibility overrides status)
+  - id: help-docs-no-deployment
+    setup:
+      system_with_deployment_info: true
+    expect:
+      - assertion: no deployment.md in help-docs/
+  - id: developer-docs-unchanged
+    setup:
+      generate_run: true
+    expect:
+      - assertion: .usm-workspace/docs/ has all features
+      - assertion: .usm-workspace/docs/ has deployment.md
+      - assertion: .usm-workspace/docs/ has full feature docs with contracts and tests
+
+implementation:
+  primary: src/cli/docs.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-docs"
+  - "usm/gen-markdown"
+  - "usm/gen-feature-review"
