@@ -134,8 +134,41 @@ function escapeAllMarkdown(docsRoot: string): number {
 }
 
 /**
+ * Common acronyms for area display names.
+ * Maps lowercase area directory names to proper display names.
+ * Works for any codebase — extends the map with project-specific acronyms.
+ */
+const AREA_ACRONYMS: Record<string, string> = {
+  cli: "CLI",
+  mcp: "MCP",
+  api: "API",
+  db: "Database",
+  idp: "IDP",
+  orm: "ORM",
+  ui: "UI",
+};
+
+function areaDisplayName(area: string): string {
+  return AREA_ACRONYMS[area.toLowerCase()]
+    || area.charAt(0).toUpperCase() + area.slice(1);
+}
+
+/**
+ * Status priority for sorting: active features first, planned last.
+ */
+const STATUS_ORDER: Record<string, number> = {
+  active: 0,
+  built: 1,
+  "in-progress": 2,
+  experimental: 3,
+  planned: 4,
+  deprecated: 5,
+};
+
+/**
  * Generate a VitePress sidebar from the system.usm index and feature files.
  * Only includes links to files that actually exist in the docs directory.
+ * All group names are derived from the .usm file structure — works for any codebase.
  */
 function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
@@ -146,11 +179,13 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
     return fs.existsSync(path.join(docsRoot, relPath + ".md"));
   }
 
-  // System overview
-  sidebar.push({
-    text: "System",
-    items: [{ text: "Overview", link: "/" }],
-  });
+  // Getting Started (if generated)
+  const gettingStarted: SidebarItem[] = [];
+  if (docExists("getting-started")) {
+    gettingStarted.push({ text: "Getting Started", link: "/getting-started" });
+  }
+  gettingStarted.push({ text: "Overview", link: "/" });
+  sidebar.push({ text: "System", items: gettingStarted });
 
   if (!fs.existsSync(systemPath)) return sidebar;
 
@@ -172,19 +207,17 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
   }
 
   // Features grouped by area — derive slug from ref path to preserve case
+  // Group names come from .usm/features/ subdirectories (generic, any codebase)
   const featuresByArea = new Map<string, SidebarItem[]>();
   if (system.index) {
     for (const feat of system.index) {
-      // Determine area and slug from the ref path
-      // e.g., .usm/features/generators/agentsMd.usm → area="generators", slug="agentsMd"
       const refMatch = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
-      if (!refMatch) continue; // Skip entries that don't match feature ref pattern (e.g., data files)
+      if (!refMatch) continue;
 
       const area = refMatch[1];
       const slug = refMatch[2];
-      const areaDisplay = area.charAt(0).toUpperCase() + area.slice(1);
+      const areaDisplay = areaDisplayName(area);
 
-      // Check if the feature doc exists
       const relPath = `features/${area}/${slug}`;
       if (!docExists(relPath)) continue;
 
@@ -203,8 +236,22 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
     }
   }
 
-  // Add feature groups to sidebar (sorted)
+  // Add feature groups to sidebar (sorted alphabetically by area name)
+  // Within each group, sort by status (active first, planned last)
   for (const [area, items] of [...featuresByArea.entries()].sort()) {
+    // Sort items by status priority, then alphabetically
+    items.sort((a, b) => {
+      const aStatus = a.text.includes("[planned]") ? STATUS_ORDER["planned"]
+        : a.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
+        : a.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
+        : STATUS_ORDER["active"];
+      const bStatus = b.text.includes("[planned]") ? STATUS_ORDER["planned"]
+        : b.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
+        : b.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
+        : STATUS_ORDER["active"];
+      if (aStatus !== bStatus) return aStatus - bStatus;
+      return a.text.localeCompare(b.text);
+    });
     sidebar.push({
       text: area,
       collapsed: true,
@@ -212,26 +259,37 @@ function generateSidebar(root: string, docsRoot: string): SidebarGroup[] {
     });
   }
 
-  // Cross-cutting — only include links to files that exist
-  const crossCutting: SidebarItem[] = [];
+  // Architecture — technical reference (diagrams, data models)
+  const archItems: SidebarItem[] = [];
   if (docExists("architecture/architecture")) {
-    crossCutting.push({ text: "Architecture", link: "/architecture/architecture" });
+    archItems.push({ text: "System Architecture", link: "/architecture/architecture" });
   }
   if (docExists("data/models")) {
-    crossCutting.push({ text: "Data Models", link: "/data/models" });
+    archItems.push({ text: "Data Models", link: "/data/models" });
+  }
+  if (archItems.length > 0) {
+    sidebar.push({ text: "Architecture", collapsed: true, items: archItems });
+  }
+
+  // Deployment & Operations — from system.usm deployment + operations
+  const deployItems: SidebarItem[] = [];
+  if (docExists("deployment")) {
+    deployItems.push({ text: "Deployment", link: "/deployment" });
+  }
+  if (deployItems.length > 0) {
+    sidebar.push({ text: "Deployment", collapsed: true, items: deployItems });
+  }
+
+  // Project — project management (roadmap, risks, principles)
+  const projectItems: SidebarItem[] = [];
+  if (docExists("roadmap")) {
+    projectItems.push({ text: "Roadmap", link: "/roadmap" });
   }
   if (docExists("risks")) {
-    crossCutting.push({ text: "Risks", link: "/risks" });
+    projectItems.push({ text: "Risks", link: "/risks" });
   }
-  if (docExists("roadmap")) {
-    crossCutting.push({ text: "Roadmap", link: "/roadmap" });
-  }
-  if (crossCutting.length > 0) {
-    sidebar.push({
-      text: "Platform",
-      collapsed: true,
-      items: crossCutting,
-    });
+  if (projectItems.length > 0) {
+    sidebar.push({ text: "Project", collapsed: true, items: projectItems });
   }
 
   return sidebar;

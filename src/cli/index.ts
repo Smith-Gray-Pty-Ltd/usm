@@ -17,6 +17,8 @@ import {
   generatePackagesIndex,
   generateRisksDoc,
   generateRoadmapDoc,
+  generateDeploymentDoc,
+  generateGettingStartedDoc,
   generateDataModelDoc,
   generateDataIndex,
   generateSeedDataDoc,
@@ -707,6 +709,8 @@ program
         // Cross-cutting platform docs
         { name: "risks", fn: () => generateRisksDoc(systemFile, root) },
         { name: "roadmap", fn: () => generateRoadmapDoc(systemFile, root) },
+        { name: "deployment", fn: () => generateDeploymentDoc(systemFile, root) },
+        { name: "getting-started", fn: () => generateGettingStartedDoc(systemFile, root) },
         { name: "shared-services-index", fn: () => generateSharedServicesIndex(serviceFiles, root) },
         { name: "packages-index", fn: () => generatePackagesIndex(serviceFiles, root) },
         { name: "data-model", fn: () => generateDataModelDoc(dataFiles, root, serviceFiles) },

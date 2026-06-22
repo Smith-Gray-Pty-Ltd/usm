@@ -12,6 +12,8 @@ export {
   generatePackagesIndex,
   generateRisksDoc,
   generateRoadmapDoc,
+  generateDeploymentDoc,
+  generateGettingStartedDoc,
   generateDataModelDoc,
   generateDataIndex,
   generatePerAppDecisions,

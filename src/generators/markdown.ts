@@ -1746,6 +1746,193 @@ export function generateRoadmapDoc(system: SystemUsm, root: string): GenerationR
 }
 
 /**
+ * Generate docs/deployment.md — from system.deployment + system.operations
+ */
+export function generateDeploymentDoc(system: SystemUsm, root: string): GenerationResult {
+  if (!system.deployment && !system.operations) {
+    return { outputs: [] };
+  }
+
+  const lines: string[] = [];
+  lines.push("# Deployment & Operations");
+  lines.push("");
+  lines.push("Source: `.usm/system.usm` → `deployment` + `operations`");
+  lines.push("");
+
+  // Deployment environments
+  if (system.deployment?.environments && system.deployment.environments.length > 0) {
+    lines.push("## Environments");
+    lines.push("");
+    lines.push("| Name | URL | Type | Notes |");
+    lines.push("|------|-----|------|-------|");
+    for (const env of system.deployment.environments) {
+      const url = env.url ? `[${env.url}](${env.url})` : "—";
+      const type = env.type || "—";
+      const notes = (env.notes as string) || "—";
+      lines.push(`| ${env.name} | ${url} | ${type} | ${notes} |`);
+    }
+    lines.push("");
+
+    // Extract deployment details from environment fields (generic — any project can use these)
+    for (const env of system.deployment.environments) {
+      if (env.build_command || env.output_directory || env.project_name || env.secrets) {
+        lines.push(`### ${env.name} Details`);
+        lines.push("");
+        if (env.build_command) {
+          lines.push(`**Build command**: \`${env.build_command}\``);
+          lines.push("");
+        }
+        if (env.output_directory) {
+          lines.push(`**Output directory**: \`${env.output_directory}\``);
+          lines.push("");
+        }
+        if (env.project_name) {
+          lines.push(`**Project name**: ${env.project_name}`);
+          lines.push("");
+        }
+        if (env.secrets) {
+          const secrets = env.secrets as string[];
+          lines.push(`**Required secrets**: ${secrets.join(", ")}`);
+          lines.push("");
+        }
+      }
+    }
+  }
+
+  // Operations
+  if (system.operations) {
+    lines.push("## Operations");
+    lines.push("");
+
+    // Operations has [key: string]: unknown, so we iterate known + custom fields
+    const ops = system.operations as Record<string, unknown>;
+    for (const [key, val] of Object.entries(ops)) {
+      if (val === undefined || val === null) continue;
+      const displayKey = key.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      lines.push(`### ${displayKey}`);
+      lines.push("");
+      lines.push(String(val));
+      lines.push("");
+    }
+  }
+
+  if (lines.length <= 4) {
+    return { outputs: [] }; // No real content
+  }
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/deployment.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
+ * Generate docs/getting-started.md — orientation page from system summary, roles, and local dev
+ */
+export function generateGettingStartedDoc(system: SystemUsm, root: string): GenerationResult {
+  const lines: string[] = [];
+  lines.push("# Getting Started");
+  lines.push("");
+  lines.push(system.summary);
+  lines.push("");
+
+  // Roles summary
+  if (system.roles && system.roles.length > 0) {
+    lines.push("## Who Uses This System");
+    lines.push("");
+    for (const role of system.roles) {
+      lines.push(`**${role.name}** — ${role.description.split("\n")[0]}`);
+      lines.push("");
+    }
+  }
+
+  // Local development
+  if (system.local_development) {
+    const ld = system.local_development;
+    lines.push("## Local Development");
+    lines.push("");
+
+    if (ld.monorepo) {
+      if (ld.monorepo.package_manager) {
+        lines.push(`**Package manager**: ${ld.monorepo.package_manager}`);
+        lines.push("");
+      }
+      if (ld.monorepo.install_command) {
+        lines.push(`**Install**: \`${ld.monorepo.install_command}\``);
+        lines.push("");
+      }
+    }
+
+    if (ld.apps && ld.apps.length > 0) {
+      lines.push("### Apps");
+      lines.push("");
+      lines.push("| App | Port | Dev Command | URL |");
+      lines.push("|-----|------|-------------|-----|");
+      for (const app of ld.apps) {
+        const name = app.name || "—";
+        const port = app.port ? String(app.port) : "—";
+        const cmd = app.dev_command || "—";
+        const url = app.url_local || "—";
+        lines.push(`| ${name} | ${port} | \`${cmd}\` | ${url} |`);
+      }
+      lines.push("");
+    }
+
+    if (ld.environment?.required_vars && ld.environment.required_vars.length > 0) {
+      lines.push("### Required Environment Variables");
+      lines.push("");
+      for (const v of ld.environment.required_vars) {
+        lines.push(`- \`${v}\``);
+      }
+      lines.push("");
+    }
+
+    if (ld.known_quirks && ld.known_quirks.length > 0) {
+      lines.push("### Known Quirks");
+      lines.push("");
+      for (const q of ld.known_quirks) {
+        if (q.title) {
+          lines.push(`**${q.title}**`);
+          if (q.description) {
+            lines.push(`> ${q.description}`);
+          }
+          if (q.workaround) {
+            lines.push(`> **Workaround**: ${q.workaround}`);
+          }
+          lines.push("");
+        }
+      }
+    }
+  }
+
+  // Quick links
+  lines.push("## Explore");
+  lines.push("");
+  const featureCount = (system.index || []).length;
+  const serviceCount = (system.services || []).length;
+  if (serviceCount > 0) {
+    lines.push(`- [Services](/) — ${serviceCount} service(s)`);
+  }
+  if (featureCount > 0) {
+    lines.push(`- [Features](/) — ${featureCount} feature(s)`);
+  }
+  lines.push("- [Architecture](architecture/architecture.md)");
+  if (system.roadmap && system.roadmap.length > 0) {
+    lines.push("- [Roadmap](roadmap.md)");
+  }
+  lines.push("");
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/getting-started.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
  * Generate data/models.md — from .usm/data/models.usm + Prisma schema.
  * Also accepts ServiceUsm files that live in .usm/data/ (scan generates
  * them with $type: service rather than $type: data).
