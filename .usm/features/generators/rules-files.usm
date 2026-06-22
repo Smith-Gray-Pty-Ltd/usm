@@ -1,0 +1,209 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-rules-files
+$type: feature
+$version: 1
+$last_updated: "2026-06-22"
+status: planned
+summary: |
+  Tool-specific rules file generator — produces instruction files for AI coding tools (Cursor, Claude Code, Codex, GitHub Copilot) that teach agents the USM spec-first workflow. Each file tells the agent when to read .usm, when to write specs, and how to update them after implementation.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  USM's distribution model is not a standalone app — it's an MCP server plus
+  rules files that teach agents how to use it. Each AI coding tool reads a
+  specific file for project instructions: Cursor reads .cursor/rules/*.mdc,
+  Claude Code reads CLAUDE.md, Codex reads AGENTS.md, Copilot reads
+  .github/copilot-instructions.md. Currently USM generates a generic AGENTS.md
+  with structural context but no workflow instructions. This generator produces
+  tool-specific files that instruct agents to follow the spec-first loop:
+  discuss → draft .usm → human reviews → build → update .usm.
+
+decisions:
+  - id: one-generator-multiple-outputs
+    decision: Single generator produces all tool-specific files in one pass
+    rationale: |
+      The workflow instructions are largely the same across tools; only the file
+      path and format conventions differ. A single generator with per-tool
+      templates avoids drift between instruction files.
+    status: accepted
+  - id: workflow-instructions-not-just-context
+    decision: Rules files contain behavioural instructions, not just system description
+    rationale: |
+      The current AGENTS.md generator outputs structural context (what apps
+      exist, what packages exist). That's useful but passive. The rules files
+      must actively instruct: "Before implementing a feature, draft a .usm spec
+      and show the human the review markdown. After implementation, update the
+      feature status." Behavioural instructions are what make USM a workflow,
+      not just a reference.
+    status: accepted
+  - id: smart-merge-for-rules-files
+    decision: Reuse the smart-merge strategy from AGENTS.md generator
+    rationale: |
+      Teams may add tool-specific instructions (e.g. "use pnpm not npm") that
+      must survive regeneration. The USM:START/USM:END marker strategy preserves
+      human content outside the generated block.
+    status: accepted
+  - id: cursor-uses-mdc-format
+    decision: Generate .cursor/rules/usm.mdc in Cursor's rule format
+    rationale: |
+      Cursor rules (.mdc files) support frontmatter with globs and descriptions
+      that control when the rule is injected. Generating in .mdc format means
+      the rule auto-activates when agents work in .usm/ directories.
+    status: accepted
+
+flows:
+  - id: generate-all-rules-files
+    name: Generate rules files for all supported tools
+    description: |
+      During usm generate, produce instruction files for each supported AI
+      coding tool, each containing the spec-first workflow tailored to that
+      tool's conventions.
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm for project identity and principles
+      - id: s2
+        action: parse
+        target: service files for available MCP tools and CLI commands
+      - id: s3
+        action: generate
+        target: .cursor/rules/usm.mdc with Cursor frontmatter + workflow
+      - id: s4
+        action: generate
+        target: CLAUDE.md with Claude Code workflow instructions
+      - id: s5
+        action: generate
+        target: AGENTS.md with enhanced workflow (extends current generator)
+      - id: s6
+        action: generate
+        target: .github/copilot-instructions.md with Copilot workflow
+      - id: s7
+        action: smart-merge
+        target: each file preserving human content outside USM markers
+
+  - id: generate-cursor-rule
+    name: Generate Cursor .mdc rule file
+    description: |
+      Cursor rules use .mdc format with YAML frontmatter specifying when the
+      rule activates. The rule teaches the agent the spec-first workflow.
+    steps:
+      - id: s1
+        action: generate
+        target: frontmatter with description, globs (*.usm, .usm/**)
+      - id: s2
+        action: generate
+        target: workflow instructions (read .usm before work, draft before build, update after)
+      - id: s3
+        action: generate
+        target: MCP tool reference (list available tools and when to use each)
+      - id: s4
+        action: write
+        target: .cursor/rules/usm.mdc
+
+  - id: generate-claude-md
+    name: Generate CLAUDE.md for Claude Code
+    description: |
+      Claude Code reads CLAUDE.md for project instructions. The file teaches
+      the spec-first workflow and references the MCP server.
+    steps:
+      - id: s1
+        action: generate
+        target: project identity and system summary
+      - id: s2
+        action: generate
+        target: spec-first workflow instructions
+      - id: s3
+        action: generate
+        target: MCP server connection info and tool reference
+      - id: s4
+        action: smart-merge
+        target: preserve existing CLAUDE.md content outside markers
+
+  - id: enhance-agents-md
+    name: Enhance AGENTS.md with workflow instructions
+    description: |
+      Extend the existing agentsMd generator to include spec-first workflow
+      instructions alongside the structural context it already produces.
+    steps:
+      - id: s1
+        action: parse
+        target: existing AGENTS.md content
+      - id: s2
+        action: generate
+        target: structural context (current behaviour — apps, packages, patterns)
+      - id: s3
+        action: generate
+        target: workflow instructions section (new — spec-first loop, MCP tools)
+      - id: s4
+        action: smart-merge
+        target: replace between USM markers, preserve rest
+
+contracts:
+  - id: all-tools-covered
+    description: Generator produces files for all supported tools
+    must_have:
+      - ".cursor/rules/usm.mdc generated for Cursor"
+      - "CLAUDE.md generated for Claude Code"
+      - "AGENTS.md enhanced with workflow instructions"
+      - ".github/copilot-instructions.md generated for Copilot"
+  - id: workflow-instructions-consistent
+    description: All files teach the same spec-first workflow
+    must_have:
+      - "Each file instructs: read .usm before starting work"
+      - "Each file instructs: draft feature .usm before implementing"
+      - "Each file instructs: show human the review markdown"
+      - "Each file instructs: update feature status after implementation"
+  - id: smart-merge-preserves-human-content
+    description: Regeneration does not destroy human-added instructions
+    must_have:
+      - "Content outside USM:START/USM:END markers preserved"
+      - "Content inside markers replaced with generated output"
+      - "If no markers, insert after first H1"
+  - id: cursor-mdc-has-valid-frontmatter
+    description: Cursor .mdc file has valid frontmatter for auto-activation
+    must_have:
+      - "YAML frontmatter with description field"
+      - "globs field includes .usm/** and *.usm patterns"
+      - "alwaysApply or appropriate trigger setting"
+
+tests:
+  - id: generate-all-files
+    setup:
+      system_usm: true
+      service_files: true
+    expect:
+      - assertion: .cursor/rules/usm.mdc exists with frontmatter
+      - assertion: CLAUDE.md exists with workflow instructions
+      - assertion: AGENTS.md has workflow section between markers
+      - assertion: .github/copilot-instructions.md exists
+  - id: cursor-mdc-frontmatter-valid
+    setup:
+      generated_mdc_file: true
+    expect:
+      - assertion: frontmatter has description field
+      - assertion: frontmatter has globs field with .usm patterns
+      - assertion: body contains spec-first workflow instructions
+  - id: smart-merge-preserves-custom-instructions
+    setup:
+      existing_claude_md_with_custom_content: true
+    expect:
+      - assertion: custom content outside markers preserved
+      - assertion: generated content inside markers updated
+  - id: workflow-consistent-across-files
+    setup:
+      all_rules_files_generated: true
+    expect:
+      - assertion: all files mention draft_feature workflow
+      - assertion: all files mention human review step
+      - assertion: all files mention update_feature_status after implementation
+
+implementation:
+  primary: src/generators/rulesFiles.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/gen-agentsmd"
+  - "usm/mcp-write"
+  - "usm/gen-feature-review"

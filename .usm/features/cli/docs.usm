@@ -1,0 +1,287 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-docs
+$type: feature
+$version: 1
+$last_updated: "2026-06-22"
+status: planned
+summary: |
+  usm docs serve and usm docs build — serves generated docs locally via VitePress dev server with live reload for the spec-first review workflow, and builds a static site for Cloudflare Pages deployment. Unifies all generated docs into a single docs/ directory with auto-generated sidebar navigation.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  The spec-first workflow requires a human to review generated feature docs
+  before the agent builds. Currently the only way to read generated docs is
+  raw markdown in a code editor — no rendering, no navigation, no hot reload.
+  This makes the review step painful and breaks the workflow loop. This feature
+  adds a dev server that serves generated docs with proper rendering, sidebar
+  navigation, search, and live reload when .usm files change. It also unifies
+  the scattered docs output (currently split across .agents-workspace/docs/ and
+  apps/*/.agents-workspace/docs/) into a single docs/ directory with a clear
+  hierarchy that maps to the .usm file structure.
+
+decisions:
+  - id: vitepress-over-custom
+    decision: Use VitePress as the rendering layer instead of building a custom server
+    rationale: |
+      Building a custom markdown server with navigation, search, themes, and
+      live reload is a whole separate product. VitePress is purpose-built for
+      docs: markdown-native, Vite-powered HMR, built-in sidebar/search/dark
+      mode, static build output. USM owns the content (generating markdown from
+      .usm), VitePress owns the experience (rendering, nav, search). Clean
+      separation of concerns. Used by Vue, Vitest, Pinia — battle-tested.
+      Alternatives considered: custom Express+marked.js (rejected — reinventing
+      the wheel, permanent maintenance burden), Docsify (rejected — client-side
+      rendering, poor SEO), Nextra (rejected — heavyweight, pulls in Next.js).
+    status: accepted
+
+  - id: unified-docs-directory
+    decision: All generated docs write to a single docs/ directory instead of scattered .agents-workspace/ paths
+    rationale: |
+      Currently feature docs land in apps/<service>/.agents-workspace/docs/ and
+      service docs in .agents-workspace/docs/shared-services/. This scattering
+      makes navigation impossible and paths unpredictable. A unified docs/
+      directory with services/, features/, architecture/ subdirectories creates
+      a clean hierarchy that maps 1:1 to the .usm file structure and works as
+      VitePress input.
+    status: accepted
+
+  - id: sidebar-from-system-index
+    decision: Auto-generate VitePress sidebar config from system.usm index + feature directory structure
+    rationale: |
+      system.usm already has an index[] with feature id, name, ref, status, and
+      tags. This is the authoritative source of what features exist and how
+      they're grouped. Generating the sidebar from this index means the
+      navigation is always in sync with the spec — no manual sidebar maintenance.
+      Feature grouping (CLI, generators, mcp) comes from the directory structure
+      of .usm/features/.
+    status: accepted
+
+  - id: vitepress-optional-dependency
+    decision: VitePress is an optional peer dependency, not bundled with USM
+    rationale: |
+      Not every USM user needs the docs server — some just want the CLI and
+      MCP tools. Making VitePress optional keeps the core install lightweight.
+      usm docs serve checks for VitePress and prints install instructions if
+      missing, rather than failing at install time.
+    status: accepted
+
+  - id: dont-commit-generated-docs
+    decision: Generated docs are not committed to the repo — served locally and deployed via CI
+    rationale: |
+      Committing generated files creates diff noise and merge conflicts. The
+      docs/ directory is gitignored. usm docs serve reads from the local
+      generated output. CI runs usm generate && usm docs build for deployment.
+      GitHub browsing links to the deployed site. This matches the current
+      .gitignore strategy for .agents-workspace/.
+    status: accepted
+
+flows:
+  - id: docs-serve
+    name: Start docs dev server
+    description: |
+      User runs usm docs serve. USM generates markdown from .usm files into
+      docs/, generates VitePress config (sidebar, nav) from system.usm index,
+      starts VitePress dev server with hot reload. When .usm files change,
+      affected markdown regenerates and VitePress HMR updates the browser.
+    steps:
+      - id: s1
+        action: check
+        target: VitePress installed in project (optional peer dep)
+        expect:
+          - installed: true
+      - id: s2
+        action: generate
+        target: markdown docs from .usm files into docs/ directory (unified structure)
+      - id: s3
+        action: generate
+        target: .vitepress/config.ts with sidebar and nav from system.usm index
+      - id: s4
+        action: start
+        target: VitePress dev server on configurable port (default 5173)
+      - id: s5
+        action: watch
+        target: .usm/ directory for file changes
+      - id: s6
+        action: regenerate
+        target: affected markdown when .usm file changes
+      - id: s7
+        action: observe
+        target: VitePress HMR updates browser automatically
+
+  - id: docs-build
+    name: Build static docs site
+    description: |
+      User runs usm docs build. USM generates markdown + VitePress config,
+      then runs vitepress build to produce a static site in docs/.vitepress/dist/
+      ready for Cloudflare Pages or any static host.
+    steps:
+      - id: s1
+        action: generate
+        target: markdown docs from .usm files into docs/ directory
+      - id: s2
+        action: generate
+        target: .vitepress/config.ts with sidebar and nav
+      - id: s3
+        action: build
+        target: vitepress build docs/ → static HTML in docs/.vitepress/dist/
+      - id: s4
+        action: observe
+        target: output directory ready for deployment
+
+  - id: generate-vitepress-config
+    name: Generate VitePress sidebar and nav config
+    description: |
+      Generate .vitepress/config.ts from system.usm index and feature directory
+      structure. Sidebar groups mirror .usm/features/ subdirectories. Feature
+      status shown as badge in nav. Services listed from system.usm services[].
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm for identity, services[], index[]
+      - id: s2
+        action: scan
+        target: .usm/features/ subdirectories for grouping (cli, generators, mcp, schema)
+      - id: s3
+        action: map
+        target: each index entry to a sidebar item with link, label, status badge
+      - id: s4
+        action: generate
+        target: .vitepress/config.ts with sidebar tree, nav bar, theme config
+      - id: s5
+        action: write
+        target: docs/.vitepress/config.ts
+
+  - id: unified-output-structure
+    name: Generate docs into unified docs/ directory
+    description: |
+      The generate command writes all output to a single docs/ directory with
+      a clear hierarchy: services/, features/<area>/, architecture/, cross-cutting
+      (risks, roadmap, decisions). This replaces the current scattered output
+      across .agents-workspace/docs/ and apps/*/.agents-workspace/docs/.
+    steps:
+      - id: s1
+        action: generate
+        target: docs/index.md from system.usm (overview, stats, principles)
+      - id: s2
+        action: generate
+        target: docs/services/<service>.md from each service .usm
+      - id: s3
+        action: generate
+        target: docs/features/<area>/<feature>.md from each feature .usm
+      - id: s4
+        action: generate
+        target: docs/architecture/ (diagrams, data models, dependencies)
+      - id: s5
+        action: generate
+        target: docs/risks.md, docs/roadmap.md, docs/decisions/ from system.usm
+      - id: s6
+        action: generate
+        target: docs/api/openapi.yaml from features with routes
+
+contracts:
+  - id: serve-starts-on-configurable-port
+    description: usm docs serve must start on a configurable port with sensible default
+    must_have:
+      - "Default port is 5173 (VitePress default)"
+      - "--port flag overrides default"
+      - "Server accessible at http://localhost:<port>"
+      - "Clear console output with URL and QR code for mobile review"
+  - id: sidebar-matches-system-index
+    description: VitePress sidebar must reflect all features from system.usm index
+    must_have:
+      - "Every index entry appears in the sidebar"
+      - "Sidebar groups match .usm/features/ subdirectory names"
+      - "Feature status (planned, active, deprecated) shown as badge"
+      - "Services listed in sidebar from system.usm services[]"
+  - id: hot-reload-on-usm-change
+    description: Editing a .usm file must trigger regeneration and browser update
+    must_have:
+      - "File watcher monitors .usm/ directory recursively"
+      - "Only affected markdown regenerated (not full rebuild)"
+      - "VitePress HMR updates browser within 1 second"
+      - "Console shows which file changed and was regenerated"
+  - id: build-produces-static-output
+    description: usm docs build must produce a deployable static site
+    must_have:
+      - "Static HTML output in docs/.vitepress/dist/"
+      - "All assets (CSS, JS, images) bundled"
+      - "No server runtime required to serve output"
+      - "Output works on Cloudflare Pages, GitHub Pages, Netlify, or any static host"
+  - id: unified-structure-is-flat-and-navigable
+    description: All docs in a single docs/ directory with predictable paths
+    must_have:
+      - "One markdown file per .usm feature"
+      - "Path pattern: docs/features/<area>/<feature>.md"
+      - "Services at docs/services/<service>.md"
+      - "No docs scattered across apps/ or .agents-workspace/"
+  - id: vitepress-missing-graceful-error
+    description: If VitePress is not installed, show helpful error not a crash
+    must_have:
+      - "Error message explains VitePress is optional dependency"
+      - "Install command shown (pnpm add -D vitepress)"
+      - "Exit code 1 with clear message, not a stack trace"
+
+tests:
+  - id: serve-starts-and-accessible
+    setup:
+      vitepress_installed: true
+      usm_files_present: true
+    expect:
+      - assertion: server starts on port 5173
+      - assertion: http://localhost:5173 returns rendered HTML
+      - assertion: sidebar visible with feature list
+  - id: serve-custom-port
+    setup:
+      vitepress_installed: true
+      port_flag: "--port 3000"
+    expect:
+      - assertion: server starts on port 3000
+      - assertion: console output shows correct URL
+  - id: sidebar-reflects-all-features
+    setup:
+      system_usm_with_27_features: true
+    expect:
+      - assertion: sidebar contains all 27 features from index
+      - assertion: features grouped by directory (cli, generators, mcp, schema)
+      - assertion: planned features show badge
+  - id: hot-reload-on-edit
+    setup:
+      dev_server_running: true
+    expect:
+      - assertion: editing a .usm file triggers regeneration
+      - assertion: browser updates within 1 second
+      - assertion: only affected markdown file regenerated
+  - id: build-produces-static-site
+    setup:
+      vitepress_installed: true
+      usm_files_present: true
+    expect:
+      - assertion: docs/.vitepress/dist/ directory created
+      - assertion: index.html present
+      - assertion: all pages rendered as static HTML
+  - id: vitepress-missing-error
+    setup:
+      vitepress_not_installed: true
+    expect:
+      - assertion: clear error message about missing VitePress
+      - assertion: install command shown in output
+      - assertion: exit code 1
+  - id: unified-structure-paths
+    setup:
+      generate_run: true
+    expect:
+      - assertion: docs/services/cli.md exists
+      - assertion: docs/features/mcp/write.md exists
+      - assertion: docs/features/generators/feature-review.md exists
+      - assertion: no files in apps/*/.agents-workspace/docs/
+
+implementation:
+  primary: src/cli/docs.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"
+  - "usm/gen-feature-review"
+  - "usm/gen-markdown"

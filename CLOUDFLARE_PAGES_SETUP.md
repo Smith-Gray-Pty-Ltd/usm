@@ -26,7 +26,7 @@ You need a Cloudflare API token with these permissions:
 2. Click **New repository secret**
 3. Add two secrets:
    - `CLOUDFLARE_API_TOKEN` — the token from step 1
-   - `CLOUDFLARE_ACCOUNT_ID` — `2c204e4cb9ad4052c9b9eec2c4bac233`
+   - `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID (found in the dashboard URL)
 
 ## Create the Pages project
 
@@ -106,5 +106,5 @@ Check that the **Build output directory** is exactly `.agents-workspace/docs`
 
 ### Custom domain won't connect
 
-Make sure `usm.dev` is on Cloudflare (it is — zone `7281cf3f8f3d9de2c40150edaba7817f`).
+Make sure `usm.dev` is on Cloudflare (it is).
 The CNAME should auto-add when you click "Set up a custom domain".

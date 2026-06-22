@@ -50,7 +50,7 @@ usm generate
 usm validate
 
 # Browse via the MCP server (for AI agents)
-usm-mcp
+usm mcp serve
 ```
 
 ## Example
@@ -64,9 +64,14 @@ $type: system
 $version: 1
 $last_updated: 2026-06-19
 summary: My application — a simple REST API
-name: My App
-type: web-app
-tech_stack: [TypeScript, Next.js, PostgreSQL]
+identity:
+  name: My App
+  domain: my-app.com
+  contact: team@my-app.com
+index: []
+services: []
+apis: []
+data: []
 ```
 
 A feature file `features/agent/events.usm`:
@@ -78,18 +83,35 @@ $type: feature
 $version: 1
 $last_updated: 2026-06-19
 summary: Emit and subscribe to real-time events
-name: Agent Events
-parent: my-app/agent
+$system: my-app/system
+$service: my-app/api
+intent: |
+  Clients need to broadcast events to subscribers in real time.
 flows:
   - id: emit-event
+    name: Emit an event
     steps:
-      - actor calls POST /api/agent/events
-      - system validates payload
-      - system broadcasts to subscribers
+      - id: s1
+        action: post
+        target: POST /api/agent/events
+      - id: s2
+        action: validate
+        target: event payload against schema
+      - id: s3
+        action: broadcast
+        target: to all subscribers
+contracts:
+  - id: event-must-be-valid
+    description: Invalid events are rejected
+    must_have:
+      - "Returns 400 for malformed payload"
+      - "Returns 202 for valid payload"
 tests:
-  - given: a valid event payload
-    when: client POSTs to /api/agent/events
-    then: server returns 202 Accepted
+  - id: valid-event-accepted
+    setup:
+      valid_payload: true
+    expect:
+      - assertion: server returns 202 Accepted
 ```
 
 ## Architecture
@@ -97,13 +119,13 @@ tests:
 USM is a single Node.js package with multiple entry points:
 
 - **`@~usm/core`** — the main library, JSON Schema, parsers, validators
-- **`usm` CLI** — `init`, `scan`, `enrich`, `generate`, `validate`
+- **`usm` CLI** — `init`, `scan`, `validate`, `generate`, `enrich`, `scaffold`, `scaffold-project`, `roundtrip`, `info`, `mcp serve`, `generate:togaf`, `generate:archimate`
 - **Generators** — markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md, Vitest specs
-- **MCP server** — 12 tools for AI agents to navigate, search, and reference USM data
+- **MCP server** — 8 tools for AI agents to navigate, search, and reference USM data
 
 ## Documentation
 
-Full docs: <https://usm.dev> (deployed via Cloudflare Pages from this repo's `docs/` folder)
+Full docs: <https://usm.dev> (generated from this repo's `.usm/` files and deployed via Cloudflare Pages).
 
 For the scanner design, see [`docs/SCANNER-DESIGN.md`](docs/SCANNER-DESIGN.md).
 

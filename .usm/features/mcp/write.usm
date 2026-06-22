@@ -1,0 +1,199 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-write
+$type: feature
+$version: 1
+$last_updated: "2026-06-22"
+status: planned
+summary: |
+  MCP write tools — let agents author and update .usm feature specs as part of the spec-first workflow. Adds draft_feature, update_feature, and update_feature_status tools to the MCP server, closing the loop between human discussion and agent implementation.
+
+$system: usm/system
+$service: usm/mcp
+intent: |
+  The current MCP server is read-only — agents can list, read, search, and query
+  existing .usm files, but cannot create or update them. The spec-first workflow
+  requires the agent to write a feature .usm spec from a human discussion, show
+  the human the generated markdown for review, then update the feature after
+  implementation. Without write tools, this loop is broken: the human must
+  manually write YAML, which defeats the purpose of agent-first authoring.
+
+decisions:
+  - id: write-tools-as-mcp-not-cli
+    decision: Implement authoring as MCP tools rather than CLI commands only
+    rationale: |
+      Agents work through MCP in Cursor, Claude Desktop, and other tools. A CLI
+      command requires the agent to shell out, parse output, and handle errors
+      externally. An MCP tool returns structured JSON the agent can reason about
+      directly. CLI wrappers can be added later for human use.
+    status: accepted
+  - id: draft-returns-preview
+    decision: draft_feature returns both YAML and generated markdown
+    rationale: |
+      The human reviews the markdown, not the YAML. Returning both lets the agent
+      show the human the readable preview immediately without a separate generate
+      step. The agent can also iterate on the draft based on feedback before
+      writing to disk.
+    status: accepted
+  - id: validate-before-write
+    decision: All write operations validate against the v1 schema before persisting
+    rationale: |
+      An invalid .usm file breaks downstream generators and MCP read tools.
+      Validation at write time prevents corruption. The tool returns structured
+      validation errors so the agent can fix them before retrying.
+    status: accepted
+
+flows:
+  - id: draft-feature-from-discussion
+    name: Draft a feature spec from human discussion
+    description: |
+      Agent and human discuss a feature in chat. Agent calls draft_feature with
+      structured fields derived from the discussion. Tool validates, generates
+      YAML + markdown preview. Agent shows markdown to human for review.
+    steps:
+      - id: s1
+        action: receive
+        target: structured feature fields (summary, intent, flows, contracts, tests)
+      - id: s2
+        action: validate
+        target: fields against v1 JSON schema
+      - id: s3
+        action: generate
+        target: YAML string and markdown preview
+      - id: s4
+        action: return
+        target: structured response with yaml, markdown, validation_status
+      - id: s5
+        action: observe
+        target: agent shows markdown to human, human approves or requests changes
+      - id: s6
+        action: write
+        target: if approved, agent calls write_feature to persist the .usm file
+
+  - id: update-feature-status
+    name: Update feature status after implementation
+    description: |
+      After the agent implements the feature in code, it updates the .usm file
+      to reflect the new status and implementation paths.
+    steps:
+      - id: s1
+        action: get
+        target: feature $id or file path
+      - id: s2
+        action: update
+        target: status field (e.g., planned → built)
+      - id: s3
+        action: update
+        target: implementation.primary with code file path
+      - id: s4
+        action: update
+        target: implementation.test_code and test_code_status if tests written
+      - id: s5
+        action: validate
+        target: updated file against schema
+      - id: s6
+        action: write
+        target: persisted .usm file with $last_updated bumped
+
+  - id: update-feature-fields
+    name: Update arbitrary fields on an existing feature
+    description: |
+      Agent partially updates a feature spec — e.g., adding a flow, revising a
+      contract, or updating tests based on what was actually built.
+    steps:
+      - id: s1
+        action: get
+        target: feature $id or file path
+      - id: s2
+        action: merge
+        target: provided fields into existing feature object
+      - id: s3
+        action: validate
+        target: merged result against schema
+      - id: s4
+        action: write
+        target: persisted .usm file if valid, error if not
+
+contracts:
+  - id: draft-validates-before-returning
+    description: draft_feature must validate the spec before returning it
+    must_have:
+      - "Returns validation_status: valid or invalid"
+      - "If invalid, returns structured errors with field paths"
+      - "YAML is only generated if validation passes"
+  - id: write-is-atomic
+    description: write_feature must not leave partial/corrupt files on disk
+    must_have:
+      - "Validates full file before writing"
+      - "Writes to temp then renames (atomic on POSIX)"
+      - "Returns error if write fails — original file untouched"
+  - id: update-preserves-unspecified-fields
+    description: update_feature merges provided fields without losing existing ones
+    must_have:
+      - "Fields not in the update payload are preserved"
+      - "Array fields are replaced, not merged (explicit intent)"
+      - "$id, $type, $schema are immutable — cannot be changed via update"
+  - id: status-transitions-are-sane
+    description: update_feature_status enforces valid status transitions
+    must_have:
+      - "planned → in-progress → built is valid"
+      - "built → deprecated is valid"
+      - "built → planned is rejected (use a new feature instead)"
+
+tests:
+  - id: draft-minimal-feature
+    setup:
+      minimal_fields:
+        $id: test-org/my-feature
+        summary: A test feature
+        intent: To test the draft tool
+    expect:
+      - assertion: validation_status is valid
+      - assertion: returned YAML contains all required fields
+      - assertion: returned markdown has summary and intent sections
+  - id: draft-invalid-feature
+    setup:
+      invalid_fields:
+        $id: test-org/my-feature
+        summary: ""
+        intent: ""
+    expect:
+      - assertion: validation_status is invalid
+      - assertion: errors array contains summary and intent validation messages
+      - assertion: no YAML or markdown in response
+  - id: write-creates-new-file
+    setup:
+      valid_feature_yaml: true
+      target_path_does_not_exist: true
+    expect:
+      - assertion: file created at target path
+      - assertion: file content matches provided YAML
+  - id: update-status-to-built
+    setup:
+      existing_feature_status: in-progress
+      update_payload:
+        status: built
+        implementation:
+          primary: src/features/my-feature.ts
+    expect:
+      - assertion: status field is built
+      - assertion: implementation.primary is set
+      - assertion: $last_updated is bumped to today
+      - assertion: summary and intent preserved unchanged
+  - id: update-status-rejects-backwards
+    setup:
+      existing_feature_status: built
+      update_payload:
+        status: planned
+    expect:
+      - assertion: error returned with message about invalid transition
+      - assertion: original file unchanged
+
+implementation:
+  primary: src/mcp/write.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/mcp"
+  - "usm/mcp-validate"
+  - "usm/gen-feature-review"

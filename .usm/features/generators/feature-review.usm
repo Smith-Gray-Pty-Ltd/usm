@@ -1,0 +1,167 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-feature-review
+$type: feature
+$version: 1
+$last_updated: "2026-06-22"
+status: planned
+summary: |
+  Review-quality feature markdown — restructures the feature markdown generator to produce a spec document a human can read and approve, not a structural field dump. Optimises for the human review step in the spec-first workflow.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  In the spec-first workflow, the agent writes a feature .usm spec, generates
+  markdown, and the human reviews it before the agent builds. The current
+  markdown generator produces structural reference docs — tables of fields,
+  mechanical section ordering. A human reviewing a feature spec needs to
+  quickly answer: What will be built? What are the steps? What must be true?
+  How will it be tested? The current output doesn't frame these questions. This
+  feature restructures the feature markdown to read like a reviewable spec.
+
+decisions:
+  - id: review-mode-separate-from-reference
+    decision: Add a review-oriented template alongside the existing overview template
+    rationale: |
+      The existing overview.md is useful as a structural reference (what fields
+      exist, where files are). The review template serves a different purpose:
+      human approval before implementation. Keeping both lets the overview remain
+      a reference while the review doc is the approval artifact.
+    status: accepted
+  - id: flows-as-numbered-steps
+    decision: Render flows as numbered human-readable steps, not tables
+    rationale: |
+      A table of {id, action, target} is hard to read as a narrative. Numbered
+      steps like "1. Receive structured feature fields → 2. Validate against
+      schema → 3. Generate YAML + markdown" read like a procedure a human can
+      follow and approve.
+    status: accepted
+  - id: contracts-as-checklist
+    decision: Render contracts as a markdown checklist the human can mentally tick
+    rationale: |
+      Contracts are guarantees the implementation must satisfy. A checklist
+      (- [ ] ...) frames them as acceptance criteria, which is how a human
+      naturally reviews a spec: "does this cover what I expect?"
+    status: accepted
+  - id: tests-as-given-when-then
+    decision: Render tests in given/when/then format
+    rationale: |
+      The .usm test schema already has setup (given), implied action (when), and
+      expect (then). Making this explicit in the markdown helps the human
+      understand what test cases will verify the feature.
+    status: accepted
+
+flows:
+  - id: generate-review-doc
+    name: Generate review-quality markdown from feature .usm
+    description: |
+      When a feature .usm is generated, produce a review.md alongside overview.md
+      that frames the spec for human approval.
+    steps:
+      - id: s1
+        action: parse
+        target: feature .usm file
+      - id: s2
+        action: generate
+        target: review.md with intent, flows, contracts, tests sections
+      - id: s3
+        action: write
+        target: .agents-workspace/docs/<area>/review.md
+
+  - id: render-flows-as-prose
+    name: Render flows as numbered procedural steps
+    description: |
+      Convert the flows[] array into readable numbered steps grouped by flow,
+      with each step's action and target combined into a sentence.
+    steps:
+      - id: s1
+        action: parse
+        target: flows array
+      - id: s2
+        action: transform
+        target: each step into "N. {action} → {target}" format
+      - id: s3
+        action: group
+        target: steps by flow with flow name as subheading
+
+  - id: render-contracts-as-checklist
+    name: Render contracts as acceptance checklist
+    description: |
+      Convert the contracts[] array into a markdown checklist under each contract
+      description.
+    steps:
+      - id: s1
+        action: parse
+        target: contracts array
+      - id: s2
+        action: transform
+        target: each must_have item into "- [ ] {item}"
+      - id: s3
+        action: group
+        target: under contract description as subheading
+
+  - id: render-tests-as-bdd
+    name: Render tests in given/when/then format
+    description: |
+      Convert the tests[] array into given/when/then blocks for readability.
+    steps:
+      - id: s1
+        action: parse
+        target: tests array
+      - id: s2
+        action: transform
+        target: setup → Given, flow ref → When, expect → Then
+      - id: s3
+        action: format
+        target: each test as a block with bold Given/When/Then labels
+
+contracts:
+  - id: review-doc-has-approval-framing
+    description: The review.md must frame the spec for human approval
+    must_have:
+      - "Starts with a one-line intent summary in plain language"
+      - "Flows section reads as a procedure, not a data table"
+      - "Contracts section is a checklist, not a table"
+      - "Tests section uses given/when/then format"
+      - "Ends with an implementation plan section (primary file, status)"
+  - id: review-doc-is-separate-from-overview
+    description: review.md is a new file, overview.md is unchanged
+    must_have:
+      - "overview.md continues to be generated with current format"
+      - "review.md is generated alongside overview.md"
+      - "Both files share the same output directory"
+  - id: decisions-included-when-present
+    description: When a feature has decisions[], they appear in the review doc
+    must_have:
+      - "Each decision shows the decision text and rationale"
+      - "Decisions frame as 'Why this approach' section"
+
+tests:
+  - id: review-doc-from-feature-with-all-fields
+    setup:
+      feature_with_flows_contracts_tests_decisions: true
+    expect:
+      - assertion: review.md has Intent, Flows, Contracts, Tests, Decisions, Implementation sections
+      - assertion: flows rendered as numbered steps not tables
+      - assertion: contracts rendered as checklist
+      - assertion: tests rendered as given/when/then
+  - id: review-doc-from-minimal-feature
+    setup:
+      feature_with_only_summary_and_intent: true
+    expect:
+      - assertion: review.md has Intent section
+      - assertion: empty sections omitted (no empty Flows heading)
+  - id: overview-md-unchanged
+    setup:
+      feature_file: true
+    expect:
+      - assertion: overview.md content matches pre-change format
+      - assertion: review.md also generated in same directory
+
+implementation:
+  primary: src/generators/markdown.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/gen-markdown"
+  - "usm/mcp-write"

@@ -47,6 +47,11 @@ index:
     ref: .usm/features/cli/scaffold-project.usm
     status: active
     tags: [cli, project-setup]
+  - id: cli-docs
+    name: Docs Serve & Build
+    ref: .usm/features/cli/docs.usm
+    status: planned
+    tags: [cli, docs, vitepress, dev-server]
   - id: gen-markdown
     name: Markdown Generator
     ref: .usm/features/generators/markdown.usm
@@ -82,6 +87,16 @@ index:
     ref: .usm/features/generators/testSpecs.usm
     status: active
     tags: [generator, testing]
+  - id: gen-feature-review
+    name: Feature Review Markdown Generator
+    ref: .usm/features/generators/feature-review.usm
+    status: planned
+    tags: [generator, markdown, spec-first]
+  - id: gen-rules-files
+    name: Rules Files Generator
+    ref: .usm/features/generators/rules-files.usm
+    status: planned
+    tags: [generator, agent-rules, plugin]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm
@@ -122,6 +137,11 @@ index:
     ref: .usm/features/mcp/summary.usm
     status: active
     tags: [mcp, overview]
+  - id: mcp-write
+    name: MCP Write Tools
+    ref: .usm/features/mcp/write.usm
+    status: planned
+    tags: [mcp, authoring, spec-first]
   - id: schema-v1
     name: V1 JSON Schema
     ref: .usm/features/schema/v1.usm
