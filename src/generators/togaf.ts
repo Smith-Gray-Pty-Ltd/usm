@@ -13,7 +13,7 @@ import { findAllUsmFiles, parseUsmFile, isSystemFile, isServiceFile, isFeatureFi
 
 /**
  * Generate all TOGAF ADM phase deliverables.
- * Output: `.agents-workspace/docs/togaf/{phase}-{name}.md`
+ * Output: `.usm-workspace/docs/togaf/{phase}-{name}.md`
  */
 export function generateAllTogafDeliverables(system: SystemUsm, root: string): GenerationResult {
   const files = findAllUsmFiles(root);
@@ -61,7 +61,7 @@ export function generateAllTogafDeliverables(system: SystemUsm, root: string): G
 // ─── Helpers ──────────────────────────────────────────────────────────────────────
 
 function writeDoc(root: string, relativePath: string, content: string): string {
-  const fullPath = path.join(root, ".agents-workspace", "docs", "togaf", relativePath);
+  const fullPath = path.join(root, ".usm-workspace", "docs", "togaf", relativePath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, "utf-8");
   return fullPath;
@@ -353,7 +353,7 @@ function generatePhaseC1Data(system: SystemUsm, dataFiles: DataUsm[], root: stri
   // ER diagram (simplified)
   if (fs.existsSync(schemaPath)) {
     lines.push("## Entity-Relationship Overview\n\n");
-    lines.push("> For the full ER diagram, see `.agents-workspace/docs/data/models.md`.\n\n");
+    lines.push("> For the full ER diagram, see `.usm-workspace/docs/data/models.md`.\n\n");
   }
 
   const content = lines.join("");

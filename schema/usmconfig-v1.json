@@ -318,7 +318,7 @@
         },
         "agent_context": {
           "type": "string",
-          "default": ".agents-workspace/",
+          "default": ".usm-workspace/",
           "description": "Directory for generated agent context files"
         },
         "tests": {

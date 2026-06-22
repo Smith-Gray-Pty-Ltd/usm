@@ -140,7 +140,7 @@ export function generateOpenApiSpec(
     return {
       outputs: [
         {
-          path: `${root}/.agents-workspace/docs/api/openapi.yaml`,
+          path: `${root}/.usm-workspace/docs/api/openapi.yaml`,
           content: `openapi: 3.1.0
 info:
   title: Smith & Gray AI Platform API
@@ -450,7 +450,7 @@ tags: []
   return {
     outputs: [
       {
-        path: `${root}/.agents-workspace/docs/api/openapi.yaml`,
+        path: `${root}/.usm-workspace/docs/api/openapi.yaml`,
         content: yamlContent,
       },
     ],

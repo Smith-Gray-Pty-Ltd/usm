@@ -134,7 +134,7 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
       design_docs: "docs/design/",
       help_docs: "docs/help/",
       api_docs: "docs/api/",
-      agent_context: ".agents-workspace/",
+      agent_context: ".usm-workspace/",
       tests: "tests/auto-generated/",
       diagrams: "docs/diagrams/",
     },

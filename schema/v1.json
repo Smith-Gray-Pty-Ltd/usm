@@ -623,6 +623,29 @@
                 "enum": ["proposed", "accepted", "rejected", "superseded"],
                 "default": "accepted",
                 "description": "ADR status"
+              },
+              "alternatives": {
+                "type": "array",
+                "description": "Alternatives considered and rejected (ADR-style)",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "option": {
+                      "type": "string",
+                      "description": "The alternative that was considered"
+                    },
+                    "rejected_because": {
+                      "type": "string",
+                      "description": "Why this alternative was rejected"
+                    }
+                  },
+                  "required": ["option", "rejected_because"],
+                  "additionalProperties": false
+                }
+              },
+              "consequences": {
+                "type": "string",
+                "description": "What consequences this decision has (positive and negative)"
               }
             },
             "required": [
@@ -907,6 +930,29 @@
                 "enum": ["proposed", "accepted", "rejected", "superseded"],
                 "default": "accepted",
                 "description": "ADR status"
+              },
+              "alternatives": {
+                "type": "array",
+                "description": "Alternatives considered and rejected (ADR-style)",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "option": {
+                      "type": "string",
+                      "description": "The alternative that was considered"
+                    },
+                    "rejected_because": {
+                      "type": "string",
+                      "description": "Why this alternative was rejected"
+                    }
+                  },
+                  "required": ["option", "rejected_because"],
+                  "additionalProperties": false
+                }
+              },
+              "consequences": {
+                "type": "string",
+                "description": "What consequences this decision has (positive and negative)"
               }
             },
             "required": [

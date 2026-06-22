@@ -306,7 +306,7 @@ export function generateAllAppAgentsMd(
   );
   for (const pkg of pkgServices) {
     const slug = pkg.$id.split("/").pop() || "";
-    // Skip packages that don't have .agents-workspace directories
+    // Skip packages that don't have .usm-workspace directories
     // (they get a lighter docs shape)
     void slug; // no-op for now
   }

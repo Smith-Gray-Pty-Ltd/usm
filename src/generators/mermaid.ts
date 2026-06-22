@@ -63,7 +63,7 @@ const PACKAGE_COLOR = "#64748b";  // Slate
  * Generate a Mermaid architecture diagram from the system.usm services array.
  * Shows all apps, shared services, packages, and their dependencies in subgraphs.
  *
- * Output: `.agents-workspace/docs/architecture/architecture.md`
+ * Output: `.usm-workspace/docs/architecture/architecture.md`
  */
 export function generateArchitectureDiagram(system: SystemUsm, root: string): GenerationResult {
   const services = system.services || [];
@@ -172,7 +172,7 @@ export function generateArchitectureDiagram(system: SystemUsm, root: string): Ge
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/architecture/architecture.md`,
+      path: `${root}/.usm-workspace/docs/architecture/architecture.md`,
       content: lines.join("\n"),
     }],
   };
@@ -327,7 +327,7 @@ function formatExpectationNote(
  * Generate a Mermaid erDiagram from data/models.usm and the Prisma schema.
  * Appends the diagram to the existing models.md content.
  *
- * Output: injected into `.agents-workspace/docs/data/models.md`
+ * Output: injected into `.usm-workspace/docs/data/models.md`
  */
 export function generateERDiagram(dataFiles: DataUsm[], root: string, serviceFiles?: ServiceUsm[]): GenerationResult {
   // Parse the Prisma schema for the full ER info
@@ -382,7 +382,7 @@ export function generateERDiagram(dataFiles: DataUsm[], root: string, serviceFil
   lines.push("");
 
   // Now read the existing models.md and append the ER diagram section
-  const existingPath = `${root}/.agents-workspace/docs/data/models.md`;
+  const existingPath = `${root}/.usm-workspace/docs/data/models.md`;
   // Existing content is always set in try/catch below; declare without initializer
   let existingContent: string;
   try {
@@ -422,9 +422,9 @@ export function generateERDiagram(dataFiles: DataUsm[], root: string, serviceFil
  * what it depends on.
  *
  * Output:
- * - apps/{app}/.agents-workspace/docs/architecture/dependencies.md (for apps)
- * - .agents-workspace/docs/shared-services/{svc}/architecture/dependencies.md (for shared services)
- * - .agents-workspace/docs/packages/{pkg}/dependencies.md (for packages)
+ * - apps/{app}/.usm-workspace/docs/architecture/dependencies.md (for apps)
+ * - .usm-workspace/docs/shared-services/{svc}/architecture/dependencies.md (for shared services)
+ * - .usm-workspace/docs/packages/{pkg}/dependencies.md (for packages)
  */
 export function generateServiceDependencies(
   system: SystemUsm,
@@ -462,16 +462,16 @@ export function generateServiceDependencies(
 
     switch (classification) {
       case "app":
-        outputPath = `${root}/apps/${svc.id}/.agents-workspace/docs/architecture/dependencies.md`;
+        outputPath = `${root}/apps/${svc.id}/.usm-workspace/docs/architecture/dependencies.md`;
         break;
       case "shared-service":
-        outputPath = `${root}/.agents-workspace/docs/shared-services/${svc.id}/architecture/dependencies.md`;
+        outputPath = `${root}/.usm-workspace/docs/shared-services/${svc.id}/architecture/dependencies.md`;
         break;
       case "package":
-        outputPath = `${root}/.agents-workspace/docs/packages/${svc.id}/dependencies.md`;
+        outputPath = `${root}/.usm-workspace/docs/packages/${svc.id}/dependencies.md`;
         break;
       default:
-        outputPath = `${root}/.agents-workspace/docs/packages/${svc.id}/dependencies.md`;
+        outputPath = `${root}/.usm-workspace/docs/packages/${svc.id}/dependencies.md`;
     }
 
     outputs.push({ path: outputPath, content });

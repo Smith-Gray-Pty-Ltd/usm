@@ -39,7 +39,7 @@ interface XmiRelationship {
 
 /**
  * Generate ArchiMate 3.1 Open Exchange XML from USM.
- * Output: `.agents-workspace/docs/archimate/model.xml`
+ * Output: `.usm-workspace/docs/archimate/model.xml`
  */
 export function generateArchiMateModel(system: SystemUsm, root: string): GenerationResult {
   // 1. Load all .usm files (excluding system — already passed as param)
@@ -476,7 +476,7 @@ export function generateArchiMateModel(system: SystemUsm, root: string): Generat
   const xml = renderXmi(elements, relationships, system);
 
   // 4. Write output
-  const outPath = path.join(root, ".agents-workspace", "docs", "archimate", "model.xml");
+  const outPath = path.join(root, ".usm-workspace", "docs", "archimate", "model.xml");
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, xml, "utf-8");
 

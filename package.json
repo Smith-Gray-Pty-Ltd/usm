@@ -67,6 +67,14 @@
     "js-yaml": "^4.1.0",
     "zod": "^3.23.8"
   },
+  "peerDependencies": {
+    "vitepress": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitepress": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/js-yaml": "^4.0.9",

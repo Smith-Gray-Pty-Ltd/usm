@@ -29,40 +29,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
+      - name: Install VitePress
+        run: pnpm add -D vitepress
+
+      - name: Build USM
         run: pnpm run build
 
       - name: Generate docs
-        # Generate the docs site from this repo's own .usm/ scope (dogfooding)
-        run: |
-          if [ ! -d ".usm" ]; then
-            echo "No .usm/ found — running usm init"
-            node dist/cli/index.js init
-          fi
-          node dist/cli/index.js generate
+        run: node dist/cli/index.js generate
 
-      - name: Verify docs directory
-        run: |
-          ls -la .agents-workspace/docs/ | head -10
-          echo "---"
-          echo "Total files: $(find .agents-workspace/docs -type f | wc -l)"
-
-      - name: Convert Markdown to HTML
-        # Cloudflare Pages does NOT auto-render Markdown (unlike GitHub Pages).
-        # We convert .md → .html ourselves, with README.md → index.html.
-        run: |
-          rm -rf .agents-workspace/site
-          npx tsx scripts/md-to-html.ts .agents-workspace/docs .agents-workspace/site
-
-      - name: Add CSS stylesheet
-        run: |
-          mkdir -p .agents-workspace/site/assets
-          cp scripts/site-style.css .agents-workspace/site/assets/style.css
-
-      - name: Setup Node.js (for wrangler)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+      - name: Build docs site
+        run: node dist/cli/index.js docs build
 
       - name: Install wrangler
         run: npm install -g wrangler@3
@@ -72,7 +49,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          wrangler pages deploy .agents-workspace/site \
+          wrangler pages deploy .usm-workspace/docs/.vitepress/dist \
             --project-name=usm-dev \
             --branch=main \
             --commit-dirty=true \

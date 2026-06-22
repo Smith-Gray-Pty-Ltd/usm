@@ -1062,6 +1062,27 @@ program
     }
   });
 
+// ─── docs ─────────────────────────────────────────────────────────────────────
+
+program
+  .command("docs")
+  .description("Docs site commands (requires VitePress)")
+  .arguments("<action>")
+  .option("-p, --port <port>", "Dev server port (default: 5173)", "5173")
+  .action(async (action: string, options: { port: string }) => {
+    const root = path.resolve(process.cwd());
+    const { docsBuild, docsServe } = await import("./docs.js");
+
+    if (action === "build") {
+      await docsBuild(root);
+    } else if (action === "serve") {
+      await docsServe(root, parseInt(options.port, 10));
+    } else {
+      console.error(`Unknown docs action: ${action}. Use 'build' or 'serve'.`);
+      process.exit(1);
+    }
+  });
+
 // ─── generate:togaf ─────────────────────────────────────────────────────────────
 
 program

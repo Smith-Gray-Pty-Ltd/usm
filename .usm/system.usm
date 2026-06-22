@@ -168,11 +168,40 @@ data:
     ref: .usm/data/usm-config.usm
 
 infrastructure:
-  cloud: ""
-  region: ""
-  terraform_ref: ""
+  cloud: cloudflare
+  region: global
   dns: usm.dev
-  ssl: ""
+  ssl: cloudflare-managed
+
+deployment:
+  environments:
+    - name: dev
+      url: "http://localhost:5173"
+      type: local
+      notes: "usm docs serve — VitePress dev server"
+    - name: production
+      url: "https://usm.dev"
+      type: cloudflare-pages
+      build_command: "pnpm install --frozen-lockfile && pnpm add -D vitepress && pnpm run build && node dist/cli/index.js generate && node dist/cli/index.js docs build"
+      output_directory: ".usm-workspace/docs/.vitepress/dist"
+      project_name: usm-dev
+      secrets:
+        - CLOUDFLARE_API_TOKEN
+        - CLOUDFLARE_ACCOUNT_ID
+      notes: |
+        Deployed via GitHub Actions on push to main (.github/workflows/docs.yml).
+        Cloudflare Pages — free tier (unlimited static sites, requests, bandwidth).
+
+operations:
+  deployment_setup: |
+    One-time Cloudflare Pages setup:
+    1. Create Cloudflare API token (Pages:Edit, Account:Read scopes)
+    2. Add GitHub secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+    3. Create Pages project 'usm-dev' connected to GitHub repo
+    4. Set build output directory: .usm-workspace/docs/.vitepress/dist
+    5. Add custom domain usm.dev (CNAME auto-added by Cloudflare)
+  monitoring: "Cloudflare Pages dashboard — build status and deploy logs"
+  alerts: "GitHub Actions workflow failure notifications"
 
 principles:
   - key: structured-source-of-truth

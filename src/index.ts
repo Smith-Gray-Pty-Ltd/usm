@@ -62,6 +62,7 @@ export type {
   TestingConfig,
   SecurityConfig,
   Decision,
+  DecisionAlternative,
   Risk,
   RoadmapItem,
   Module,

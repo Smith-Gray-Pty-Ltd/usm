@@ -194,12 +194,19 @@ export interface SecurityConfig {
   [key: string]: unknown;
 }
 
+export interface DecisionAlternative {
+  option: string;
+  rejected_because: string;
+}
+
 export interface Decision {
   id: string;
   decision: string;
   rationale: string;
   date?: string;
   status?: "proposed" | "accepted" | "rejected" | "superseded";
+  alternatives?: DecisionAlternative[];
+  consequences?: string;
 }
 
 export interface Risk {

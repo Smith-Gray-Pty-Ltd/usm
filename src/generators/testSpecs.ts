@@ -290,7 +290,7 @@ export function generateAggregatedSpecs(
   return {
     outputs: [
       {
-        path: `${root}/.agents-workspace/docs/testing/specs.md`,
+        path: `${root}/.usm-workspace/docs/testing/specs.md`,
         content: lines.join("\n"),
       },
     ],

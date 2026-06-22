@@ -161,7 +161,7 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
     const port = svc.port ? `, port ${svc.port}` : "";
     const slug = svc.id;
     const svcName = svc.name || slugToTitle(slug);
-    lines.push(`- [${svcName}](apps/${slug}/.agents-workspace/docs/README.md) —${port}`);
+    lines.push(`- [${svcName}](apps/${slug}/.usm-workspace/docs/README.md) —${port}`);
   }
   lines.push("");
 
@@ -270,7 +270,7 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   return {
     outputs: [
       {
-        path: `${root}/.agents-workspace/docs/README.md`,
+        path: `${root}/.usm-workspace/docs/README.md`,
         content: lines.join("\n"),
       },
     ],
@@ -281,9 +281,9 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
 
 /**
  * Determine which bucket a service belongs to:
- * - 'app' → apps/{name}/.agents-workspace/docs/ (full shape)
- * - 'shared-service' → .agents-workspace/docs/shared-services/{name}/ (full shape)
- * - 'package' → .agents-workspace/docs/packages/{name}/ (light shape)
+ * - 'app' → apps/{name}/.usm-workspace/docs/ (full shape)
+ * - 'shared-service' → .usm-workspace/docs/shared-services/{name}/ (full shape)
+ * - 'package' → .usm-workspace/docs/packages/{name}/ (light shape)
  * - 'data' → skip (handled by generateDataModelDoc separately)
  */
 function classifyService(file: ServiceUsm): "app" | "shared-service" | "package" | "data" | "seed-data" {
@@ -354,7 +354,7 @@ function generateServiceMarkdown(file: ServiceUsm, root: string): GenerationResu
 // ─── Data → Data Model Doc ────────────────────────────────────────────────────
 
 function generateDataMarkdown(file: DataUsm, root: string): GenerationResult {
-  // Data files generate their content into .agents-workspace/docs/data/models.md
+  // Data files generate their content into .usm-workspace/docs/data/models.md
   // This is handled by generateDataModelDoc in the aggregator pass.
   // Return empty here — the data file's output is generated in the aggregator.
   return { outputs: [] };
@@ -499,7 +499,7 @@ function generateFeatureMarkdown(
   const featureOutputName = hasSubPath
     ? `${featureSlug}.md`
     : `${featureSlug}/index.md`;
-  const outputPath = `${root}/${appDir}/.agents-workspace/docs/features/${featureOutputName}`;
+  const outputPath = `${root}/${appDir}/.usm-workspace/docs/features/${featureOutputName}`;
 
   return {
     outputs: [{ path: outputPath, content: lines.join("\n") }],
@@ -593,7 +593,7 @@ export function generateAreaOverviews(root: string): GenerationResult {
       const appDir = `apps/${serviceDir}`;
 
       const content = buildAreaOverviewContent(areaName, subFeatures, serviceDir);
-      const outputPath = `${root}/${appDir}/.agents-workspace/docs/features/${areaName}/index.md`;
+      const outputPath = `${root}/${appDir}/.usm-workspace/docs/features/${areaName}/index.md`;
 
       outputs.push({ path: outputPath, content });
     }
@@ -642,7 +642,7 @@ function buildAreaOverviewContent(
 // ─── App Service Docs (Full Shape) ────────────────────────────────────────────
 
 function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
-  const appRoot = `${root}/apps/${slug}/.agents-workspace/docs`;
+  const appRoot = `${root}/apps/${slug}/.usm-workspace/docs`;
   const outputs: GenerationResult["outputs"] = [];
 
   // README.md — entry point
@@ -772,7 +772,7 @@ function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): G
 // ─── Shared Service Docs (Full Shape) ─────────────────────────────────────────
 
 function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
-  const svcRoot = `${root}/.agents-workspace/docs/shared-services/${slug}`;
+  const svcRoot = `${root}/.usm-workspace/docs/shared-services/${slug}`;
   const outputs: GenerationResult["outputs"] = [];
 
   // README.md — entry point
@@ -844,7 +844,7 @@ function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string)
 // ─── Package Docs (Light Shape) ───────────────────────────────────────────────
 
 function generatePackageDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
-  const pkgRoot = `${root}/.agents-workspace/docs/packages/${slug}`;
+  const pkgRoot = `${root}/.usm-workspace/docs/packages/${slug}`;
   const outputs: GenerationResult["outputs"] = [];
 
   // README.md
@@ -1330,7 +1330,7 @@ function buildRisksMd(file: ServiceUsm): string {
   } else {
     lines.push("No risks defined in this service's .usm file.");
     lines.push("");
-    lines.push("For platform-wide risks, see [Platform Risks](../../.agents-workspace/docs/risks.md).");
+    lines.push("For platform-wide risks, see [Platform Risks](../../.usm-workspace/docs/risks.md).");
     lines.push("");
   }
 
@@ -1352,7 +1352,7 @@ function buildRoadmapMd(file: ServiceUsm): string {
   } else {
     lines.push("No roadmap items defined in this service's .usm file.");
     lines.push("");
-    lines.push("For the platform roadmap, see [Platform Roadmap](../../.agents-workspace/docs/roadmap.md).");
+    lines.push("For the platform roadmap, see [Platform Roadmap](../../.usm-workspace/docs/roadmap.md).");
     lines.push("");
   }
 
@@ -1375,7 +1375,7 @@ export function generateSurfaceTables(
   // For each app service
   for (const app of APP_DIRS) {
     const appFeatures = featuresForApp(features, app);
-    const overviewPath = `${root}/apps/${app}/.agents-workspace/docs/overview.md`;
+    const overviewPath = `${root}/apps/${app}/.usm-workspace/docs/overview.md`;
 
     if (fs.existsSync(overviewPath)) {
       const content = injectSurfaceTables(
@@ -1394,7 +1394,7 @@ export function generateSurfaceTables(
 
   for (const slug of sharedServiceSlugs) {
     const svcFeatures = featuresForService(features, slug);
-    const overviewPath = `${root}/.agents-workspace/docs/shared-services/${slug}/overview.md`;
+    const overviewPath = `${root}/.usm-workspace/docs/shared-services/${slug}/overview.md`;
 
     if (fs.existsSync(overviewPath)) {
       const content = injectSurfaceTables(
@@ -1580,7 +1580,7 @@ export function generateSharedServicesIndex(services: ServiceUsm[], root: string
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/shared-services/README.md`,
+      path: `${root}/.usm-workspace/docs/shared-services/README.md`,
       content: lines.join("\n"),
     }],
   };
@@ -1611,7 +1611,7 @@ export function generatePackagesIndex(services: ServiceUsm[], root: string): Gen
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/packages/README.md`,
+      path: `${root}/.usm-workspace/docs/packages/README.md`,
       content: lines.join("\n"),
     }],
   };
@@ -1645,7 +1645,7 @@ export function generateRisksDoc(system: SystemUsm, root: string): GenerationRes
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/risks.md`,
+      path: `${root}/.usm-workspace/docs/risks.md`,
       content: lines.join("\n"),
     }],
   };
@@ -1678,7 +1678,7 @@ export function generateRoadmapDoc(system: SystemUsm, root: string): GenerationR
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/roadmap.md`,
+      path: `${root}/.usm-workspace/docs/roadmap.md`,
       content: lines.join("\n"),
     }],
   };
@@ -1854,7 +1854,7 @@ export function generateDataModelDoc(dataFiles: DataUsm[], root: string, service
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/data/models.md`,
+      path: `${root}/.usm-workspace/docs/data/models.md`,
       content: lines.join("\n"),
     }],
   };
@@ -1874,7 +1874,7 @@ export function generateDataIndex(root: string): GenerationResult {
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/data/README.md`,
+      path: `${root}/.usm-workspace/docs/data/README.md`,
       content: lines.join("\n"),
     }],
   };
@@ -2047,7 +2047,7 @@ export function generateSeedDataDoc(serviceFiles: ServiceUsm[], root: string): G
 
   return {
     outputs: [{
-      path: `${root}/.agents-workspace/docs/data/seed_users.md`,
+      path: `${root}/.usm-workspace/docs/data/seed_users.md`,
       content: lines.join("\n"),
     }],
   };
@@ -2100,7 +2100,7 @@ export function generatePerAppDecisions(
     }
 
     outputs.push({
-      path: `${root}/apps/${app}/.agents-workspace/docs/decisions/README.md`,
+      path: `${root}/apps/${app}/.usm-workspace/docs/decisions/README.md`,
       content: lines.join("\n"),
     });
   }
@@ -2118,7 +2118,7 @@ export function generatePerAppDecisions(
       renderDecisionsTable(lines, svc.decisions);
 
       outputs.push({
-        path: `${root}/.agents-workspace/docs/shared-services/${slug}/decisions/README.md`,
+        path: `${root}/.usm-workspace/docs/shared-services/${slug}/decisions/README.md`,
         content: lines.join("\n"),
       });
     }
@@ -2154,7 +2154,7 @@ export function generatePerAppApiReference(features: FeatureUsm[], root: string)
     lines.push("");
 
     outputs.push({
-      path: `${root}/apps/${app}/.agents-workspace/docs/api/reference.md`,
+      path: `${root}/apps/${app}/.usm-workspace/docs/api/reference.md`,
       content: lines.join("\n"),
     });
   }
@@ -2190,7 +2190,7 @@ export function generatePerAppApiContracts(features: FeatureUsm[], root: string)
     }
 
     outputs.push({
-      path: `${root}/apps/${app}/.agents-workspace/docs/api/contracts.md`,
+      path: `${root}/apps/${app}/.usm-workspace/docs/api/contracts.md`,
       content: lines.join("\n"),
     });
   }
@@ -2265,7 +2265,7 @@ export function generatePerAppUiMap(features: FeatureUsm[], root: string): Gener
     }
 
     outputs.push({
-      path: `${root}/apps/${app}/.agents-workspace/docs/ui/ui-map.md`,
+      path: `${root}/apps/${app}/.usm-workspace/docs/ui/ui-map.md`,
       content: lines.join("\n"),
     });
   }
@@ -2302,7 +2302,7 @@ export function generatePerAppTestSpecs(features: FeatureUsm[], root: string): G
     }
 
     outputs.push({
-      path: `${root}/apps/${app}/.agents-workspace/docs/testing/specs.md`,
+      path: `${root}/apps/${app}/.usm-workspace/docs/testing/specs.md`,
       content: lines.join("\n"),
     });
   }
@@ -2394,7 +2394,7 @@ function buildArchOverview(file: ServiceUsm, slug: string): string {
   // Cross-link to platform-level
   lines.push("## Platform-Level Docs");
   lines.push("");
-  lines.push("For the full platform architecture, see [Platform System Architecture](../../../../.agents-workspace/docs/architecture/system-architecture.md).");
+  lines.push("For the full platform architecture, see [Platform System Architecture](../../../../.usm-workspace/docs/architecture/system-architecture.md).");
   lines.push("");
 
   return lines.join("\n");
@@ -2413,7 +2413,7 @@ function buildArchSystemArchitecture(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push("For the full system architecture, see:");
   lines.push("");
-  lines.push("- [Platform System Architecture](../../../../.agents-workspace/docs/architecture/system-architecture.md)");
+  lines.push("- [Platform System Architecture](../../../../.usm-workspace/docs/architecture/system-architecture.md)");
   lines.push("");
 
   // Modules summary
@@ -2462,7 +2462,7 @@ function buildArchSecurity(file: ServiceUsm, slug: string): string {
   // Cross-link to platform security
   lines.push("## Platform-Level Security");
   lines.push("");
-  lines.push("For the full platform security model, see [Platform Security Model](../../../../.agents-workspace/docs/architecture/security-model.md).");
+  lines.push("For the full platform security model, see [Platform Security Model](../../../../.usm-workspace/docs/architecture/security-model.md).");
   lines.push("");
 
   return lines.join("\n");
@@ -2479,7 +2479,7 @@ function buildArchDataModel(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push(`This app uses the shared data model.`);
   lines.push("");
-  lines.push("For the full data model documentation, see [Data Models](../../../../.agents-workspace/docs/data/models.md).");
+  lines.push("For the full data model documentation, see [Data Models](../../../../.usm-workspace/docs/data/models.md).");
   lines.push("");
 
   // List modules that reference the database
@@ -2596,7 +2596,7 @@ function buildDeployProduction(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push("For AWS deployment documentation, see:");
   lines.push("");
-  lines.push("- [AWS Deployment](../../../../.agents-workspace/docs/deployment/aws.md)");
+  lines.push("- [AWS Deployment](../../../../.usm-workspace/docs/deployment/aws.md)");
   lines.push("- [AWS Runbook](../../../../docs/deployment/clouds/aws/runbook.md)");
   lines.push("");
 
@@ -2614,7 +2614,7 @@ function buildOpsObservability(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push("This app uses platform-level observability infrastructure.");
   lines.push("");
-  lines.push("For monitoring, alerting, and dashboard details, see [Platform Observability](../../../../.agents-workspace/docs/operations/observability.md).");
+  lines.push("For monitoring, alerting, and dashboard details, see [Platform Observability](../../../../.usm-workspace/docs/operations/observability.md).");
   lines.push("");
 
   // Health check
@@ -2641,7 +2641,7 @@ function buildOpsIncidentResponse(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push("This app follows the platform incident response process.");
   lines.push("");
-  lines.push("For runbooks and escalation procedures, see [Platform Incident Response](../../../../.agents-workspace/docs/operations/incident-response.md).");
+  lines.push("For runbooks and escalation procedures, see [Platform Incident Response](../../../../.usm-workspace/docs/operations/incident-response.md).");
   lines.push("");
 
   return lines.join("\n");
