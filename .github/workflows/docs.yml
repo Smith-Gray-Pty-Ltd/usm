@@ -47,6 +47,18 @@ jobs:
           echo "---"
           echo "Total files: $(find .agents-workspace/docs -type f | wc -l)"
 
+      - name: Convert Markdown to HTML
+        # Cloudflare Pages does NOT auto-render Markdown (unlike GitHub Pages).
+        # We convert .md → .html ourselves, with README.md → index.html.
+        run: |
+          rm -rf .agents-workspace/site
+          npx tsx scripts/md-to-html.ts .agents-workspace/docs .agents-workspace/site
+
+      - name: Add CSS stylesheet
+        run: |
+          mkdir -p .agents-workspace/site/assets
+          cp scripts/site-style.css .agents-workspace/site/assets/style.css
+
       - name: Setup Node.js (for wrangler)
         uses: actions/setup-node@v4
         with:
@@ -60,7 +72,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          wrangler pages deploy .agents-workspace/docs \
+          wrangler pages deploy .agents-workspace/site \
             --project-name=usm-dev \
             --branch=main \
             --commit-dirty=true \
