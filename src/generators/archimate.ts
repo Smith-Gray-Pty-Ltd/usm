@@ -187,7 +187,7 @@ export function generateArchiMateModel(system: SystemUsm, root: string): Generat
 
   // ── Business layer: actors (from system.services) ──────────────────────────
   // Map well-known app services as Business Actors
-  const appServiceIds = new Set(["the-architect", "tenant", "platform", "marketing", "desktop", "mobile"]);
+  const appServiceIds = new Set<string>();
   if (system.services) {
     for (const s of system.services) {
       if (appServiceIds.has(s.id)) {
