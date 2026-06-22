@@ -47,9 +47,21 @@ jobs:
           echo "---"
           echo "Total files: $(find .agents-workspace/docs -type f | wc -l)"
 
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - name: Setup Node.js (for wrangler)
+        uses: actions/setup-node@v4
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy .agents-workspace/docs --project-name=usm-dev --branch=main --commit-dirty=true --commit-message="${{ github.event.head_commit.message }}"
+          node-version: 22
+
+      - name: Install wrangler
+        run: npm install -g wrangler@3
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler pages deploy .agents-workspace/docs \
+            --project-name=usm-dev \
+            --branch=main \
+            --commit-dirty=true \
+            --commit-message="${{ github.event.head_commit.message }}"
