@@ -256,6 +256,18 @@ export default defineConfig({
 }
 
 /**
+ * VitePress uses index.md as the home page, but the generator produces README.md.
+ * Copy README.md → index.md so VitePress serves it at /.
+ */
+function ensureIndexPage(docsRoot: string): void {
+  const readme = path.join(docsRoot, "README.md");
+  const index = path.join(docsRoot, "index.md");
+  if (fs.existsSync(readme)) {
+    fs.copyFileSync(readme, index);
+  }
+}
+
+/**
  * Write the VitePress config and run vitepress build.
  */
 export async function docsBuild(root: string): Promise<void> {
@@ -278,6 +290,9 @@ export async function docsBuild(root: string): Promise<void> {
   if (escaped > 0) {
     console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
   }
+
+  // VitePress needs index.md, not README.md
+  ensureIndexPage(docsRoot);
 
   // Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
@@ -330,6 +345,9 @@ export async function docsServe(root: string, port: number): Promise<void> {
   if (escaped > 0) {
     console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
   }
+
+  // VitePress needs index.md, not README.md
+  ensureIndexPage(docsRoot);
 
   // Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
