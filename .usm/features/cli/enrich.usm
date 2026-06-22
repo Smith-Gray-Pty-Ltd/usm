@@ -53,6 +53,43 @@ tests:
       - assertion: no files written
       - assertion: planned changes reported
 
+usage:
+  - command: "usm enrich"
+    description: "Enrich all .usm files with TODO placeholders"
+  - command: "usm enrich --file .usm/features/auth/login.usm"
+    description: "Enrich a single file"
+  - command: "usm enrich --dry-run"
+    description: "Show what would change without calling LLM or writing"
+  - command: "usm enrich --model anthropic/claude-sonnet-4-5"
+    description: "Override the LLM model"
+
+options:
+  - flag: "--root <root>"
+    description: "Monorepo root directory"
+    default: "current directory"
+  - flag: "--file <file>"
+    description: "Single .usm file to enrich"
+    default: "all files with TODOs"
+  - flag: "--dry-run"
+    description: "Show changes without writing or calling LLM"
+    default: "false"
+  - flag: "--fields <fields>"
+    description: "Comma-separated fields to enrich"
+    default: "summary,intent,decisions,flows,contracts,tests,status"
+  - flag: "--model <model>"
+    description: "Override LLM model"
+    default: "from usmconfig.json"
+  - flag: "--provider <provider>"
+    description: "Override provider (litellm|openai|anthropic|ollama)"
+    default: "from usmconfig.json"
+  - flag: "--url <url>"
+    description: "Override LLM API URL"
+    default: "from usmconfig.json"
+
+prerequisites:
+  - ".usm files with TODO: describe placeholders"
+  - "LLM provider configured in usmconfig.json or via flags"
+
 implementation:
   primary: src/enrich/index.ts
   test_code: ""

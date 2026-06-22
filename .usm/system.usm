@@ -108,6 +108,11 @@ index:
     ref: .usm/features/generators/docs-split.usm
     status: built
     tags: [generator, docs, audience]
+  - id: gen-help-reference
+    name: Help Docs Reference Expansion
+    ref: .usm/features/generators/help-reference.usm
+    status: in-progress
+    tags: [generator, docs, reference, schema]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm

@@ -276,6 +276,28 @@ tests:
       - assertion: docs/features/generators/feature-review.md exists
       - assertion: no files in apps/*/.agents-workspace/docs/
 
+usage:
+  - command: "usm docs serve"
+    description: "Start VitePress dev server with live reload"
+  - command: "usm docs serve --audience help"
+    description: "Serve filtered help docs (public-facing)"
+  - command: "usm docs build"
+    description: "Build static site for deployment"
+  - command: "usm docs build --audience help"
+    description: "Build static help docs site"
+
+options:
+  - flag: "--port <port>"
+    description: "Dev server port"
+    default: "5173"
+  - flag: "--audience <audience>"
+    description: "Audience: developer (full) or help (public, filtered)"
+    default: "developer"
+
+prerequisites:
+  - "Run 'usm generate' first to produce docs"
+  - "VitePress installed (pnpm add -D vitepress)"
+
 implementation:
   primary: src/cli/docs.ts
   test_code: ""

@@ -20,7 +20,7 @@ import type {
   ServiceInfrastructure,
   LocalDevelopment,
 } from "../types.js";
-import { findUsmFiles, parseUsmFile, isServiceFile, isFeatureFile, findAllUsmDirs } from "../index.js";
+import { findUsmFiles, findAllUsmFiles, parseUsmFile, isServiceFile, isFeatureFile, findAllUsmDirs } from "../index.js";
 import { generateSequenceDiagrams } from "./mermaid.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1984,6 +1984,310 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
   return {
     outputs: [{
       path: `${root}/.usm-workspace/docs/getting-started.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
+ * Generate docs/cli-reference.md — from feature specs with usage/options fields.
+ * Scans all .usm feature files for usage examples and CLI options.
+ * Generic — works for any project that adds usage/options to their feature specs.
+ */
+export function generateCliReference(root: string): GenerationResult {
+  const lines: string[] = [];
+  lines.push("# CLI Reference");
+  lines.push("");
+  lines.push("Commands and options for the `usm` CLI.");
+  lines.push("");
+
+  // Find all .usm files and look for ones with usage fields
+  const allFiles = findAllUsmFiles(root);
+  const commands: Array<{ id: string; name: string; summary: string; usage?: unknown[]; options?: unknown[]; prerequisites?: string[] }> = [];
+
+  for (const filePath of allFiles) {
+    try {
+      const parsed = parseUsmFile(filePath);
+      if (parsed.$type !== "feature") continue;
+      const feature = parsed as FeatureUsm;
+      if (!feature.usage && !feature.options) continue;
+      commands.push({
+        id: feature.$id,
+        name: feature.$id.split("/").pop() || feature.$id,
+        summary: feature.summary,
+        usage: feature.usage as unknown[],
+        options: feature.options as unknown[],
+        prerequisites: feature.prerequisites,
+      });
+    } catch {
+      // Skip unparseable
+    }
+  }
+
+  if (commands.length === 0) {
+    return { outputs: [] };
+  }
+
+  // Sort by name
+  commands.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Quick reference table
+  lines.push("## Quick Reference");
+  lines.push("");
+  lines.push("| Command | Description |");
+  lines.push("|---------|-------------|");
+  for (const cmd of commands) {
+    const firstLine = cmd.summary.split("\n")[0].slice(0, 80);
+    lines.push(`| \`${cmd.name}\` | ${firstLine} |`);
+  }
+  lines.push("");
+
+  // Per-command details
+  for (const cmd of commands) {
+    lines.push(`## ${cmd.name}`);
+    lines.push("");
+    lines.push(cmd.summary);
+    lines.push("");
+
+    if (cmd.prerequisites && cmd.prerequisites.length > 0) {
+      lines.push("**Prerequisites**:");
+      lines.push("");
+      for (const p of cmd.prerequisites) {
+        lines.push(`- ${p}`);
+      }
+      lines.push("");
+    }
+
+    if (cmd.usage && Array.isArray(cmd.usage) && cmd.usage.length > 0) {
+      lines.push("### Usage");
+      lines.push("");
+      lines.push("```bash");
+      for (const u of cmd.usage) {
+        const usage = u as { command: string; description: string };
+        lines.push(`# ${usage.description}`);
+        lines.push(usage.command);
+        lines.push("");
+      }
+      lines.push("```");
+      lines.push("");
+    }
+
+    if (cmd.options && Array.isArray(cmd.options) && cmd.options.length > 0) {
+      lines.push("### Options");
+      lines.push("");
+      lines.push("| Flag | Description | Default |");
+      lines.push("|------|-------------|---------|");
+      for (const o of cmd.options) {
+        const opt = o as { flag: string; description: string; default?: string };
+        lines.push(`| \`${opt.flag}\` | ${opt.description} | ${opt.default || "—"} |`);
+      }
+      lines.push("");
+    }
+  }
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/cli-reference.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
+ * Generate docs/config-reference.md — from usmconfig-v1.json schema.
+ * Reads the JSON schema and produces a human-readable field reference.
+ * Generic — the config schema is the same for all USM projects.
+ */
+export function generateConfigReference(root: string): GenerationResult {
+  const schemaPath = path.resolve(__dirname, "..", "..", "schema", "usmconfig-v1.json");
+  if (!fs.existsSync(schemaPath)) {
+    return { outputs: [] };
+  }
+
+  const schema = JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as Record<string, unknown>;
+  const props = schema.properties as Record<string, Record<string, unknown>>;
+  const defs = (schema.$defs || {}) as Record<string, Record<string, unknown>>;
+
+  const lines: string[] = [];
+  lines.push("# Configuration Reference");
+  lines.push("");
+  lines.push("Fields in `usmconfig.json` — the configuration file that drives `usm init` and `usm scan`.");
+  lines.push("");
+
+  // Top-level fields
+  lines.push("## Top-Level Fields");
+  lines.push("");
+  lines.push("| Field | Type | Description |");
+  lines.push("|-------|------|-------------|");
+  const required = (schema.required as string[]) || [];
+  for (const [key, val] of Object.entries(props)) {
+    const type = (val.type as string) || (val.$ref ? `$ref → ${val.$ref}` : "—");
+    const desc = (val.description as string) || "—";
+    const reqMark = required.includes(key) ? " *(required)*" : "";
+    lines.push(`| \`${key}\`${reqMark} | ${type} | ${desc} |`);
+  }
+  lines.push("");
+
+  // $defs sections
+  for (const [defName, defVal] of Object.entries(defs)) {
+    const defProps = defVal.properties as Record<string, Record<string, unknown>> | undefined;
+    if (!defProps) continue;
+    const defDesc = (defVal.description as string) || "";
+    lines.push(`## ${defName}`);
+    lines.push("");
+    if (defDesc) {
+      lines.push(defDesc);
+      lines.push("");
+    }
+    lines.push("| Field | Type | Description |");
+    lines.push("|-------|------|-------------|");
+    const defRequired = (defVal.required as string[]) || [];
+    for (const [key, val] of Object.entries(defProps)) {
+      const type = (val.type as string) || (val.$ref ? `$ref` : "—");
+      const desc = (val.description as string) || "—";
+      const reqMark = defRequired.includes(key) ? " *(required)*" : "";
+      lines.push(`| \`${key}\`${reqMark} | ${type} | ${desc} |`);
+    }
+    lines.push("");
+  }
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/config-reference.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
+ * Generate docs/schema-reference.md — from v1.json schema.
+ * Reads the JSON schema and produces a field reference for each .usm type.
+ * Generic — the schema is the same for all USM projects.
+ */
+export function generateSchemaReference(root: string): GenerationResult {
+  const schemaPath = path.resolve(__dirname, "..", "..", "schema", "v1.json");
+  if (!fs.existsSync(schemaPath)) {
+    return { outputs: [] };
+  }
+
+  const schema = JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as Record<string, unknown>;
+  const oneOf = schema.oneOf as Array<Record<string, unknown>> | undefined;
+  if (!oneOf) {
+    return { outputs: [] };
+  }
+
+  const lines: string[] = [];
+  lines.push("# Schema Reference");
+  lines.push("");
+  lines.push("Fields for each `.usm` file type, derived from the [v1 JSON Schema](https://usm.dev/schema/v1.json).");
+  lines.push("");
+
+  for (const subSchema of oneOf) {
+    const props = subSchema.properties as Record<string, Record<string, unknown>> | undefined;
+    if (!props) continue;
+
+    const typeVal = (props.$type as Record<string, unknown>)?.const as string | undefined;
+    const typeName = typeVal || "unknown";
+    lines.push(`## ${typeName.charAt(0).toUpperCase() + typeName.slice(1)} Files`);
+    lines.push("");
+
+    const required = (subSchema.required as string[]) || [];
+    lines.push("| Field | Type | Required | Description |");
+    lines.push("|-------|------|----------|-------------|");
+
+    for (const [key, val] of Object.entries(props)) {
+      if (key.startsWith("$")) {
+        // Show $ fields with their const values
+        const constVal = val.const as string | undefined;
+        const desc = (val.description as string) || "";
+        lines.push(`| \`${key}\` | ${constVal ? `\`${constVal}\`` : (val.type as string || "—")} | ${required.includes(key) ? "✅" : "—"} | ${desc} |`);
+      } else {
+        const type = (val.type as string) || (val.$ref ? "object" : "—");
+        const desc = (val.description as string) || "";
+        lines.push(`| \`${key}\` | ${type} | ${required.includes(key) ? "✅" : "—"} | ${desc} |`);
+      }
+    }
+    lines.push("");
+  }
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/schema-reference.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
+ * Generate docs/mcp-reference.md — consolidated MCP tools reference.
+ * Scans .usm/features/mcp/ for all tool specs and generates a table.
+ * Generic for USM's own docs — other projects may not have MCP features.
+ */
+export function generateMcpReference(root: string): GenerationResult {
+  const mcpDir = path.join(root, ".usm", "features", "mcp");
+  if (!fs.existsSync(mcpDir)) {
+    return { outputs: [] };
+  }
+
+  const lines: string[] = [];
+  lines.push("# MCP Tools Reference");
+  lines.push("");
+  lines.push("Tools available in the USM MCP server for AI agents.");
+  lines.push("");
+
+  // Read all .usm files in features/mcp/
+  const tools: Array<{ id: string; name: string; summary: string; intent: string }> = [];
+  for (const entry of fs.readdirSync(mcpDir)) {
+    if (!entry.endsWith(".usm")) continue;
+    const filePath = path.join(mcpDir, entry);
+    try {
+      const parsed = parseUsmFile(filePath);
+      if (parsed.$type !== "feature") continue;
+      const feature = parsed as FeatureUsm;
+      tools.push({
+        id: feature.$id,
+        name: feature.$id.split("/").pop() || feature.$id,
+        summary: feature.summary,
+        intent: feature.intent,
+      });
+    } catch {
+      // Skip
+    }
+  }
+
+  if (tools.length === 0) {
+    return { outputs: [] };
+  }
+
+  // Sort by name
+  tools.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Tools table
+  lines.push("## All Tools");
+  lines.push("");
+  lines.push("| Tool | Summary |");
+  lines.push("|------|---------|");
+  for (const tool of tools) {
+    const firstLine = tool.summary.split("\n")[0].slice(0, 100);
+    lines.push(`| \`${tool.name}\` | ${firstLine} |`);
+  }
+  lines.push("");
+
+  // Per-tool details
+  for (const tool of tools) {
+    lines.push(`## ${tool.name}`);
+    lines.push("");
+    lines.push(tool.summary);
+    lines.push("");
+    lines.push("**Purpose**:");
+    lines.push("");
+    lines.push(tool.intent);
+    lines.push("");
+  }
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/mcp-reference.md`,
       content: lines.join("\n"),
     }],
   };

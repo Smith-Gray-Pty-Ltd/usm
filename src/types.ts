@@ -466,6 +466,17 @@ export interface FeatureRoute {
   auth_required?: boolean;
 }
 
+export interface UsageExample {
+  command: string;
+  description: string;
+}
+
+export interface CliOption {
+  flag: string;
+  description: string;
+  default?: string;
+}
+
 export interface FeatureUsm extends UsmCommon {
   $type: "feature";
   $system: string;
@@ -483,6 +494,9 @@ export interface FeatureUsm extends UsmCommon {
   routes?: FeatureRoute[];
   apps?: string[];
   source?: string;
+  usage?: UsageExample[];
+  options?: CliOption[];
+  prerequisites?: string[];
 }
 
 // Union type

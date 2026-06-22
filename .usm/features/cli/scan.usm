@@ -55,6 +55,36 @@ tests:
       - assertion: human-edited summary preserved
       - assertion: mechanical fields like $last_updated updated
 
+usage:
+  - command: "usm scan"
+    description: "Scan with defaults (smart merge)"
+  - command: "usm scan --force"
+    description: "Overwrite all existing .usm files"
+  - command: "usm scan --routes"
+    description: "Only extract routes, skip service/package detection"
+  - command: "usm scan --merge overwrite"
+    description: "Overwrite mechanical fields, preserve human edits"
+
+options:
+  - flag: "--root <root>"
+    description: "Repo root directory"
+    default: "."
+  - flag: "--config <path>"
+    description: "Path to usmconfig.json"
+    default: "usmconfig.json"
+  - flag: "--force"
+    description: "Overwrite existing .usm files (bypasses merge)"
+    default: "false"
+  - flag: "--routes"
+    description: "Only extract routes (skip service/package/data detection)"
+    default: "false"
+  - flag: "--merge <strategy>"
+    description: "Merge strategy: smart, skip, or overwrite"
+    default: "smart"
+
+prerequisites:
+  - "Run 'usm init' first to create usmconfig.json"
+
 implementation:
   primary: src/scan/structural.ts
   test_code: ""

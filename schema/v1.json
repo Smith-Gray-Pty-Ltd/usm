@@ -1242,6 +1242,38 @@
         "source": {
           "type": "string",
           "description": "How this feature was detected (e.g., 'scan', 'hand-written')"
+        },
+        "usage": {
+          "type": "array",
+          "description": "Command usage examples for this feature",
+          "items": {
+            "type": "object",
+            "properties": {
+              "command": { "type": "string", "description": "The command invocation" },
+              "description": { "type": "string", "description": "What this invocation does" }
+            },
+            "required": ["command", "description"],
+            "additionalProperties": false
+          }
+        },
+        "options": {
+          "type": "array",
+          "description": "CLI options/flags for this feature",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flag": { "type": "string", "description": "Flag name (e.g. '--root <root>')" },
+              "description": { "type": "string" },
+              "default": { "type": "string" }
+            },
+            "required": ["flag", "description"],
+            "additionalProperties": false
+          }
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "What needs to exist before using this feature"
         }
       },
       "required": [

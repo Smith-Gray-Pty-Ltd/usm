@@ -50,6 +50,26 @@ tests:
       - assertion: error thrown "File already exists"
       - assertion: exit code 1
 
+usage:
+  - command: "usm init"
+    description: "Analyze repo and generate usmconfig.json"
+  - command: "usm init --force"
+    description: "Overwrite existing usmconfig.json"
+
+options:
+  - flag: "--root <root>"
+    description: "Repo root directory"
+    default: "."
+  - flag: "--output <path>"
+    description: "Output path for usmconfig.json"
+    default: "usmconfig.json"
+  - flag: "--force"
+    description: "Overwrite existing usmconfig.json"
+    default: "false"
+
+prerequisites:
+  - "None — this is the first command to run"
+
 implementation:
   primary: src/scan/init.ts
   test_code: ""

@@ -58,6 +58,23 @@ tests:
     expect:
       - assertion: reports up-to-date or out-of-date without writing
 
+usage:
+  - command: "usm generate"
+    description: "Generate all docs from .usm files"
+  - command: "usm generate --check"
+    description: "Check if generated files are up to date (dry run)"
+
+options:
+  - flag: "--check"
+    description: "Check if outputs are up to date without writing"
+    default: "false"
+  - flag: "--root <root>"
+    description: "Monorepo root directory"
+    default: "current directory"
+
+prerequisites:
+  - ".usm files must exist (run 'usm init' and 'usm scan' first)"
+
 implementation:
   primary: src/cli/index.ts (generate command)
   test_code: ""

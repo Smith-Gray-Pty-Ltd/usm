@@ -442,6 +442,24 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     sidebar.push({ text: "Project", collapsed: true, items: projectItems });
   }
 
+  // Reference — CLI commands, config, schema, MCP tools
+  const refItems: SidebarItem[] = [];
+  if (docExists("cli-reference")) {
+    refItems.push({ text: "CLI Reference", link: "/cli-reference" });
+  }
+  if (docExists("config-reference")) {
+    refItems.push({ text: "Configuration", link: "/config-reference" });
+  }
+  if (docExists("schema-reference")) {
+    refItems.push({ text: "Schema Reference", link: "/schema-reference" });
+  }
+  if (docExists("mcp-reference")) {
+    refItems.push({ text: "MCP Tools", link: "/mcp-reference" });
+  }
+  if (refItems.length > 0) {
+    sidebar.push({ text: "Reference", collapsed: true, items: refItems });
+  }
+
   return sidebar;
 }
 
