@@ -166,8 +166,8 @@ export function generateTestSpec(
   lines.push("});");
 
   // Output path — mirror the .usm source tree structure
-  // e.g. .usm/features/agent/events.usm → apps/the-architect/__tests__/features/agent/events.spec.ts
-  const outputPath = `${root}/apps/${appName}/__tests__/features/${featureSlug}.spec.ts`;
+  // e.g. .usm/features/agent/events.usm → .usm-workspace/tests/features/agent/events.spec.ts
+  const outputPath = `${root}/.usm-workspace/tests/features/${featureSlug}.spec.ts`;
 
   return {
     outputs: [{ path: outputPath, content: lines.join("\n") }],
@@ -282,7 +282,7 @@ export function generateAggregatedSpecs(
     }
 
     // Link to spec file
-    const specPath = `apps/${appName}/__tests__/features/${featureSlug}.spec.ts`;
+    const specPath = `.usm-workspace/tests/features/${featureSlug}.spec.ts`;
     lines.push(`_Spec file: \`${specPath}\`_`);
     lines.push("");
   }
@@ -290,7 +290,7 @@ export function generateAggregatedSpecs(
   return {
     outputs: [
       {
-        path: `${root}/.usm-workspace/docs/testing/specs.md`,
+        path: `${root}/.usm-workspace/tests/specs.md`,
         content: lines.join("\n"),
       },
     ],

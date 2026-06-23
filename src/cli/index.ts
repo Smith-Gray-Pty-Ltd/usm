@@ -1102,6 +1102,31 @@ program
     }
   });
 
+// ─── generate:help-docs ──────────────────────────────────────────────────────────
+
+program
+  .command("generate:help-docs")
+  .description("Generate filtered help docs (public-facing) from existing developer docs")
+  .option("-r, --root <root>", "Monorepo root directory", process.cwd())
+  .action((options: { root: string }) => {
+    const root = path.resolve(options.root);
+    const sourceDocsRoot = path.join(root, ".usm-workspace", "docs");
+
+    if (!fs.existsSync(sourceDocsRoot)) {
+      console.error("No developer docs found. Run 'usm generate' first.");
+      process.exit(1);
+    }
+
+    // Import the filtering function from docs.ts
+    const { filterForHelpAudience } = require("../cli/docs.js") as { filterForHelpAudience: (root: string, docsRoot: string, helpRoot: string) => number };
+
+    const helpRoot = path.join(root, ".usm-workspace", "help-docs");
+    console.log("Generating help docs (filtering developer docs)...");
+    const count = filterForHelpAudience(root, sourceDocsRoot, helpRoot);
+    console.log(`✓ ${count} file(s) written to .usm-workspace/help-docs/`);
+    console.log("\nRun 'usm docs serve --audience help' to preview, or 'usm docs build --audience help' to build.");
+  });
+
 // ─── generate:togaf ─────────────────────────────────────────────────────────────
 
 program

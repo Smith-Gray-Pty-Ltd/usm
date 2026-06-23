@@ -140,7 +140,7 @@ export function generateOpenApiSpec(
     return {
       outputs: [
         {
-          path: `${root}/.usm-workspace/docs/api/openapi.yaml`,
+          path: `${root}/.usm-workspace/openapi/openapi.yaml`,
           content: `openapi: 3.1.0
 info:
   title: Smith & Gray AI Platform API
@@ -450,7 +450,7 @@ tags: []
   return {
     outputs: [
       {
-        path: `${root}/.usm-workspace/docs/api/openapi.yaml`,
+        path: `${root}/.usm-workspace/openapi/openapi.yaml`,
         content: yamlContent,
       },
     ],
@@ -467,7 +467,7 @@ export function generateOpenApiTypes(
   const lines: string[] = [];
 
   lines.push("// Auto-generated TypeScript types from .usm/features/*.usm");
-  lines.push("// Source: usm generate → docs/api/openapi.yaml");
+  lines.push("// Source: usm generate → .usm-workspace/openapi/openapi.yaml");
   lines.push("// DO NOT EDIT — regenerate with: pnpm --filter usm generate");
   lines.push("");
 

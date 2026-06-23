@@ -61,7 +61,7 @@ export function generateAllTogafDeliverables(system: SystemUsm, root: string): G
 // ─── Helpers ──────────────────────────────────────────────────────────────────────
 
 function writeDoc(root: string, relativePath: string, content: string): string {
-  const fullPath = path.join(root, ".usm-workspace", "docs", "togaf", relativePath);
+  const fullPath = path.join(root, ".usm-workspace", "togaf", relativePath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, "utf-8");
   return fullPath;

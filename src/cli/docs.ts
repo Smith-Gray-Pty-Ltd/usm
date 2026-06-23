@@ -214,7 +214,7 @@ function simplifyFeatureDoc(content: string): string {
  * - Excludes features that aren't built (unless visibility: public)
  * - Simplifies feature docs (removes contracts, tests, implementation, decisions)
  */
-function filterForHelpAudience(root: string, docsRoot: string, helpRoot: string): number {
+export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: string): number {
   let copied = 0;
 
   // Clean help root
@@ -540,35 +540,31 @@ function ensureIndexPage(docsRoot: string): void {
 export async function docsBuild(root: string, audience: Audience = "developer"): Promise<void> {
   requireVitePress();
 
-  const sourceDocsRoot = path.join(root, ".usm-workspace", "docs");
-  if (!fs.existsSync(sourceDocsRoot)) {
-    console.error("No docs found. Run 'usm generate' first.");
+  // Determine docs root based on audience
+  const docsRoot = audience === "help"
+    ? path.join(root, ".usm-workspace", "help-docs")
+    : path.join(root, ".usm-workspace", "docs");
+
+  if (!fs.existsSync(docsRoot)) {
+    if (audience === "help") {
+      console.error("No help docs found. Run 'usm generate:help-docs' first.");
+    } else {
+      console.error("No docs found. Run 'usm generate' first.");
+    }
     process.exit(1);
   }
 
-  // Step 1: Consolidate feature docs into source docs/ (always, for both audiences)
-  const copied = consolidateFeatureDocs(root);
-  if (copied > 0) {
-    console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
-  }
-
-  // Step 2: Escape angle brackets in source docs
-  const escaped = escapeAllMarkdown(sourceDocsRoot);
-  if (escaped > 0) {
-    console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
-  }
-
-  // Step 3: Ensure index page in source docs
-  ensureIndexPage(sourceDocsRoot);
-
-  // Step 4: For help audience, filter from source docs into help-docs/
-  let docsRoot = sourceDocsRoot;
-  if (audience === "help") {
-    const helpRoot = path.join(root, ".usm-workspace", "help-docs");
-    console.log("Filtering docs for help audience...");
-    const count = filterForHelpAudience(root, sourceDocsRoot, helpRoot);
-    console.log(`  ${count} file(s) copied (developer-only content excluded)`);
-    docsRoot = helpRoot;
+  // For developer audience, consolidate + escape (help docs are pre-filtered)
+  if (audience === "developer") {
+    const copied = consolidateFeatureDocs(root);
+    if (copied > 0) {
+      console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
+    }
+    const escaped = escapeAllMarkdown(docsRoot);
+    if (escaped > 0) {
+      console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
+    }
+    ensureIndexPage(docsRoot);
   }
 
   // Step 5: Generate VitePress config
@@ -605,35 +601,31 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
 export async function docsServe(root: string, port: number, audience: Audience = "developer"): Promise<void> {
   requireVitePress();
 
-  const sourceDocsRoot = path.join(root, ".usm-workspace", "docs");
-  if (!fs.existsSync(sourceDocsRoot)) {
-    console.error("No docs found. Run 'usm generate' first.");
+  // Determine docs root based on audience
+  const docsRoot = audience === "help"
+    ? path.join(root, ".usm-workspace", "help-docs")
+    : path.join(root, ".usm-workspace", "docs");
+
+  if (!fs.existsSync(docsRoot)) {
+    if (audience === "help") {
+      console.error("No help docs found. Run 'usm generate:help-docs' first.");
+    } else {
+      console.error("No docs found. Run 'usm generate' first.");
+    }
     process.exit(1);
   }
 
-  // Step 1: Consolidate feature docs into source docs/ (always, for both audiences)
-  const copied = consolidateFeatureDocs(root);
-  if (copied > 0) {
-    console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
-  }
-
-  // Step 2: Escape angle brackets in source docs
-  const escaped = escapeAllMarkdown(sourceDocsRoot);
-  if (escaped > 0) {
-    console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
-  }
-
-  // Step 3: Ensure index page in source docs
-  ensureIndexPage(sourceDocsRoot);
-
-  // Step 4: For help audience, filter from source docs into help-docs/
-  let docsRoot = sourceDocsRoot;
-  if (audience === "help") {
-    const helpRoot = path.join(root, ".usm-workspace", "help-docs");
-    console.log("Filtering docs for help audience...");
-    const count = filterForHelpAudience(root, sourceDocsRoot, helpRoot);
-    console.log(`  ${count} file(s) copied (developer-only content excluded)`);
-    docsRoot = helpRoot;
+  // For developer audience, consolidate + escape (help docs are pre-filtered)
+  if (audience === "developer") {
+    const copied = consolidateFeatureDocs(root);
+    if (copied > 0) {
+      console.log(`Consolidated ${copied} feature doc(s) into .usm-workspace/docs/features/`);
+    }
+    const escaped = escapeAllMarkdown(docsRoot);
+    if (escaped > 0) {
+      console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
+    }
+    ensureIndexPage(docsRoot);
   }
 
   // Step 5: Generate VitePress config
