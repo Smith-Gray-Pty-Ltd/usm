@@ -33,9 +33,15 @@
   ],
   "data": [],
   "outputs": {
-    "usm_source": ".usm/",
-    "agent_context": "AGENTS.md",
-    "design_docs": "docs/"
+    "workspace": ".usm-workspace",
+    "docs": ".usm-workspace/docs",
+    "help_docs": ".usm-workspace/help-docs",
+    "archimate": ".usm-workspace/archimate",
+    "togaf": ".usm-workspace/togaf",
+    "openapi": ".usm-workspace/openapi",
+    "tests": ".usm-workspace/tests",
+    "usm_source": ".usm",
+    "agents_md": "AGENTS.md"
   },
   "generation": {
     "merge_with_existing": "smart",

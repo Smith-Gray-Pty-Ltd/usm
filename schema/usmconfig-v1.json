@@ -296,40 +296,50 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "usm_source": {
+        "workspace": {
           "type": "string",
-          "default": ".usm/",
-          "description": "Directory for generated .usm source files"
+          "default": ".usm-workspace/",
+          "description": "Root directory for all generated output"
         },
-        "design_docs": {
+        "docs": {
           "type": "string",
-          "default": "docs/design/",
-          "description": "Directory for generated design documents"
+          "default": ".usm-workspace/docs/",
+          "description": "Directory for generated developer docs (markdown)"
         },
         "help_docs": {
           "type": "string",
-          "default": "docs/help/",
-          "description": "Directory for generated help documents"
+          "default": ".usm-workspace/help-docs/",
+          "description": "Directory for generated help docs (filtered, public-facing)"
         },
-        "api_docs": {
+        "archimate": {
           "type": "string",
-          "default": "docs/api/",
-          "description": "Directory for generated API documentation"
+          "default": ".usm-workspace/archimate/",
+          "description": "Directory for generated ArchiMate XML"
         },
-        "agent_context": {
+        "togaf": {
           "type": "string",
-          "default": ".usm-workspace/",
-          "description": "Directory for generated agent context files"
+          "default": ".usm-workspace/togaf/",
+          "description": "Directory for generated TOGAF deliverables"
+        },
+        "openapi": {
+          "type": "string",
+          "default": ".usm-workspace/openapi/",
+          "description": "Directory for generated OpenAPI spec and types"
         },
         "tests": {
           "type": "string",
-          "default": "tests/auto-generated/",
-          "description": "Directory for generated test files"
+          "default": ".usm-workspace/tests/",
+          "description": "Directory for generated test specs"
         },
-        "diagrams": {
+        "usm_source": {
           "type": "string",
-          "default": "docs/diagrams/",
-          "description": "Directory for generated diagram files"
+          "default": ".usm/",
+          "description": "Directory for .usm source files"
+        },
+        "agents_md": {
+          "type": "string",
+          "default": "AGENTS.md",
+          "description": "Path for generated AGENTS.md file"
         }
       }
     },

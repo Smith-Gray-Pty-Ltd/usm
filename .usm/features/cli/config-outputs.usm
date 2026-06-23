@@ -1,0 +1,143 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-config-outputs
+$type: feature
+$version: 1
+$last_updated: "2026-06-23"
+status: in-progress
+summary: |
+  Configurable output paths in usmconfig.json and simplified command convention. Generators read output paths from config instead of hardcoding. generate:xxx commands replaced with generate --only flag.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  Output paths are hardcoded to .usm-workspace/ in every generator. Users
+  can't configure where outputs go without editing source code. The command
+  convention is inconsistent (generate:help-docs uses colons, docs serve uses
+  spaces). This feature makes all output paths configurable via usmconfig.json
+  and simplifies the command convention to verb + target with --only flag.
+
+decisions:
+  - id: outputs-from-config
+    decision: All generators read output paths from usmconfig.json outputs section
+    rationale: |
+      Users may want outputs in different locations (e.g. docs/ instead of
+      .usm-workspace/docs/, or a custom build directory). Reading from config
+      with sensible defaults means it works out of the box but is overridable.
+    consequences: "All generators need to call a shared getOutputPath() utility instead of hardcoding paths"
+    status: accepted
+  - id: generate-only-flag
+    decision: Replace generate:xxx commands with generate --only <target> flag
+    rationale: |
+      generate:help-docs, generate:togaf, generate:archimate use colon syntax
+      which is inconsistent with docs serve, mcp serve (space syntax). Using
+      --only flag keeps generate as a single command with a filter, which is
+      simpler and more consistent.
+    alternatives:
+      - option: Keep colon commands (generate:togaf, generate:archimate)
+        rejected_because: "Inconsistent with space-syntax subcommands, clutters --help output"
+      - option: Subcommands (generate togaf, generate archimate)
+        rejected_because: "Makes generate a parent command, changes default behaviour, more complex Commander setup"
+    consequences: "Breaking change — generate:xxx commands removed. Pre-public-release so acceptable."
+    status: accepted
+  - id: scaffold-project-to-subcommand
+    decision: Rename scaffold-project to 'scaffold project' (subcommand)
+    rationale: |
+      Consistent with 'docs serve', 'mcp serve', 'scan infrastructure' —
+      all use space syntax for subcommands.
+    consequences: "Breaking change — scaffold-project becomes 'scaffold project'"
+    status: accepted
+
+flows:
+  - id: resolve-output-paths
+    name: Resolve output paths from usmconfig.json
+    description: |
+      A shared utility reads usmconfig.json and returns the configured
+      output path for each type (docs, help-docs, archimate, togaf, openapi,
+      tests). Falls back to defaults if not configured or config missing.
+    steps:
+      - id: s1
+        action: read
+        target: usmconfig.json from root
+      - id: s2
+        action: parse
+        target: outputs section
+      - id: s3
+        action: resolve
+        target: each output type to a full path
+      - id: s4
+        action: return
+        target: map of output type → path
+
+  - id: generate-with-only
+    name: Generate with --only flag
+    description: |
+      usm generate runs all generators. usm generate --only <target> runs
+      only the specified output. Valid targets: docs, help-docs, togaf,
+      archimate, openapi, tests, rules, agents-md.
+    steps:
+      - id: s1
+        action: parse
+        target: --only flag from CLI args
+      - id: s2
+        action: check
+        target: is target valid?
+      - id: s3
+        action: generate
+        target: only the specified output's generators
+      - id: s4
+        action: observe
+        target: if no --only, run all generators (default)
+
+contracts:
+  - id: outputs-configurable
+    description: All output paths are configurable via usmconfig.json
+    must_have:
+      - "Generators read paths from config, not hardcoded"
+      - "Defaults work when config is missing or outputs section absent"
+      - "All output types have config keys: workspace, docs, help_docs, archimate, togaf, openapi, tests, agents_md"
+  - id: only-flag-works
+    description: generate --only <target> runs only the specified output
+    must_have:
+      - "Invalid target shows error with valid options"
+      - "No --only runs all generators (backward compatible)"
+      - "Valid targets: docs, help-docs, togaf, archimate, openapi, tests, rules, agents-md"
+  - id: no-colon-commands
+    description: generate:xxx commands are removed
+    must_have:
+      - "generate:help-docs removed — use 'generate --only help-docs'"
+      - "generate:togaf removed — use 'generate --only togaf'"
+      - "generate:archimate removed — use 'generate --only archimate'"
+
+tests:
+  - id: default-paths-work
+    setup:
+      usmconfig_without_outputs: true
+    expect:
+      - assertion: docs go to .usm-workspace/docs/
+      - assertion: togaf goes to .usm-workspace/togaf/
+  - id: custom-paths-work
+    setup:
+      usmconfig_with_custom_outputs: true
+    expect:
+      - assertion: docs go to configured path
+  - id: only-flag-filters
+    setup:
+      only_flag: "togaf"
+    expect:
+      - assertion: only TOGAF files generated
+      - assertion: no docs files generated
+  - id: invalid-only-target
+    setup:
+      only_flag: "invalid"
+    expect:
+      - assertion: error message with valid targets listed
+
+implementation:
+  primary: src/cli/index.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-generate"
+  - "usm/cli-docs"
+  - "usm/gen-docs-split"

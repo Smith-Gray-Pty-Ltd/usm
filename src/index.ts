@@ -96,6 +96,9 @@ export type {
   GenerationResult,
 } from "./types.js";
 
+// Output path resolution
+export { getOutputPaths, resolveOutputPath, type OutputPaths } from "./outputs.js";
+
 // Scan & Init (code-to-.usm direction)
 export { initConfig, writeConfig, scanStructural } from "./scan/index.js";
 export type {

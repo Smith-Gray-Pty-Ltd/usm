@@ -111,8 +111,13 @@ index:
   - id: gen-help-reference
     name: Help Docs Reference Expansion
     ref: .usm/features/generators/help-reference.usm
-    status: in-progress
+    status: built
     tags: [generator, docs, reference, schema]
+  - id: cli-config-outputs
+    name: Configurable Outputs + Command Convention
+    ref: .usm/features/cli/config-outputs.usm
+    status: in-progress
+    tags: [cli, config, commands]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm

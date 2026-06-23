@@ -59,7 +59,7 @@ import {
   generateRulesFiles,
 } from "../generators/rulesFiles.js";
 import type { MergeStrategy } from "../scan/types.js";
-import type { SystemUsm, ServiceUsm, FeatureUsm, DataUsm } from "../types.js";
+import type { SystemUsm, ServiceUsm, FeatureUsm, DataUsm, GenerationResult } from "../types.js";
 
 const program = new Command();
 
@@ -583,9 +583,50 @@ program
   .command("generate")
   .description("Generate documentation from .usm files")
   .option("--check", "Check if generated files are up to date (dry run)")
+  .option("--only <target>", "Only generate a specific output: docs, help-docs, togaf, archimate, openapi, tests, rules, agents-md")
   .option("-r, --root <root>", "Monorepo root directory", process.cwd())
-  .action((options: { check: boolean; root: string }) => {
+  .action(async (options: { check: boolean; only?: string; root: string }) => {
     const root = path.resolve(options.root);
+    const onlyTarget = options.only;
+    const runAll = !onlyTarget;
+    const runDocs = runAll || onlyTarget === "docs";
+
+    // Validate --only target early (before any generation)
+    const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md"];
+    if (onlyTarget && !validTargets.includes(onlyTarget)) {
+      console.error(`Invalid --only target: ${onlyTarget}. Valid targets: ${validTargets.join(", ")}`);
+      process.exit(1);
+    }
+
+    // Handle help-docs target specially (filter existing docs, no generation)
+    if (onlyTarget === "help-docs") {
+      const docsRoot = path.join(root, ".usm-workspace", "docs");
+      if (!fs.existsSync(docsRoot)) {
+        console.error("No developer docs found. Run 'usm generate' first.");
+        process.exit(1);
+      }
+      const { filterForHelpAudience } = await import("./docs.js");
+      const helpRoot = path.join(root, ".usm-workspace", "help-docs");
+      console.log("Generating help docs (filtering developer docs)...");
+      const count = filterForHelpAudience(root, docsRoot, helpRoot);
+      console.log(`✓ ${count} file(s) written to .usm-workspace/help-docs/`);
+      return;
+    }
+
+    // Handle archimate target
+    if (onlyTarget === "archimate") {
+      const systemPath = path.join(root, ".usm", "system.usm");
+      if (!fs.existsSync(systemPath)) {
+        console.error("No .usm/system.usm found.");
+        process.exit(1);
+      }
+      const system = parseUsmFile(systemPath) as SystemUsm;
+      const result = generateArchiMateModel(system, root);
+      if (result.outputs.length > 0) {
+        console.log(`Generated ArchiMate model: ${path.relative(root, result.outputs[0].path)}`);
+      }
+      return;
+    }
 
     // Find .usm files across all sub-.usm/ directories in the monorepo
     const files = findAllUsmFiles(root);
@@ -712,40 +753,43 @@ program
     // ─── Pass 3: Aggregator generators (per-service docs) ─────────────────
     const systemFile = systemFiles[0];
     if (systemFile) {
-      const aggregatorGenerators = [
-        // Cross-cutting platform docs
-        { name: "risks", fn: () => generateRisksDoc(systemFile, root) },
-        { name: "roadmap", fn: () => generateRoadmapDoc(systemFile, root) },
-        { name: "deployment", fn: () => generateDeploymentDoc(systemFile, root) },
-        { name: "getting-started", fn: () => generateGettingStartedDoc(systemFile, root) },
-        { name: "cli-reference", fn: () => generateCliReference(root) },
-        { name: "config-reference", fn: () => generateConfigReference(root) },
-        { name: "schema-reference", fn: () => generateSchemaReference(root) },
-        { name: "mcp-reference", fn: () => generateMcpReference(root) },
-        { name: "shared-services-index", fn: () => generateSharedServicesIndex(serviceFiles, root) },
-        { name: "packages-index", fn: () => generatePackagesIndex(serviceFiles, root) },
-        { name: "data-model", fn: () => generateDataModelDoc(dataFiles, root, serviceFiles) },
-        { name: "data-index", fn: () => generateDataIndex(root) },
-        { name: "seed-data", fn: () => generateSeedDataDoc(serviceFiles, root) },
-        // Per-app aggregator docs
-        { name: "per-app-decisions", fn: () => generatePerAppDecisions(featureFiles, serviceFiles, root) },
-        { name: "per-app-api-reference", fn: () => generatePerAppApiReference(featureFiles, root) },
-        { name: "per-app-api-contracts", fn: () => generatePerAppApiContracts(featureFiles, root) },
-        { name: "per-app-ui-map", fn: () => generatePerAppUiMap(featureFiles, root) },
-        { name: "per-app-test-specs", fn: () => generatePerAppTestSpecs(featureFiles, root) },
-        // AGENTS.md generation
-        { name: "app-agents-md", fn: () => generateAllAppAgentsMd(serviceFiles, root) },
-        { name: "root-agents-md", fn: () => generateRootAgentsMd(systemFile, serviceFiles, root) },
-        { name: "rules-files", fn: () => generateRulesFiles(systemFile, serviceFiles, root) },
-        // OpenAPI + TypeScript types (Phase D)
-        { name: "openapi-spec", fn: () => generateOpenApiSpec(featureFiles, root) },
-        { name: "openapi-types", fn: () => generateOpenApiTypes(featureFiles, root) },
-        // Test specs (Phase E)
-        { name: "test-specs-per-feature", fn: () => generateAllTestSpecs(featureFiles, root) },
-        { name: "test-specs-aggregated", fn: () => generateAggregatedSpecs(featureFiles, root) },
+      const aggregatorGenerators: Array<{ name: string; target: string; fn: () => GenerationResult }> = [
+        // Cross-cutting platform docs (target: docs)
+        { name: "risks", target: "docs", fn: () => generateRisksDoc(systemFile, root) },
+        { name: "roadmap", target: "docs", fn: () => generateRoadmapDoc(systemFile, root) },
+        { name: "deployment", target: "docs", fn: () => generateDeploymentDoc(systemFile, root) },
+        { name: "getting-started", target: "docs", fn: () => generateGettingStartedDoc(systemFile, root) },
+        { name: "cli-reference", target: "docs", fn: () => generateCliReference(root) },
+        { name: "config-reference", target: "docs", fn: () => generateConfigReference(root) },
+        { name: "schema-reference", target: "docs", fn: () => generateSchemaReference(root) },
+        { name: "mcp-reference", target: "docs", fn: () => generateMcpReference(root) },
+        { name: "shared-services-index", target: "docs", fn: () => generateSharedServicesIndex(serviceFiles, root) },
+        { name: "packages-index", target: "docs", fn: () => generatePackagesIndex(serviceFiles, root) },
+        { name: "data-model", target: "docs", fn: () => generateDataModelDoc(dataFiles, root, serviceFiles) },
+        { name: "data-index", target: "docs", fn: () => generateDataIndex(root) },
+        { name: "seed-data", target: "docs", fn: () => generateSeedDataDoc(serviceFiles, root) },
+        // Per-app aggregator docs (target: docs)
+        { name: "per-app-decisions", target: "docs", fn: () => generatePerAppDecisions(featureFiles, serviceFiles, root) },
+        { name: "per-app-api-reference", target: "docs", fn: () => generatePerAppApiReference(featureFiles, root) },
+        { name: "per-app-api-contracts", target: "docs", fn: () => generatePerAppApiContracts(featureFiles, root) },
+        { name: "per-app-ui-map", target: "docs", fn: () => generatePerAppUiMap(featureFiles, root) },
+        { name: "per-app-test-specs", target: "docs", fn: () => generatePerAppTestSpecs(featureFiles, root) },
+        // AGENTS.md (target: agents-md)
+        { name: "app-agents-md", target: "agents-md", fn: () => generateAllAppAgentsMd(serviceFiles, root) },
+        { name: "root-agents-md", target: "agents-md", fn: () => generateRootAgentsMd(systemFile, serviceFiles, root) },
+        // Rules files (target: rules)
+        { name: "rules-files", target: "rules", fn: () => generateRulesFiles(systemFile, serviceFiles, root) },
+        // OpenAPI (target: openapi)
+        { name: "openapi-spec", target: "openapi", fn: () => generateOpenApiSpec(featureFiles, root) },
+        { name: "openapi-types", target: "openapi", fn: () => generateOpenApiTypes(featureFiles, root) },
+        // Test specs (target: tests)
+        { name: "test-specs-per-feature", target: "tests", fn: () => generateAllTestSpecs(featureFiles, root) },
+        { name: "test-specs-aggregated", target: "tests", fn: () => generateAggregatedSpecs(featureFiles, root) },
       ];
 
       for (const agg of aggregatorGenerators) {
+        // Skip if --only is specified and doesn't match this generator's target
+        if (onlyTarget && agg.target !== onlyTarget) continue;
         try {
           const result = agg.fn();
           for (const output of result.outputs) {
@@ -824,7 +868,7 @@ program
     }
 
     // ─── Pass 6: TOGAF ADM phase deliverables ────────────────────────────
-    if (systemFile && !options.check) {
+    if (systemFile && !options.check && (runAll || onlyTarget === "togaf")) {
       try {
         const togafResult = generateAllTogafDeliverables(systemFile, root);
         for (const output of togafResult.outputs) {
@@ -1099,78 +1143,6 @@ program
     } else {
       console.error(`Unknown docs action: ${action}. Use 'build' or 'serve'.`);
       process.exit(1);
-    }
-  });
-
-// ─── generate:help-docs ──────────────────────────────────────────────────────────
-
-program
-  .command("generate:help-docs")
-  .description("Generate filtered help docs (public-facing) from existing developer docs")
-  .option("-r, --root <root>", "Monorepo root directory", process.cwd())
-  .action((options: { root: string }) => {
-    const root = path.resolve(options.root);
-    const sourceDocsRoot = path.join(root, ".usm-workspace", "docs");
-
-    if (!fs.existsSync(sourceDocsRoot)) {
-      console.error("No developer docs found. Run 'usm generate' first.");
-      process.exit(1);
-    }
-
-    // Import the filtering function from docs.ts
-    const { filterForHelpAudience } = require("../cli/docs.js") as { filterForHelpAudience: (root: string, docsRoot: string, helpRoot: string) => number };
-
-    const helpRoot = path.join(root, ".usm-workspace", "help-docs");
-    console.log("Generating help docs (filtering developer docs)...");
-    const count = filterForHelpAudience(root, sourceDocsRoot, helpRoot);
-    console.log(`✓ ${count} file(s) written to .usm-workspace/help-docs/`);
-    console.log("\nRun 'usm docs serve --audience help' to preview, or 'usm docs build --audience help' to build.");
-  });
-
-// ─── generate:togaf ─────────────────────────────────────────────────────────────
-
-program
-  .command("generate:togaf")
-  .description("Generate TOGAF ADM phase deliverables from USM")
-  .option("--phase <phase>", "Specific phase: A, B, C1, C2, D, E, G, H, or 'all' (default: all)", "all")
-  .action((options: { phase: string }) => {
-    const root = path.resolve(process.cwd());
-    const systemPath = path.join(root, ".usm", "system.usm");
-
-    if (!fs.existsSync(systemPath)) {
-      console.error("No .usm/system.usm found. Run from monorepo root.");
-      process.exit(1);
-    }
-
-    const system = parseUsmFile(systemPath) as SystemUsm;
-    const result = generateAllTogafDeliverables(system, root);
-
-    console.log(`Generated ${result.outputs.length} TOGAF phase deliverables:`);
-    for (const output of result.outputs) {
-      console.log(`  → ${path.relative(root, output.path)}`);
-    }
-  });
-
-// ─── generate:archimate ───────────────────────────────────────────────────────────
-
-program
-  .command("generate:archimate")
-  .description("Generate ArchiMate 3.1 Open Exchange XML from USM")
-  .action(() => {
-    const root = path.resolve(process.cwd());
-    const systemPath = path.join(root, ".usm", "system.usm");
-
-    if (!fs.existsSync(systemPath)) {
-      console.error("No .usm/system.usm found. Run from monorepo root.");
-      process.exit(1);
-    }
-
-    const system = parseUsmFile(systemPath) as SystemUsm;
-    const result = generateArchiMateModel(system, root);
-
-    if (result.outputs.length > 0) {
-      console.log(`Generated ArchiMate model: ${path.relative(root, result.outputs[0].path)}`);
-      console.log(`  Elements: count layers, Relationships: see model.xml`);
     }
   });
 

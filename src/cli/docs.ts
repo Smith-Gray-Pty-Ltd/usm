@@ -547,7 +547,7 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
 
   if (!fs.existsSync(docsRoot)) {
     if (audience === "help") {
-      console.error("No help docs found. Run 'usm generate:help-docs' first.");
+      console.error("No help docs found. Run 'usm generate --only help-docs' first.");
     } else {
       console.error("No docs found. Run 'usm generate' first.");
     }
@@ -608,7 +608,7 @@ export async function docsServe(root: string, port: number, audience: Audience =
 
   if (!fs.existsSync(docsRoot)) {
     if (audience === "help") {
-      console.error("No help docs found. Run 'usm generate:help-docs' first.");
+      console.error("No help docs found. Run 'usm generate --only help-docs' first.");
     } else {
       console.error("No docs found. Run 'usm generate' first.");
     }
