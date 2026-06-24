@@ -1,4 +1,4 @@
-name: Deploy docs to Cloudflare Pages
+name: Deploy help docs to docs.usm.dev
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    name: Build and deploy docs site
+    name: Build and deploy help docs
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -35,11 +35,14 @@ jobs:
       - name: Build USM
         run: pnpm run build
 
-      - name: Generate docs
+      - name: Generate developer docs
         run: node dist/cli/index.js generate
 
-      - name: Build docs site
-        run: node dist/cli/index.js docs build
+      - name: Generate help docs
+        run: node dist/cli/index.js generate --only help-docs
+
+      - name: Build help docs site
+        run: node dist/cli/index.js docs build --audience help
 
       - name: Install wrangler
         run: npm install -g wrangler@3
@@ -49,8 +52,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          wrangler pages deploy .usm-workspace/docs/.vitepress/dist \
-            --project-name=usm-dev \
+          wrangler pages deploy .usm-workspace/help-docs/.vitepress/dist \
+            --project-name=usm-docs \
             --branch=main \
             --commit-dirty=true \
             --commit-message="${{ github.event.head_commit.message }}"

@@ -204,15 +204,29 @@ deployment:
     - name: production
       url: "https://usm.dev"
       type: cloudflare-pages
-      build_command: "pnpm install --frozen-lockfile && pnpm add -D vitepress && pnpm run build && node dist/cli/index.js generate && node dist/cli/index.js docs build"
-      output_directory: ".usm-workspace/docs/.vitepress/dist"
+      build_command: "cd web && npm ci && npm run build"
+      output_directory: "web/out"
       project_name: usm-dev
       secrets:
         - CLOUDFLARE_API_TOKEN
         - CLOUDFLARE_ACCOUNT_ID
       notes: |
-        Deployed via GitHub Actions on push to main (.github/workflows/docs.yml).
-        Cloudflare Pages — free tier (unlimited static sites, requests, bandwidth).
+        Marketing site (Next.js + shadcn). Deployed via GitHub Actions
+        (.github/workflows/marketing.yml) on push to main when web/ changes.
+        Cloudflare Pages — free tier.
+    - name: help-docs
+      url: "https://docs.usm.dev"
+      type: cloudflare-pages
+      build_command: "pnpm install && pnpm build && usm generate && usm generate --only help-docs && usm docs build --audience help"
+      output_directory: ".usm-workspace/help-docs/.vitepress/dist"
+      project_name: usm-docs
+      secrets:
+        - CLOUDFLARE_API_TOKEN
+        - CLOUDFLARE_ACCOUNT_ID
+      notes: |
+        Help docs (VitePress, filtered for public audience). Deployed via
+        GitHub Actions (.github/workflows/docs.yml) on push to main.
+        Cloudflare Pages — free tier.
 
 operations:
   deployment_setup: |
