@@ -567,6 +567,11 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
     ensureIndexPage(docsRoot);
   }
 
+  // Ensure index.md for help audience too (VitePress needs it, not README.md)
+  if (audience === "help") {
+    ensureIndexPage(docsRoot);
+  }
+
   // Step 5: Generate VitePress config
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
@@ -625,6 +630,11 @@ export async function docsServe(root: string, port: number, audience: Audience =
     if (escaped > 0) {
       console.log(`Escaped angle brackets in ${escaped} file(s) for VitePress`);
     }
+    ensureIndexPage(docsRoot);
+  }
+
+  // Ensure index.md for help audience too (VitePress needs it, not README.md)
+  if (audience === "help") {
     ensureIndexPage(docsRoot);
   }
 
