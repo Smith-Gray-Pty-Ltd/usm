@@ -1,6 +1,6 @@
 {
   "name": "@~usm/core",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Universal System Map — structured source of truth for agentic systems. CLI + MCP server + JSON Schema + generators (markdown, Mermaid, OpenAPI, ArchiMate, TOGAF).",
   "license": "MIT",
   "repository": {

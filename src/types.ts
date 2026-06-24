@@ -82,6 +82,7 @@ export interface SystemUsm extends UsmCommon {
   $type: "system";
   identity: SystemIdentity;
   status?: "planned" | "in-progress" | "built" | "deprecated";
+  version?: string;
   index?: FeatureRef[];
   services?: ServiceRef[];
   apis?: ApiRef[];
@@ -524,6 +525,10 @@ export type UsmFile = SystemUsm | ServiceUsm | FeatureUsm | DataUsm;
 export interface ValidationResult {
   valid: boolean;
   errors?: Array<{
+    path: string;
+    message: string;
+  }>;
+  warnings?: Array<{
     path: string;
     message: string;
   }>;

@@ -565,6 +565,9 @@ program
       const result = validateUsmFile(filePath);
       if (result.valid) {
         console.log(`✓ ${filePath}`);
+        for (const warn of result.warnings || []) {
+          console.log(`  ⚠ ${warn.path}: ${warn.message}`);
+        }
       } else {
         console.log(`✗ ${filePath}`);
         for (const err of result.errors || []) {

@@ -30,7 +30,14 @@ function getSchema(): object {
 }
 
 /**
+ * The current schema version that this version of USM supports.
+ * .usm files with a different $version will get a warning.
+ */
+const CURRENT_SCHEMA_VERSION = 1;
+
+/**
  * Validate a parsed .usm object against the v1 JSON Schema.
+ * Also checks $version compatibility and adds warnings for mismatches.
  */
 export function validateUsm(file: UsmFile): ValidationResult {
   const ajv = getAjv();
@@ -39,16 +46,25 @@ export function validateUsm(file: UsmFile): ValidationResult {
   const validate = ajv.compile(schema);
   const valid = validate(file);
 
-  if (valid) {
-    return { valid: true };
+  if (!valid) {
+    const errors = (validate.errors || []).map((err) => ({
+      path: err.instancePath || "/",
+      message: err.message || "Unknown validation error",
+    }));
+    return { valid: false, errors };
   }
 
-  const errors = (validate.errors || []).map((err) => ({
-    path: err.instancePath || "/",
-    message: err.message || "Unknown validation error",
-  }));
+  // Schema validation passed — check $version compatibility
+  const warnings: Array<{ path: string; message: string }> = [];
 
-  return { valid: false, errors };
+  if (file.$version !== undefined && file.$version !== CURRENT_SCHEMA_VERSION) {
+    warnings.push({
+      path: "/$version",
+      message: `File has $version ${file.$version} but this USM supports $version ${CURRENT_SCHEMA_VERSION}. The file may use features not yet supported, or may be missing new features.`,
+    });
+  }
+
+  return { valid: true, warnings: warnings.length > 0 ? warnings : undefined };
 }
 
 /**

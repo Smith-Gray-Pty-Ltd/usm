@@ -2,7 +2,8 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/system
 $type: system
 $version: 1
-$last_updated: "2026-06-19"
+$last_updated: "2026-06-23"
+version: "0.1.0"
 summary: |
   Universal System Map — a structured source of truth for agentic systems. A single .usm/ directory describes apps, services, features, flows, contracts, and decisions in YAML validated by a JSON Schema, and generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md, and Vitest specs.
 
@@ -231,32 +232,32 @@ roadmap:
     status: shipped
     target_date: "2026-06-22"
     feature: usm/cli-docs
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: review-quality-markdown
     title: Review-quality feature markdown
     description: "Flows as numbered steps, contracts as checklists, tests as Given/When/Then, decisions with alternatives"
     status: shipped
     target_date: "2026-06-22"
     feature: usm/gen-feature-review
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: empty-section-suppression
     title: Suppress empty sections in generated docs
     description: "No more empty App Services, No UI pages documented, or No risks defined pages"
     status: shipped
     target_date: "2026-06-22"
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: roles-schema
     title: Roles field in system schema
     description: "Any project can describe who uses their system and what they need"
     status: shipped
     target_date: "2026-06-22"
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: adr-schema-enrichment
     title: ADR schema enrichment
     description: "Alternatives and consequences fields on decisions for proper ADR-style recording"
     status: shipped
     target_date: "2026-06-22"
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: roadmap-improvements
     title: Roadmap with feature links and delivery tracking
     description: "Roadmap items link to feature specs, show shipped_in version, sidebar dead links fixed, mermaid rendering"
@@ -267,13 +268,13 @@ roadmap:
     description: "draft_feature, update_feature_status — close the spec-first loop so agents can author .usm files"
     status: shipped
     feature: usm/mcp-write
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: rules-file-generation
     title: Tool-specific rules files
     description: "Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow instructions"
     status: shipped
     feature: usm/gen-rules-files
-    shipped_in: "1.1.0"
+    shipped_in: "0.1.0"
   - id: marketing-site
     title: Marketing site
     description: "Next.js + shadcn landing page at usm.dev with spec-first workflow story"

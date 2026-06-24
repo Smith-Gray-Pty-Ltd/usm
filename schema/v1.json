@@ -95,6 +95,10 @@
           "default": "built",
           "description": "Implementation status: planned (no code yet), in-progress (partial code), built (code exists), deprecated (replaced by something else)"
         },
+        "version": {
+          "type": "string",
+          "description": "Project version (e.g. '0.1.0'). Tracks the project's own release version, separate from $version (schema version)."
+        },
         "identity": {
           "type": "object",
           "properties": {
