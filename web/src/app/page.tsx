@@ -27,16 +27,16 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 h-14 flex items-center justify-between">
           <a href="/" className="font-semibold tracking-tight">USM</a>
           <div className="flex items-center gap-4 text-sm">
-            <a href="https://usm.dev" className="text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+            <a href="https://docs.usm.dev" className="text-muted-foreground hover:text-foreground transition-colors">Docs</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" className="text-muted-foreground hover:text-foreground transition-colors">GitHub</a>
-            <a href="https://usm.dev/getting-started" className={buttonVariants({ size: "sm" })}>Get Started</a>
+            <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "sm" })}>Get Started</a>
           </div>
         </div>
       </nav>
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <Badge variant="secondary" className="mb-6">Spec-first development for AI agents</Badge>
+        <Badge variant="secondary" className="mb-6">Alpha v0.1.0 — Spec-first development for AI agents</Badge>
         <h1 className="text-5xl font-bold tracking-tight mb-6">
           A shared map that humans<br />and AI agents maintain together
         </h1>
@@ -45,8 +45,8 @@ export default function Home() {
           automatically, always in sync, because it was written first.
         </p>
           <div className="flex items-center justify-center gap-4">
-            <a href="https://usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>Get Started</a>
-            <a href="https://usm.dev" className={buttonVariants({ size: "lg", variant: "outline" })}>View Docs</a>
+            <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>Get Started</a>
+            <a href="https://docs.usm.dev" className={buttonVariants({ size: "lg", variant: "outline" })}>View Docs</a>
           </div>
       </section>
 
@@ -141,7 +141,7 @@ export default function Home() {
             USM is MIT licensed, self-hosting, and works with Cursor, Claude Code, and Codex.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <a href="https://usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>Get Started</a>
+            <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>Get Started</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" className={buttonVariants({ size: "lg", variant: "outline" })}>View on GitHub</a>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-8 flex items-center justify-between text-sm text-muted-foreground">
           <div>MIT © 2026 Smith & Gray Pty Ltd</div>
           <div className="flex items-center gap-4">
-            <a href="https://usm.dev" className="hover:text-foreground transition-colors">Docs</a>
+            <a href="https://docs.usm.dev" className="hover:text-foreground transition-colors">Docs</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" className="hover:text-foreground transition-colors">GitHub</a>
           </div>
         </div>
