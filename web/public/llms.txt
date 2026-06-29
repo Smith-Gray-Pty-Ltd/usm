@@ -1,0 +1,62 @@
+# USM — Universal System Map
+
+> A shared focused brain for human + AI development
+
+USM is a structured source of truth for agentic systems. A single .usm/ directory of YAML files describes your whole system — apps, services, features, flows, contracts, decisions — and generates markdown docs, Mermaid diagrams, OpenAPI specs, AGENTS.md, Vitest test specs, ArchiMate, and TOGAF deliverables.
+
+## The Problem
+
+Agentic coding has no shared artifact between human intent and agent output. You describe what you want in chat, the agent writes code, and the discussion is lost. Docs go stale. You re-explain context every session. You burn thousands of tokens feeding entire codebases for context.
+
+## The Solution: Spec-First Workflow
+
+USM inverts the loop: write the spec first, then build from it.
+
+1. Discuss — Human and agent talk about the feature
+2. Spec — Agent drafts a .usm feature spec via MCP
+3. Review — Human reviews the generated markdown
+4. Build — Agent implements from the approved spec
+5. Documented — The spec IS the docs, always in sync
+
+## Key Benefits
+
+- Ship features faster — less back-and-forth with agents
+- Higher code quality — contracts and tests defined upfront
+- Always-up-to-date docs — spec is written first, never stale
+- 10-20x fewer tokens — structured MCP context vs raw codebase/vaults
+
+## MCP Tools (12 total)
+
+Read tools (8): usm_list, usm_read, usm_search, usm_validate, usm_summary, usm_references, usm_get_contracts, usm_get_flows
+
+Write tools (4): usm_draft_feature, usm_write_feature, usm_update_feature, usm_update_feature_status
+
+## CLI Commands
+
+```
+npm install -g @smithgray/usm
+usm init          # Generate usmconfig.json
+usm scan          # Scan codebase → .usm files
+usm generate      # Generate all outputs
+usm docs serve    # Serve docs locally (VitePress)
+usm mcp serve     # Start MCP server for AI agents
+```
+
+## Works With
+
+Cursor, Claude Code, Claude Desktop, Continue.dev, Codex, GitHub Copilot — any MCP-compatible tool.
+
+## Links
+
+- [Docs](https://docs.usm.dev)
+- [Getting Started](https://docs.usm.dev/getting-started)
+- [GitHub](https://github.com/Smith-Gray-Pty-Ltd/usm)
+- [CLI Reference](https://docs.usm.dev/cli-reference)
+- [Schema Reference](https://docs.usm.dev/schema-reference)
+- [Config Reference](https://docs.usm.dev/config-reference)
+- [MCP Tools Reference](https://docs.usm.dev/mcp-reference)
+- [JSON Schema](https://usm.dev/schema/v1.json)
+
+## License
+
+MIT © 2026 Smith & Gray Pty Ltd
