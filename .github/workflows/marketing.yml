@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "schema/**"
       - ".github/workflows/marketing.yml"
   workflow_dispatch:
 
@@ -26,6 +27,11 @@ jobs:
       - name: Install dependencies
         working-directory: web
         run: npm ci
+
+      - name: Copy schema files to public directory
+        run: |
+          mkdir -p web/public/schema
+          cp schema/*.json web/public/schema/
 
       - name: Build marketing site
         working-directory: web
