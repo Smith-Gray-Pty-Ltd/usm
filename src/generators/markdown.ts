@@ -1843,7 +1843,7 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
   lines.push("");
   lines.push("```bash");
   lines.push("# Install USM globally");
-  lines.push("npm install -g @~usm/core");
+  lines.push("npm install -g '@smithgray/usm@0.1.0'");
   lines.push("");
   lines.push("# Initialize a .usm/ scope in your project");
   lines.push("usm init");
