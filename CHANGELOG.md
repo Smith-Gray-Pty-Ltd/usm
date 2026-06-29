@@ -37,7 +37,21 @@ functional but the API and schema may change before 1.0.
 
 ### Migrated from @smith-gray/usm v0.1.0
 - Same codebase, but now:
-  - Public package: `@~usm/core` (was `@smith-gray/usm` private)
+  - Public package: `@smithgray/usm` (was `@smith-gray/usm` private)
   - Standalone repo: `github.com/Smith-Gray-Pty-Ltd/usm`
   - MIT licensed
   - With public docs site: usm.dev
+
+## [1.0.0-renamed] - 2026-06-29
+
+### Renamed to `@smithgray/usm`
+- Package renamed from `@~usm/core` (unusual `~` org name) to `@smithgray/usm` (proper npm org under Smith & Gray account)
+- Old `@~usm/core@1.0.0` marked deprecated with redirect message to the new package name
+- Install URL bug note: `npm install @smithgray/usm` may fail with a 404 due to a known npm CLI URL-encoding issue with org names without hyphens. Workaround:
+  ```bash
+  # Install via direct tarball
+  npm install https://registry.npmjs.org/@smithgray/usm/-/usm-0.1.0.tgz
+  
+  # OR pin to a specific version
+  npm install '@smithgray/usm@0.1.0'
+  ```

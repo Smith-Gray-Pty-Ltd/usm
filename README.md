@@ -44,7 +44,7 @@ A single `.usm/` directory of YAML files (validated by a JSON Schema) produces:
 
 ```bash
 # Install
-npm install -g @~usm/core
+npm install -g @smithgray/usm
 
 # Initialize a .usm/ scope in your project
 usm init
