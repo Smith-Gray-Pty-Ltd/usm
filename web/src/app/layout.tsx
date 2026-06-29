@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "USM — Universal System Map",
-  description: "A shared map that humans and AI agents maintain together. Write the spec first, then build. The spec becomes the docs — automatically, always in sync.",
+  title: "USM — The Shared Brain for Human + AI Coding",
+  description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with Cursor, Claude Code, and Codex.",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="dark h-full antialiased"
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
