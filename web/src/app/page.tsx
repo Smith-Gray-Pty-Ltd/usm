@@ -149,7 +149,7 @@ export default function Home() {
             <div>
               <Badge variant="secondary" className="mb-5">Alpha v0.1.0 — Free &amp; open source</Badge>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-5 leading-tight">
-                The shared brain for<br />human + AI coding
+                The shared focused brain for<br />human + AI development
               </h1>
               <p className="text-lg text-muted-foreground mb-6 max-w-md">
                 Write specs first. Agents build from them. Docs stay perfectly in sync —

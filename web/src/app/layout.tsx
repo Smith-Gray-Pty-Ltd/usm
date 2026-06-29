@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "USM — The Shared Brain for Human + AI Coding",
+  title: "USM — A Shared Focused Brain for Human + AI Development",
   description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with Cursor, Claude Code, and Codex.",
 };
 
