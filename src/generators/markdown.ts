@@ -2294,6 +2294,102 @@ export function generateMcpReference(root: string): GenerationResult {
 }
 
 /**
+ * Language support data — used by both the marketing carousel and the docs grid.
+ * This is the single source of truth for language/framework/route detection info.
+ */
+const LANGUAGE_SUPPORT = [
+  { language: "TypeScript/JavaScript", manifest: "package.json", runtime: "node", frameworks: ["Next.js", "Express", "Hono", "NestJS"], routeExample: "app.get('/users', handler)", routePattern: "app.(get|post|put|delete)\\(['\"]([^'\"]+)" },
+  { language: "Python", manifest: "pyproject.toml / requirements.txt", runtime: "python", frameworks: ["FastAPI", "Flask", "Django"], routeExample: "@app.get('/users')", routePattern: "@(app|router)\\.(get|post|put|delete|patch)\\(['\"]([^'\"]+)" },
+  { language: "Go", manifest: "go.mod", runtime: "go", frameworks: ["chi", "gin", "echo", "net/http"], routeExample: "r.GET('/users', handler)", routePattern: "\\.(GET|POST|PUT|DELETE|PATCH)\\(['\"]([^'\"]+)" },
+  { language: "Rust", manifest: "Cargo.toml", runtime: "rust", frameworks: ["Axum", "Actix", "Rocket"], routeExample: ".route('/users', get(handler))", routePattern: "\\.route\\(['\"]([^'\"]+).*?(get|post|put|delete)" },
+  { language: "Java/Kotlin", manifest: "pom.xml / build.gradle", runtime: "jvm", frameworks: ["Spring Boot", "Javalin", "Quarkus"], routeExample: "@GetMapping('/users')", routePattern: "@(Get|Post|Put|Delete|Request)Mapping\\(['\"]?([^'\"]+)" },
+  { language: "C#/.NET", manifest: ".csproj / .sln", runtime: "dotnet", frameworks: ["ASP.NET Core", "Minimal APIs"], routeExample: "[HttpGet('users')]", routePattern: "\\[(Get|Post|Put|Delete)Http\\(['\"]?([^'\"]+)" },
+  { language: "Ruby", manifest: "Gemfile", runtime: "ruby", frameworks: ["Rails", "Sinatra"], routeExample: "get '/users' do", routePattern: "(get|post|put|delete)\\s+['\"]([^'\"]+)" },
+  { language: "PHP", manifest: "composer.json", runtime: "php", frameworks: ["Laravel", "Symfony", "Slim"], routeExample: "Route::get('/users', ...)", routePattern: "Route::(get|post|put|delete)\\(['\"]([^'\"]+)" },
+  { language: "Elixir", manifest: "mix.exs", runtime: "elixir", frameworks: ["Phoenix"], routeExample: "get '/users', UserController, :index", routePattern: "(get|post|put|delete)\\s+['\"]([^'\"]+)" },
+  { language: "Swift", manifest: "Package.swift", runtime: "swift", frameworks: ["Vapor"], routeExample: "routes.get('users') { req in }", routePattern: "routes?\\.(get|post|put|delete)\\(['\"]([^'\"]+)" },
+  { language: "Scala", manifest: "build.sbt", runtime: "jvm", frameworks: ["Akka HTTP", "Play", "Tapir"], routeExample: "path('users') { get { ... } }", routePattern: "path\\(['\"]?([^'\"]+)" },
+  { language: "C/C++", manifest: "CMakeLists.txt / Makefile", runtime: "native", frameworks: ["Crow", "Drogon", "Pistache"], routeExample: "CROW_ROUTE(app, \"/users\")", routePattern: "CROW_ROUTE\\([^,]+,\\s*['\"]([^'\"]+)" },
+];
+
+/**
+ * Generate docs/language-support.md — comprehensive language/framework reference.
+ * Lists all 12 languages, their manifests, frameworks, and route detection patterns.
+ * Generic — same for all USM installations.
+ */
+export function generateLanguageSupportDoc(root: string): GenerationResult {
+  const lines: string[] = [];
+  lines.push("# Language Support");
+  lines.push("");
+  lines.push("USM's scanner detects services, routes, and data models across 12 languages and 30+ frameworks.");
+  lines.push("");
+  lines.push("## Supported Languages");
+  lines.push("");
+  lines.push("| Language | Manifest | Runtime | Frameworks |");
+  lines.push("|----------|----------|---------|------------|");
+
+  for (const lang of LANGUAGE_SUPPORT) {
+    lines.push(`| ${lang.language} | \`${lang.manifest}\` | ${lang.runtime} | ${lang.frameworks.join(", ")} |`);
+  }
+  lines.push("");
+
+  // Route detection details
+  lines.push("## Route Detection Patterns");
+  lines.push("");
+  lines.push("| Language | Framework | Example | Regex Pattern |");
+  lines.push("|----------|-----------|---------|---------------|");
+
+  for (const lang of LANGUAGE_SUPPORT) {
+    for (const fw of lang.frameworks) {
+      lines.push(`| ${lang.language} | ${fw} | \`${lang.routeExample}\` | \`${lang.routePattern}\` |`);
+    }
+  }
+  lines.push("");
+
+  // Data model detection
+  lines.push("## Data Model Detection");
+  lines.push("");
+  lines.push("| ORM | Language | Detection |");
+  lines.push("|-----|----------|-----------|");
+  lines.push("| Prisma | TypeScript | `schema.prisma` file |");
+  lines.push("| SQLAlchemy | Python | Class definitions in `models.py` |");
+  lines.push("| Django ORM | Python | Class definitions in `models.py` |");
+  lines.push("| GORM | Go | Struct definitions with `gorm` tags |");
+  lines.push("| Diesel | Rust | `table!` macros in `schema.rs` |");
+  lines.push("| Hibernate | Java | `@Entity` annotations in `.java` |");
+  lines.push("| Entity Framework | C# | `DbSet` properties in `DbContext` |");
+  lines.push("| ActiveRecord | Ruby | Classes inheriting `ApplicationRecord` |");
+  lines.push("| Eloquent | PHP | Classes extending `Model` |");
+  lines.push("| Ecto | Elixir | `schema` definitions in `.ex` files |");
+  lines.push("");
+
+  lines.push("## Custom Detection Rules");
+  lines.push("");
+  lines.push("Add custom manifest and route patterns in `usmconfig.json`:");
+  lines.push("");
+  lines.push("```json");
+  lines.push("{");
+  lines.push('  "detection": {');
+  lines.push('    "manifests": [');
+  lines.push('      { "pattern": "**/my-framework.config", "language": "custom", "frameworks": ["my-framework"] }');
+  lines.push('    ],');
+  lines.push('    "routes": [');
+  lines.push('      { "framework": "my-framework", "pattern": "route\\\\.(get|post)\\\\([\'\"]([^\'\"]+)", "method_group": 1, "path_group": 2 }');
+  lines.push('    ]');
+  lines.push('  }');
+  lines.push('}');
+  lines.push("```");
+  lines.push("");
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/language-support.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
  * Generate data/models.md — from .usm/data/models.usm + Prisma schema.
  * Also accepts ServiceUsm files that live in .usm/data/ (scan generates
  * them with $type: service rather than $type: data).

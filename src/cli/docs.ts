@@ -456,6 +456,9 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
   if (docExists("mcp-reference")) {
     refItems.push({ text: "MCP Tools", link: "/mcp-reference" });
   }
+  if (docExists("language-support")) {
+    refItems.push({ text: "Language Support", link: "/language-support" });
+  }
   if (refItems.length > 0) {
     sidebar.push({ text: "Reference", collapsed: true, items: refItems });
   }

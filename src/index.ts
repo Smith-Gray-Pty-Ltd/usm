@@ -18,6 +18,7 @@ export {
   generateConfigReference,
   generateSchemaReference,
   generateMcpReference,
+  generateLanguageSupportDoc,
   generateDataModelDoc,
   generateDataIndex,
   generatePerAppDecisions,
