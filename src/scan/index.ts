@@ -2,7 +2,9 @@
 
 export { initConfig, writeConfig } from "./init.js";
 export { scanStructural } from "./structural.js";
-export { extractRoutes, groupRoutesIntoFeatures } from "./routes.js";
+export { detectServices, extractRoutes } from "./multi-lang.js";
+export type { DetectedService, DetectedRoute } from "./multi-lang.js";
+export { extractRoutes as extractNextJsRoutes, groupRoutesIntoFeatures } from "./routes.js";
 export { smartMerge } from "./merge.js";
 export { scanInfrastructure } from "./infrastructure.js";
 export type { InfrastructureScanOptions, InfrastructureScanResult, ServiceInfraResult } from "./infrastructure.js";

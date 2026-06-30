@@ -102,6 +102,8 @@ export { getOutputPaths, resolveOutputPath, type OutputPaths } from "./outputs.j
 
 // Scan & Init (code-to-.usm direction)
 export { initConfig, writeConfig, scanStructural } from "./scan/index.js";
+export { detectServices, extractRoutes } from "./scan/multi-lang.js";
+export type { DetectedService, DetectedRoute } from "./scan/multi-lang.js";
 export type {
   UsmConfig,
   UsmConfigSources,
