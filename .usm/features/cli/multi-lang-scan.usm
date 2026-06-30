@@ -5,22 +5,22 @@ $version: 1
 $last_updated: "2026-06-30"
 status: planned
 summary: |
-  Multi-language scanner support — extend usm scan to detect services, routes, and data models from Python, Rust, Go, Java, Ruby, and PHP projects, not just Node.js/TypeScript. The .usm format and all generators are already language-agnostic; only the scanner needs extending.
+  Multi-language scanner support — extend usm scan to detect services, routes, and data models from 10+ languages and 30+ frameworks. The .usm format and all generators are already language-agnostic; only the scanner needs extending.
 
 $system: usm/system
 $service: usm/cli
 intent: |
   The .usm format, MCP tools, generators, and validator are all language-agnostic.
   But the scanner only detects Node.js/TypeScript projects (package.json, Next.js
-  routes, Prisma schemas). A Python team using FastAPI, a Rust team using Axum,
-  or a Go team using Chi can't run 'usm scan' — they have to hand-write .usm
-  files. This feature extends the scanner to detect services and routes from
-  common frameworks across major languages, making USM truly language-agnostic
-  end-to-end.
+  routes, Prisma schemas). A Python team using FastAPI, a Java team using Spring
+  Boot, a C# team using ASP.NET, or a Ruby team using Rails can't run 'usm scan'
+  — they have to hand-write .usm files. This feature extends the scanner to
+  detect services and routes from common frameworks across all major programming
+  languages, making USM truly language-agnostic end-to-end.
 
 decisions:
   - id: manifest-based-detection
-    decision: Detect services by language manifest files (package.json, pyproject.toml, Cargo.toml, go.mod, etc.)
+    decision: Detect services by language manifest files
     rationale: |
       Every language ecosystem has a standard manifest file. Detecting these
       files is reliable, language-specific, and doesn't require parsing source
@@ -31,15 +31,15 @@ decisions:
     decision: Detect routes per-framework, not per-language
     rationale: |
       Route patterns differ by framework, not language. Next.js uses app/page.tsx,
-      FastAPI uses @app.get decorators in .py files, Express uses app.get in .js,
-      Rails uses config/routes.rb, Spring uses @RequestMapping annotations.
+      FastAPI uses @app.get decorators, Spring uses @GetMapping annotations,
+      Rails uses config/routes.rb, ASP.NET uses [HttpGet] attributes.
       Each framework needs its own route extractor.
     alternatives:
       - option: Generic AST parsing per language
         rejected_because: "Too complex, requires language-specific parsers, fragile"
       - option: File-pattern matching only (no framework awareness)
-        rejected_because: "Misses decorator/annotation-based routes (FastAPI, Spring)"
-    consequences: "Route detection is framework-by-framework. New frameworks need a route extractor plugin."
+        rejected_because: "Misses decorator/annotation-based routes (FastAPI, Spring, ASP.NET)"
+    consequences: "Route detection is framework-by-framework. New frameworks need a route extractor."
     status: accepted
   - id: configurable-in-usmconfig
     decision: Language/framework detection rules are configurable in usmconfig.json
@@ -49,110 +49,265 @@ decisions:
       common frameworks; advanced users can extend.
     consequences: "usmconfig.json gains a 'detection' section with language/framework rules"
     status: accepted
-  - id: phased-rollout
-    decision: Start with Python + Go + Rust, add Java/Ruby/PHP later
+  - id: all-languages-from-start
+    decision: Support all major languages from the initial implementation
     rationale: |
-      Python (FastAPI, Flask, Django) and Go (chi, gin, echo) are the most
-      common non-JS languages for API services. Rust (Axum, Actix) is growing.
-      These three cover the majority of non-JS agentic coding use cases.
-    consequences: "Java (Spring), Ruby (Rails), PHP (Laravel) added in a follow-up phase"
+      Rather than phasing, include all major languages (Python, Go, Rust, Java,
+      Kotlin, C#, Ruby, PHP, Elixir, Swift, Scala, C/C++) from the start. The
+      manifest detection is simple (file pattern matching) and route detection
+      is regex-based per framework. The complexity is manageable.
+    consequences: "Larger initial implementation but no phased rollout complexity"
     status: accepted
 
 flows:
   - id: detect-multi-lang-services
     name: Detect services from multiple language manifests
     description: |
-      Scanner reads usmconfig.json detection rules and checks for manifest
-      files. Each manifest identifies a service and its language/framework.
+      Scanner reads usmconfig.json detection.manifests (or defaults) and checks
+      for manifest files. Each manifest identifies a service and its language.
+      Framework is detected from dependencies in the manifest.
     steps:
       - id: s1
         action: read
-        target: usmconfig.json detection.manifests (or defaults)
+        target: "usmconfig.json detection.manifests (or defaults)"
       - id: s2
         action: scan
-        target: directories for manifest files (package.json, pyproject.toml, Cargo.toml, go.mod)
+        target: "directories for all manifest files"
       - id: s3
         action: parse
-        target: each manifest for framework dependencies
+        target: "each manifest for framework dependencies"
       - id: s4
         action: classify
-        target: service type (web-app, api, worker) from framework
+        target: "service type (web-app, api, worker) from framework"
       - id: s5
         action: generate
-        target: .usm/services/<name>.usm with detected language, runtime, framework
+        target: ".usm/services/<name>.usm with detected language, runtime, framework"
 
-  - id: detect-fastapi-routes
-    name: Detect FastAPI routes from Python decorators
+  - id: detect-python-routes
+    name: Detect Python routes (FastAPI, Flask, Django)
     description: |
-      Scan .py files for @app.get, @app.post, @router.get, @router.post
-      decorators to extract API routes.
+      Scan .py files for decorator-based routes. FastAPI uses @app.get/@router.get,
+      Flask uses @app.route, Django uses urlpatterns in urls.py.
     steps:
       - id: s1
         action: scan
-        target: .py files in service directory
+        target: ".py files in service directory"
       - id: s2
         action: match
-        target: regex for @app.(get|post|put|delete|patch) and @router.(get|post|...)
+        target: "FastAPI: @app.(get|post|put|delete|patch), @router.(get|post|...); Flask: @app.route; Django: path('', views)"
       - id: s3
         action: extract
-        target: path and HTTP method from decorator
+        target: "path and HTTP method from decorator/pattern"
       - id: s4
         action: generate
-        target: routes[] in feature .usm files
+        target: "routes[] in feature .usm files"
 
   - id: detect-go-routes
-    name: Detect Go routes from router registrations
+    name: Detect Go routes (chi, gin, echo, net/http)
     description: |
-      Scan .go files for router registration patterns (r.GET, r.POST,
-      router.HandleFunc, mux.HandleFunc) to extract API routes.
+      Scan .go files for router registration patterns. chi/gin/echo use
+      r.GET/r.POST, net/http uses http.HandleFunc, gorilla/mux uses r.HandleFunc.
     steps:
       - id: s1
         action: scan
-        target: .go files in service directory
+        target: ".go files in service directory"
       - id: s2
         action: match
-        target: regex for (r|router|mux)\.(GET|POST|PUT|DELETE|PATCH|HandleFunc)
+        target: "(r|router|mux)\\.(GET|POST|PUT|DELETE|PATCH|HandleFunc|Handle)"
       - id: s3
         action: extract
-        target: path and HTTP method
+        target: "path and HTTP method"
       - id: s4
         action: generate
-        target: routes[] in feature .usm files
+        target: "routes[] in feature .usm files"
 
   - id: detect-rust-routes
-    name: Detect Rust routes from Axum/Actix macros
+    name: Detect Rust routes (Axum, Actix, Rocket)
     description: |
-      Scan .rs files for #[axum::routing] or #[actix_web::main] patterns
-      and route registration calls.
+      Scan .rs files for route patterns. Axum uses .route(), Actix uses
+      #[get(...)] macros, Rocket uses #[get("/path")] attributes.
     steps:
       - id: s1
         action: scan
-        target: .rs files in service directory
+        target: ".rs files in service directory"
       - id: s2
         action: match
-        target: patterns for .route(), .service(), #[get(...)], #[post(...)]
+        target: ".route(), .service(), #[get(...)], #[post(...)], #[route(GET, \"/path\")]"
       - id: s3
         action: extract
-        target: path and HTTP method
+        target: "path and HTTP method"
       - id: s4
         action: generate
-        target: routes[] in feature .usm files
+        target: "routes[] in feature .usm files"
 
-  - id: detect-multi-lang-data-models
-    name: Detect data models from multiple ORMs
+  - id: detect-java-routes
+    name: Detect Java/Kotlin routes (Spring Boot, Javalin, Quarkus)
     description: |
-      Extend data model detection beyond Prisma to support SQLAlchemy
-      (Python), GORM (Go), Diesel (Rust), and others.
+      Scan .java/.kt files for annotation-based routes. Spring uses
+      @GetMapping/@PostMapping/@RequestMapping, Javalin uses app.get/post,
+      Quarkus uses @Path + @GET/@POST.
     steps:
       - id: s1
         action: scan
-        target: known ORM schema files (models.py, schema.go, migrations/)
+        target: ".java and .kt files in service directory"
+      - id: s2
+        action: match
+        target: "Spring: @GetMapping/@PostMapping/@RequestMapping; Javalin: app.get/post; Quarkus: @GET/@POST + @Path"
+      - id: s3
+        action: extract
+        target: "path and HTTP method from annotation"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-csharp-routes
+    name: Detect C# routes (ASP.NET Core, Minimal APIs)
+    description: |
+      Scan .cs files for attribute-based routes. ASP.NET uses [HttpGet],
+      [HttpPost], [Route], Minimal APIs use app.MapGet/MapPost.
+    steps:
+      - id: s1
+        action: scan
+        target: ".cs files in service directory"
+      - id: s2
+        action: match
+        target: "[HttpGet], [HttpPost], [Route(\"path\")], app.MapGet, app.MapPost"
+      - id: s3
+        action: extract
+        target: "path and HTTP method from attribute"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-ruby-routes
+    name: Detect Ruby routes (Rails, Sinatra)
+    description: |
+      Scan config/routes.rb for Rails routes (get/post/resources) and .rb
+      files for Sinatra routes (get '/path' do).
+    steps:
+      - id: s1
+        action: scan
+        target: "config/routes.rb and .rb files in service directory"
+      - id: s2
+        action: match
+        target: "Rails: get/post/resources/namespace; Sinatra: get '/path' do, post '/path' do"
+      - id: s3
+        action: extract
+        target: "path and HTTP method"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-php-routes
+    name: Detect PHP routes (Laravel, Symfony, Slim)
+    description: |
+      Scan routes/web.php for Laravel routes (Route::get/post), .php files
+      for Symfony attributes (#[Route]) and Slim ($app->get/post).
+    steps:
+      - id: s1
+        action: scan
+        target: "routes/web.php, routes/api.php, and .php files"
+      - id: s2
+        action: match
+        target: "Laravel: Route::get/post; Symfony: #[Route]; Slim: $app->get/post"
+      - id: s3
+        action: extract
+        target: "path and HTTP method"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-elixir-routes
+    name: Detect Elixir routes (Phoenix)
+    description: |
+      Scan router.ex for Phoenix routes (get/post/pipe_through/scope).
+    steps:
+      - id: s1
+        action: scan
+        target: "lib/*_web/router.ex files"
+      - id: s2
+        action: match
+        target: "get/post/put/patch/delete within scope blocks"
+      - id: s3
+        action: extract
+        target: "path and HTTP method"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-swift-routes
+    name: Detect Swift routes (Vapor)
+    description: |
+      Scan .swift files for Vapor route registrations (routes.get/post,
+      app.get/post).
+    steps:
+      - id: s1
+        action: scan
+        target: ".swift files in service directory"
+      - id: s2
+        action: match
+        target: "routes.get/post/put/delete, app.get/post"
+      - id: s3
+        action: extract
+        target: "path and HTTP method"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-scala-routes
+    name: Detect Scala routes (Akka HTTP, Play, Tapir)
+    description: |
+      Scan .scala files for route patterns. Akka HTTP uses path/endpoints,
+      Play uses routes file, Tapir uses endpoint.get/post.
+    steps:
+      - id: s1
+        action: scan
+        target: ".scala files and conf/routes files"
+      - id: s2
+        action: match
+        target: "Akka: path/endpoints; Play: GET /path; Tapir: endpoint.get/post"
+      - id: s3
+        action: extract
+        target: "path and HTTP method"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-cpp-routes
+    name: Detect C++ routes (Crow, Drogon, Pistache)
+    description: |
+      Scan .cpp/.h files for route registration patterns. Crow uses
+      CROW_ROUTE, Drogon uses app.registerHandler, Pistache uses
+      router.get/post.
+    steps:
+      - id: s1
+        action: scan
+        target: ".cpp and .h files in service directory"
+      - id: s2
+        action: match
+        target: "Crow: CROW_ROUTE; Drogon: registerHandler; Pistache: router.get/post"
+      - id: s3
+        action: extract
+        target: "path and HTTP method"
+      - id: s4
+        action: generate
+        target: "routes[] in feature .usm files"
+
+  - id: detect-multi-lang-data-models
+    name: Detect data models from multiple ORMs across languages
+    description: |
+      Extend data model detection beyond Prisma to support ORMs across
+      all supported languages.
+    steps:
+      - id: s1
+        action: scan
+        target: "known ORM schema files per language"
       - id: s2
         action: parse
-        target: model definitions (class-based, struct-based, macro-based)
+        target: "model definitions (class-based, struct-based, macro-based, annotation-based)"
       - id: s3
         action: generate
-        target: .usm/data/<name>.usm with models and fields
+        target: ".usm/data/<name>.usm with models and fields"
 
 contracts:
   - id: manifest-detection-coverage
@@ -162,22 +317,66 @@ contracts:
       - "pyproject.toml or requirements.txt → Python"
       - "Cargo.toml → Rust"
       - "go.mod → Go"
+      - "pom.xml or build.gradle → Java/Kotlin"
+      - ".csproj or .sln → C#/.NET"
+      - "Gemfile → Ruby"
+      - "composer.json → PHP"
+      - "mix.exs → Elixir"
+      - "Package.swift → Swift"
+      - "build.sbt → Scala"
+      - "CMakeLists.txt or Makefile → C/C++"
       - "Framework detected from dependencies in manifest"
   - id: route-detection-coverage
-    description: Scanner detects routes from common frameworks per language
+    description: Scanner detects routes from 30+ frameworks across all languages
     must_have:
       - "Next.js: app/page.tsx, app/route.ts (existing)"
-      - "FastAPI: @app.get/post/put/delete decorators in .py files"
+      - "Express: app.get/post/put/delete in .js/.ts files"
+      - "FastAPI: @app.get/post decorators in .py files"
       - "Flask: @app.route decorators in .py files"
-      - "Express: app.get/post/put/delete calls in .js/.ts files"
+      - "Django: path() patterns in urls.py"
       - "Go chi/gin/echo: r.GET/POST and router.HandleFunc patterns"
-      - "Rust Axum: .route() calls, Actix: #[get/post] macros"
+      - "Go net/http: http.HandleFunc patterns"
+      - "Rust Axum: .route() calls"
+      - "Rust Actix: #[get/post] macros"
+      - "Rust Rocket: #[get/post] attributes"
+      - "Spring Boot: @GetMapping/@PostMapping/@RequestMapping annotations"
+      - "Javalin: app.get/post calls"
+      - "Quarkus: @GET/@POST + @Path annotations"
+      - "ASP.NET Core: [HttpGet]/[HttpPost] attributes"
+      - "ASP.NET Minimal: app.MapGet/MapPost"
+      - "Rails: get/post/resources in config/routes.rb"
+      - "Sinatra: get '/path' do in .rb files"
+      - "Laravel: Route::get/post in routes/web.php"
+      - "Symfony: #[Route] attributes"
+      - "Slim: $app->get/post in .php files"
+      - "Phoenix: get/post in router.ex"
+      - "Vapor: routes.get/post in .swift files"
+      - "Akka HTTP: path/endpoints in .scala files"
+      - "Play: GET /path in conf/routes"
+      - "Tapir: endpoint.get/post in .scala files"
+      - "Crow: CROW_ROUTE macro in .cpp files"
+      - "Drogon: registerHandler in .cpp files"
+      - "Pistache: router.get/post in .cpp files"
+  - id: data-model-detection-coverage
+    description: Scanner detects data models from ORMs across languages
+    must_have:
+      - "Prisma: schema.prisma (existing, TypeScript)"
+      - "SQLAlchemy: class definitions in models.py (Python)"
+      - "Django ORM: class definitions in models.py (Python)"
+      - "GORM: struct definitions with gorm tags (Go)"
+      - "Diesel: table! macros in schema.rs (Rust)"
+      - "Hibernate: @Entity annotations in .java (Java)"
+      - "Entity Framework: DbSet properties in DbContext (C#)"
+      - "ActiveRecord: class definitions inheriting ApplicationRecord (Ruby)"
+      - "Eloquent: class definitions extending Model (PHP)"
+      - "Ecto: schema definitions in .ex files (Elixir)"
   - id: config-extensible
     description: Detection rules are configurable in usmconfig.json
     must_have:
-      - "detection.manifests array with {pattern, language, framework?} objects"
+      - "detection.manifests array with {pattern, language, frameworks?} objects"
       - "detection.routes array with {framework, pattern, method_group, path_group} objects"
-      - "Defaults cover common frameworks; users can add custom patterns"
+      - "detection.data_models array with {orm, pattern, model_pattern?} objects"
+      - "Defaults cover all supported frameworks; users can add custom patterns"
   - id: backward-compatible
     description: Existing Node.js/TypeScript scanning unchanged
     must_have:
@@ -203,16 +402,84 @@ tests:
     expect:
       - assertion: ".usm/services/<name>.usm created with runtime: rust"
       - assertion: "framework: axum detected"
+  - id: detect-java-service
+    setup:
+      pom_xml_with_spring_boot: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: java"
+      - assertion: "framework: spring-boot detected"
+  - id: detect-csharp-service
+    setup:
+      csproj_with_aspnet: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: dotnet"
+      - assertion: "framework: aspnet-core detected"
+  - id: detect-ruby-service
+    setup:
+      gemfile_with_rails: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: ruby"
+      - assertion: "framework: rails detected"
+  - id: detect-php-service
+    setup:
+      composer_json_with_laravel: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: php"
+      - assertion: "framework: laravel detected"
+  - id: detect-elixir-service
+    setup:
+      mix_exs_with_phoenix: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: elixir"
+      - assertion: "framework: phoenix detected"
+  - id: detect-swift-service
+    setup:
+      package_swift_with_vapor: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: swift"
+      - assertion: "framework: vapor detected"
+  - id: detect-scala-service
+    setup:
+      build_sbt_with_akka: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: scala"
+      - assertion: "framework: akka-http detected"
+  - id: detect-cpp-service
+    setup:
+      cmake_with_drogon: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: cpp"
+      - assertion: "framework: drogon detected"
   - id: extract-fastapi-routes
     setup:
       python_file_with_decorators: true
     expect:
       - assertion: "routes[] extracted with correct paths and methods"
-  - id: extract-go-routes
+  - id: extract-spring-routes
     setup:
-      go_file_with_router: true
+      java_file_with_annotations: true
     expect:
-      - assertion: "routes[] extracted with correct paths and methods"
+      - assertion: "routes[] extracted from @GetMapping/@PostMapping"
+  - id: extract-aspnet-routes
+    setup:
+      cs_file_with_attributes: true
+    expect:
+      - assertion: "routes[] extracted from [HttpGet]/[HttpPost]"
+  - id: extract-rails-routes
+    setup:
+      routes_rb_with_get_post: true
+    expect:
+      - assertion: "routes[] extracted from get/post/resources"
+  - id: extract-laravel-routes
+    setup:
+      web_php_with_route_get: true
+    expect:
+      - assertion: "routes[] extracted from Route::get/post"
+  - id: extract-phoenix-routes
+    setup:
+      router_ex_with_get_post: true
+    expect:
+      - assertion: "routes[] extracted from get/post in scope blocks"
   - id: backward-compatible-node
     setup:
       package_json_with_nextjs: true
@@ -222,7 +489,7 @@ tests:
     setup:
       usmconfig_with_custom_manifest: true
     expect:
-      - assertion: custom manifest pattern detected
+      - assertion: "custom manifest pattern detected"
 
 implementation:
   primary: src/scan/structural.ts
