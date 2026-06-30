@@ -9,7 +9,8 @@ import { LanguageCarousel } from "@/components/language-carousel";
 import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,
-  Boxes, GitBranch, Building2, Users, ArrowRight, Star
+  Boxes, GitBranch, Building2, Users, ArrowRight, Star,
+  Search, Sparkles, Wand2
 } from "lucide-react";
 
 const benefits = [
@@ -28,12 +29,19 @@ const outputs = [
   { title: "ArchiMate / TOGAF", desc: "Enterprise architecture deliverables" },
 ];
 
-const steps = [
+const devLoopSteps = [
   { num: "01", title: "Discuss", desc: "Human and agent talk about the feature", icon: MessageSquare },
   { num: "02", title: "Spec", desc: "Agent drafts a .usm feature spec via MCP", icon: FileCode },
   { num: "03", title: "Review", desc: "Human reviews the generated markdown", icon: Eye },
   { num: "04", title: "Build", desc: "Agent implements from the approved spec", icon: Hammer },
   { num: "05", title: "Documented", desc: "The spec IS the docs — always in sync", icon: CheckCircle },
+];
+
+const onboardSteps = [
+  { num: "01", title: "Init", desc: "Analyze repo, generate usmconfig.json", icon: Terminal, cmd: "usm init" },
+  { num: "02", title: "Scan", desc: "Detect services, routes, data models across 12 languages", icon: Search, cmd: "usm scan" },
+  { num: "03", title: "Enrich", desc: "Fill TODO placeholders with LLM (optional)", icon: Sparkles, cmd: "usm enrich" },
+  { num: "04", title: "Generate", desc: "Produce docs, OpenAPI, Mermaid, test specs", icon: FileCode, cmd: "usm generate" },
 ];
 
 const useCases = [
@@ -56,6 +64,8 @@ const codeLines = [
   { text: "", comment: false },
   { text: "→ Show human the markdown for review...", comment: false },
 ];
+
+const externalLink = "target=\"_blank\" rel=\"noopener noreferrer\"";
 
 function useInView<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -132,12 +142,12 @@ export default function Home() {
             USM
           </a>
           <div className="flex items-center gap-5 text-sm">
-            <a href="https://docs.usm.dev" className="text-muted-foreground hover:text-foreground transition-colors">Docs</a>
-            <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+            <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+            <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <Star className="w-4 h-4" />
               GitHub
             </a>
-            <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "sm" })}>Get Started</a>
+            <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm" })}>Get Started</a>
           </div>
         </div>
       </nav>
@@ -160,9 +170,10 @@ export default function Home() {
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Spec-first workflow</span>
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> 12 MCP tools</span>
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> 10-20x fewer tokens</span>
+                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> LLM enrichment</span>
               </div>
               <div className="flex items-center gap-3">
-                <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>
+                <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "lg" })}>
                   Install Now <ArrowRight className="w-4 h-4 ml-1" />
                 </a>
                 <a href="#see-it" className={buttonVariants({ size: "lg", variant: "outline" })}>Try in 60 seconds</a>
@@ -210,24 +221,30 @@ export default function Home() {
 
       <Separator />
 
-      {/* Workflow */}
+      {/* How It Works — Multiple Workflows */}
       <section className="mx-auto max-w-5xl px-6 py-24">
         <FadeIn>
           <div className="text-center mb-16">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">How it works</p>
-            <h2 className="text-3xl font-semibold mb-3">USM inverts the loop</h2>
+            <h2 className="text-3xl font-semibold mb-3">Three ways to use USM</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Don&apos;t write docs after the code. Write the spec first, then build from it.
+              Onboard an existing codebase, run the spec-first dev loop, or enrich specs with LLM.
             </p>
           </div>
         </FadeIn>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          {steps.map((step, i) => {
-            const Icon = step.icon;
-            return (
-              <FadeIn key={step.num} delay={i * 120}>
-                <div className="relative">
-                  <Card className="h-full hover:border-foreground/30 transition-colors duration-200">
+
+        {/* Workflow 1: Onboard existing codebase */}
+        <FadeIn>
+          <div className="mb-16">
+            <div className="flex items-center gap-2 mb-6">
+              <Search className="w-5 h-5 text-muted-foreground" />
+              <h3 className="text-xl font-semibold">Onboard an existing codebase</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {onboardSteps.map((step, i) => {
+                const Icon = step.icon;
+                return (
+                  <Card key={step.num} className="h-full hover:border-foreground/30 transition-colors duration-200">
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between mb-2">
                         <Icon className="w-5 h-5 text-foreground" />
@@ -236,17 +253,90 @@ export default function Home() {
                       <CardTitle className="text-sm">{step.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-xs text-muted-foreground">{step.desc}</p>
+                      <p className="text-xs text-muted-foreground mb-2">{step.desc}</p>
+                      <code className="text-xs font-mono text-foreground/70 bg-muted px-1.5 py-0.5 rounded">{step.cmd}</code>
                     </CardContent>
                   </Card>
-                  {i < steps.length - 1 && (
-                    <ArrowRight className="hidden md:block absolute top-1/2 -right-2.5 -translate-y-1/2 w-4 h-4 text-muted-foreground/30" />
-                  )}
+                );
+              })}
+            </div>
+          </div>
+        </FadeIn>
+
+        {/* Workflow 2: Spec-first dev loop */}
+        <FadeIn delay={150}>
+          <div className="mb-16">
+            <div className="flex items-center gap-2 mb-6">
+              <FileCode className="w-5 h-5 text-muted-foreground" />
+              <h3 className="text-xl font-semibold">The spec-first dev loop</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {devLoopSteps.map((step, i) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.num} className="relative">
+                    <Card className="h-full hover:border-foreground/30 transition-colors duration-200">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <Icon className="w-5 h-5 text-foreground" />
+                          <span className="text-xs font-mono text-muted-foreground">{step.num}</span>
+                        </div>
+                        <CardTitle className="text-sm">{step.title}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-xs text-muted-foreground">{step.desc}</p>
+                      </CardContent>
+                    </Card>
+                    {i < devLoopSteps.length - 1 && (
+                      <ArrowRight className="hidden md:block absolute top-1/2 -right-2.5 -translate-y-1/2 w-4 h-4 text-muted-foreground/30" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </FadeIn>
+
+        {/* Workflow 3: LLM enrichment */}
+        <FadeIn delay={300}>
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <Wand2 className="w-5 h-5 text-muted-foreground" />
+              <h3 className="text-xl font-semibold">LLM enrichment</h3>
+            </div>
+            <Card className="hover:border-foreground/30 transition-colors duration-200">
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Scanned <code className="font-mono text-foreground/70 bg-muted px-1.5 py-0.5 rounded">.usm</code> files
+                  contain <code className="font-mono text-foreground/70 bg-muted px-1.5 py-0.5 rounded">TODO: describe</code>
+                  placeholders. <code className="font-mono text-foreground/70 bg-muted px-1.5 py-0.5 rounded">usm enrich</code> calls
+                  an LLM to fill them in with source code context — preserving all human-written content.
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div className="border border-border rounded-md p-3">
+                    <div className="font-mono text-muted-foreground mb-1">PROVIDERS</div>
+                    <div>OpenAI, Anthropic, Ollama, LiteLLM</div>
+                  </div>
+                  <div className="border border-border rounded-md p-3">
+                    <div className="font-mono text-muted-foreground mb-1">MODELS</div>
+                    <div>Any OpenAI-compatible model</div>
+                  </div>
+                  <div className="border border-border rounded-md p-3">
+                    <div className="font-mono text-muted-foreground mb-1">PRESERVES</div>
+                    <div>Human-written fields</div>
+                  </div>
+                  <div className="border border-border rounded-md p-3">
+                    <div className="font-mono text-muted-foreground mb-1">CONFIGURABLE</div>
+                    <div>Fields, model, temperature</div>
+                  </div>
                 </div>
-              </FadeIn>
-            );
-          })}
-        </div>
+                <div className="mt-4">
+                  <CopyBlock code="usm enrich --model gpt-4o --dry-run" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </FadeIn>
       </section>
 
       <Separator />
@@ -465,13 +555,14 @@ export default function Home() {
             <CopyBlock code="npm install -g @smithgray/usm" />
             <CopyBlock code="usm init" />
             <CopyBlock code="usm scan" />
+            <CopyBlock code="usm enrich --dry-run" />
             <CopyBlock code="usm generate" />
             <CopyBlock code="usm docs serve" />
             <CopyBlock code="usm mcp serve" />
           </div>
         </FadeIn>
         <div className="text-center mt-10">
-          <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>
+          <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "lg" })}>
             Try it in 60 seconds <ArrowRight className="w-4 h-4 ml-1" />
           </a>
         </div>
@@ -522,8 +613,8 @@ export default function Home() {
             Free, open source, MIT licensed. Works with Cursor, Claude Code, and Codex. Self-hosting — your .usm files stay in your repo.
           </p>
           <div className="flex items-center justify-center gap-3">
-            <a href="https://docs.usm.dev/getting-started" className={buttonVariants({ size: "lg" })}>Get Started Free</a>
-            <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" className={buttonVariants({ size: "lg", variant: "outline" })}>Star on GitHub</a>
+            <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "lg" })}>Get Started Free</a>
+            <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "lg", variant: "outline" })}>Star on GitHub</a>
           </div>
         </FadeIn>
       </section>
@@ -533,8 +624,8 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-8 flex items-center justify-between text-sm text-muted-foreground">
           <div>MIT © 2026 Smith &amp; Gray Pty Ltd — Alpha v0.1.0</div>
           <div className="flex items-center gap-5">
-            <a href="https://docs.usm.dev" className="hover:text-foreground transition-colors">Docs</a>
-            <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" className="hover:text-foreground transition-colors">GitHub</a>
+            <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Docs</a>
+            <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
           </div>
         </div>
       </footer>
