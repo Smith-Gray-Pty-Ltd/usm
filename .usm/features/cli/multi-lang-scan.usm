@@ -1,0 +1,234 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-multi-lang-scan
+$type: feature
+$version: 1
+$last_updated: "2026-06-30"
+status: planned
+summary: |
+  Multi-language scanner support — extend usm scan to detect services, routes, and data models from Python, Rust, Go, Java, Ruby, and PHP projects, not just Node.js/TypeScript. The .usm format and all generators are already language-agnostic; only the scanner needs extending.
+
+$system: usm/system
+$service: usm/cli
+intent: |
+  The .usm format, MCP tools, generators, and validator are all language-agnostic.
+  But the scanner only detects Node.js/TypeScript projects (package.json, Next.js
+  routes, Prisma schemas). A Python team using FastAPI, a Rust team using Axum,
+  or a Go team using Chi can't run 'usm scan' — they have to hand-write .usm
+  files. This feature extends the scanner to detect services and routes from
+  common frameworks across major languages, making USM truly language-agnostic
+  end-to-end.
+
+decisions:
+  - id: manifest-based-detection
+    decision: Detect services by language manifest files (package.json, pyproject.toml, Cargo.toml, go.mod, etc.)
+    rationale: |
+      Every language ecosystem has a standard manifest file. Detecting these
+      files is reliable, language-specific, and doesn't require parsing source
+      code. The manifest also tells us dependencies (framework detection).
+    consequences: "Scanner needs a manifest-to-language map. New languages added by adding a manifest entry."
+    status: accepted
+  - id: framework-specific-route-detection
+    decision: Detect routes per-framework, not per-language
+    rationale: |
+      Route patterns differ by framework, not language. Next.js uses app/page.tsx,
+      FastAPI uses @app.get decorators in .py files, Express uses app.get in .js,
+      Rails uses config/routes.rb, Spring uses @RequestMapping annotations.
+      Each framework needs its own route extractor.
+    alternatives:
+      - option: Generic AST parsing per language
+        rejected_because: "Too complex, requires language-specific parsers, fragile"
+      - option: File-pattern matching only (no framework awareness)
+        rejected_because: "Misses decorator/annotation-based routes (FastAPI, Spring)"
+    consequences: "Route detection is framework-by-framework. New frameworks need a route extractor plugin."
+    status: accepted
+  - id: configurable-in-usmconfig
+    decision: Language/framework detection rules are configurable in usmconfig.json
+    rationale: |
+      Users can add custom manifest patterns, route patterns, and data model
+      patterns for frameworks we don't support out of the box. Defaults cover
+      common frameworks; advanced users can extend.
+    consequences: "usmconfig.json gains a 'detection' section with language/framework rules"
+    status: accepted
+  - id: phased-rollout
+    decision: Start with Python + Go + Rust, add Java/Ruby/PHP later
+    rationale: |
+      Python (FastAPI, Flask, Django) and Go (chi, gin, echo) are the most
+      common non-JS languages for API services. Rust (Axum, Actix) is growing.
+      These three cover the majority of non-JS agentic coding use cases.
+    consequences: "Java (Spring), Ruby (Rails), PHP (Laravel) added in a follow-up phase"
+    status: accepted
+
+flows:
+  - id: detect-multi-lang-services
+    name: Detect services from multiple language manifests
+    description: |
+      Scanner reads usmconfig.json detection rules and checks for manifest
+      files. Each manifest identifies a service and its language/framework.
+    steps:
+      - id: s1
+        action: read
+        target: usmconfig.json detection.manifests (or defaults)
+      - id: s2
+        action: scan
+        target: directories for manifest files (package.json, pyproject.toml, Cargo.toml, go.mod)
+      - id: s3
+        action: parse
+        target: each manifest for framework dependencies
+      - id: s4
+        action: classify
+        target: service type (web-app, api, worker) from framework
+      - id: s5
+        action: generate
+        target: .usm/services/<name>.usm with detected language, runtime, framework
+
+  - id: detect-fastapi-routes
+    name: Detect FastAPI routes from Python decorators
+    description: |
+      Scan .py files for @app.get, @app.post, @router.get, @router.post
+      decorators to extract API routes.
+    steps:
+      - id: s1
+        action: scan
+        target: .py files in service directory
+      - id: s2
+        action: match
+        target: regex for @app.(get|post|put|delete|patch) and @router.(get|post|...)
+      - id: s3
+        action: extract
+        target: path and HTTP method from decorator
+      - id: s4
+        action: generate
+        target: routes[] in feature .usm files
+
+  - id: detect-go-routes
+    name: Detect Go routes from router registrations
+    description: |
+      Scan .go files for router registration patterns (r.GET, r.POST,
+      router.HandleFunc, mux.HandleFunc) to extract API routes.
+    steps:
+      - id: s1
+        action: scan
+        target: .go files in service directory
+      - id: s2
+        action: match
+        target: regex for (r|router|mux)\.(GET|POST|PUT|DELETE|PATCH|HandleFunc)
+      - id: s3
+        action: extract
+        target: path and HTTP method
+      - id: s4
+        action: generate
+        target: routes[] in feature .usm files
+
+  - id: detect-rust-routes
+    name: Detect Rust routes from Axum/Actix macros
+    description: |
+      Scan .rs files for #[axum::routing] or #[actix_web::main] patterns
+      and route registration calls.
+    steps:
+      - id: s1
+        action: scan
+        target: .rs files in service directory
+      - id: s2
+        action: match
+        target: patterns for .route(), .service(), #[get(...)], #[post(...)]
+      - id: s3
+        action: extract
+        target: path and HTTP method
+      - id: s4
+        action: generate
+        target: routes[] in feature .usm files
+
+  - id: detect-multi-lang-data-models
+    name: Detect data models from multiple ORMs
+    description: |
+      Extend data model detection beyond Prisma to support SQLAlchemy
+      (Python), GORM (Go), Diesel (Rust), and others.
+    steps:
+      - id: s1
+        action: scan
+        target: known ORM schema files (models.py, schema.go, migrations/)
+      - id: s2
+        action: parse
+        target: model definitions (class-based, struct-based, macro-based)
+      - id: s3
+        action: generate
+        target: .usm/data/<name>.usm with models and fields
+
+contracts:
+  - id: manifest-detection-coverage
+    description: Scanner detects services from all supported language manifests
+    must_have:
+      - "package.json → Node.js/TypeScript/JavaScript"
+      - "pyproject.toml or requirements.txt → Python"
+      - "Cargo.toml → Rust"
+      - "go.mod → Go"
+      - "Framework detected from dependencies in manifest"
+  - id: route-detection-coverage
+    description: Scanner detects routes from common frameworks per language
+    must_have:
+      - "Next.js: app/page.tsx, app/route.ts (existing)"
+      - "FastAPI: @app.get/post/put/delete decorators in .py files"
+      - "Flask: @app.route decorators in .py files"
+      - "Express: app.get/post/put/delete calls in .js/.ts files"
+      - "Go chi/gin/echo: r.GET/POST and router.HandleFunc patterns"
+      - "Rust Axum: .route() calls, Actix: #[get/post] macros"
+  - id: config-extensible
+    description: Detection rules are configurable in usmconfig.json
+    must_have:
+      - "detection.manifests array with {pattern, language, framework?} objects"
+      - "detection.routes array with {framework, pattern, method_group, path_group} objects"
+      - "Defaults cover common frameworks; users can add custom patterns"
+  - id: backward-compatible
+    description: Existing Node.js/TypeScript scanning unchanged
+    must_have:
+      - "usm scan on a Node.js project produces same results as before"
+      - "usmconfig.json without detection section uses defaults"
+
+tests:
+  - id: detect-python-service
+    setup:
+      pyproject_toml_with_fastapi: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: python"
+      - assertion: "framework: fastapi detected"
+  - id: detect-go-service
+    setup:
+      go_mod_with_gin: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: go"
+      - assertion: "framework: gin detected"
+  - id: detect-rust-service
+    setup:
+      cargo_toml_with_axum: true
+    expect:
+      - assertion: ".usm/services/<name>.usm created with runtime: rust"
+      - assertion: "framework: axum detected"
+  - id: extract-fastapi-routes
+    setup:
+      python_file_with_decorators: true
+    expect:
+      - assertion: "routes[] extracted with correct paths and methods"
+  - id: extract-go-routes
+    setup:
+      go_file_with_router: true
+    expect:
+      - assertion: "routes[] extracted with correct paths and methods"
+  - id: backward-compatible-node
+    setup:
+      package_json_with_nextjs: true
+    expect:
+      - assertion: "same results as before this feature"
+  - id: custom-detection-rules
+    setup:
+      usmconfig_with_custom_manifest: true
+    expect:
+      - assertion: custom manifest pattern detected
+
+implementation:
+  primary: src/scan/structural.ts
+  test_code: ""
+  test_code_status: none
+
+see_also:
+  - "usm/cli-scan"
+  - "usm/cli-init"

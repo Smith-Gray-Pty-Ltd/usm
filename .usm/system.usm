@@ -117,8 +117,13 @@ index:
   - id: cli-config-outputs
     name: Configurable Outputs + Command Convention
     ref: .usm/features/cli/config-outputs.usm
-    status: in-progress
+    status: built
     tags: [cli, config, commands]
+  - id: cli-multi-lang-scan
+    name: Multi-Language Scanner Support
+    ref: .usm/features/cli/multi-lang-scan.usm
+    status: planned
+    tags: [cli, scanner, multi-language, python, go, rust]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm
