@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { LanguageCarousel } from "@/components/language-carousel";
 import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,
@@ -331,6 +332,24 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+        </FadeIn>
+      </section>
+
+      <Separator />
+
+      {/* Language Support Carousel */}
+      <section className="mx-auto max-w-5xl px-6 py-24">
+        <FadeIn>
+          <div className="text-center mb-12">
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Language support</p>
+            <h2 className="text-3xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Click a language to see supported frameworks and route detection patterns.
+            </p>
+          </div>
+        </FadeIn>
+        <FadeIn delay={200}>
+          <LanguageCarousel />
         </FadeIn>
       </section>
 
