@@ -124,6 +124,11 @@ index:
     ref: .usm/features/cli/multi-lang-scan.usm
     status: planned
     tags: [cli, scanner, multi-language, python, go, rust]
+  - id: mkt-language-tabs
+    name: Marketing Language Tabs
+    ref: .usm/features/generators/mkt-language-tabs.usm
+    status: planned
+    tags: [marketing, website, languages, tabs]
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm
