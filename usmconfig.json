@@ -1,7 +1,7 @@
 {
   "$schema": "https://usm.dev/schema/usmconfig-v1.json",
   "version": "1",
-  "name": "@usm/core",
+  "name": "@smithgray/usm",
   "sources": {
     "root": ".",
     "include": ["src/**/*"],
@@ -28,7 +28,7 @@
       "id": "mcp",
       "match": "src/mcp",
       "kind": "service",
-      "summary": "usm MCP server — 8 tools for AI agents"
+      "summary": "usm MCP server — 12 tools for AI agents (8 read + 4 write)"
     }
   ],
   "data": [],
