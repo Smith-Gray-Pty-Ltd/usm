@@ -52,6 +52,19 @@ tests:
       - assertion: output shows ✗ with error details
       - assertion: exit code 1
 
+usage:
+  - command: "usm validate .usm"
+    description: "Validate all .usm files in the .usm/ directory"
+  - command: "usm validate .usm/system.usm"
+    description: "Validate a single file"
+  - command: "usm validate ."
+    description: "Validate from current directory (scans all .usm dirs)"
+
+options: []
+
+prerequisites:
+  - ".usm files must exist"
+
 implementation:
   primary: src/validate.ts
   test_code: ""

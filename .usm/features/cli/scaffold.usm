@@ -46,6 +46,21 @@ tests:
       - assertion: error "File already exists"
       - assertion: exit code 1
 
+usage:
+  - command: "usm scaffold .usm/system.usm"
+    description: "Scaffold a system .usm file"
+  - command: "usm scaffold .usm/services/api.usm --type service"
+    description: "Scaffold a service .usm file"
+  - command: "usm scaffold .usm/features/auth/login.usm --type feature"
+    description: "Scaffold a feature .usm file"
+
+options:
+  - flag: "-t, --type <type>"
+    description: "File type: system, service, or feature"
+    default: "system"
+
+prerequisites: []
+
 implementation:
   primary: src/cli/index.ts (scaffold command)
   test_code: ""

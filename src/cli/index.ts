@@ -1151,4 +1151,70 @@ program
     }
   });
 
+// ─── check ───────────────────────────────────────────────────────────────────
+
+program
+  .command("check")
+  .description("Verify .usm files are in sync with the codebase (for CI)")
+  .option("-r, --root <root>", "Monorepo root directory", process.cwd())
+  .action((options: { root: string }) => {
+    const root = path.resolve(options.root);
+    const allFiles = findAllUsmFiles(root);
+    let errors = 0;
+    let warnings = 0;
+
+    console.log(`Checking ${allFiles.length} .usm file(s)...\n`);
+
+    for (const filePath of allFiles) {
+      // 1. Validate against schema
+      const validation = validateUsmFile(filePath);
+      if (!validation.valid) {
+        console.log(`✗ ${filePath}`);
+        for (const err of validation.errors || []) {
+          console.log(`  ${err.path}: ${err.message}`);
+        }
+        errors++;
+        continue;
+      }
+
+      // 2. Check for $version warnings
+      let hasWarnings = false;
+      for (const warn of validation.warnings || []) {
+        console.log(`⚠ ${filePath}`);
+        console.log(`  ${warn.path}: ${warn.message}`);
+        hasWarnings = true;
+        warnings++;
+      }
+
+      // 3. Check implementation paths exist (for features with implementation.primary)
+      try {
+        const parsed = parseUsmFile(filePath);
+        if (isFeatureFile(parsed)) {
+          const feature = parsed as FeatureUsm;
+          if (feature.implementation?.primary) {
+            const implPath = path.resolve(root, feature.implementation.primary);
+            if (!fs.existsSync(implPath)) {
+              console.log(`⚠ ${filePath}`);
+              console.log(`  implementation.primary: ${feature.implementation.primary} does not exist`);
+              warnings++;
+              hasWarnings = true;
+            }
+          }
+        }
+      } catch {
+        // Skip if can't parse
+      }
+
+      if (!hasWarnings) {
+        console.log(`✓ ${filePath}`);
+      }
+    }
+
+    console.log(`\n${allFiles.length - errors - warnings} valid, ${warnings} warnings, ${errors} errors`);
+
+    if (errors > 0) {
+      process.exit(1);
+    }
+  });
+
 program.parse();

@@ -51,6 +51,30 @@ tests:
     expect:
       - assertion: system.usm plus app service files created
 
+usage:
+  - command: "usm scaffold-project"
+    description: "Scaffold a single-app .usm/ structure"
+  - command: "usm scaffold-project --type monorepo-root"
+    description: "Scaffold a monorepo root .usm/ structure"
+  - command: "usm scaffold-project --type monorepo-sub --name my-app"
+    description: "Scaffold a sub-app in a monorepo"
+
+options:
+  - flag: "-t, --type <type>"
+    description: "Project type: single-app, monorepo-sub, or monorepo-root"
+    default: "single-app"
+  - flag: "-n, --name <name>"
+    description: "App or project name"
+    default: "my-app"
+  - flag: "-o, --output <path>"
+    description: "Output directory"
+    default: "."
+  - flag: "--org <org>"
+    description: "Organization ID prefix"
+    default: "my-org"
+
+prerequisites: []
+
 implementation:
   primary: src/cli/index.ts (scaffold-project command)
   test_code: ""

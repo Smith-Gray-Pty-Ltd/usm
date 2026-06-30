@@ -39,3 +39,6 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: USM check
+        run: node dist/cli/index.js check
