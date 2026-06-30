@@ -5,109 +5,156 @@ $version: 1
 $last_updated: "2026-06-30"
 status: planned
 summary: |
-  Marketing site language support section — tabbed UI showing all 12 supported languages with their frameworks, monochrome logos, and route detection examples. Demonstrates USM's language-agnostic scanner.
+  Marketing site language support section — clickable logo carousel showing 12 language logos. Click a language to reveal its frameworks and route detection example. Full grid with all languages/frameworks goes in help docs.
 
 $system: usm/system
 $service: usm/cli
 intent: |
-  The marketing site currently says "Works with Cursor, Claude Code" but doesn't
-  show that USM scans 12 languages and 30+ frameworks. A tabbed section with
-  per-language framework lists, monochrome logos, and a route detection example
-  per language would communicate the breadth of support visually.
+  The marketing site needs to communicate that USM scans 12 languages and 30+
+  frameworks. A logo carousel shows all 12 language logos at once (breadth),
+  and clicking one reveals its frameworks + route detection code example
+  (depth). Logos provide instant recognition. Full reference grid goes in
+  help docs for completeness.
 
 decisions:
-  - id: tabbed-interface
-    decision: Use a tabbed interface with one tab per language
+  - id: logo-carousel
+    decision: Use a clickable logo carousel, not tabs
     rationale: |
-      12 languages in a flat list is overwhelming. Tabs let visitors jump to
-      their language and see supported frameworks + route detection example
-      without scrolling through everything.
-    consequences: "Need a Tabs component from shadcn (already available)"
+      Tabs hide breadth (only one visible at a time). A logo row shows all 12
+      languages instantly. Clicking reveals frameworks + code example for that
+      language. Compact, interactive, visual.
+    alternatives:
+      - option: Tabbed interface (one tab per language)
+        rejected_because: "Hides breadth — visitor only sees one language at a time"
+      - option: Full grid (all languages and frameworks visible)
+        rejected_because: "Too much information for marketing — better in docs"
+    consequences: "Need language logos (Simple Icons) and a carousel component"
     status: accepted
-  - id: monochrome-logos
-    decision: Use monochrome (white/grayscale) logos for frameworks
+  - id: simple-icons
+    decision: Use Simple Icons (simpleicons.org) for language and framework logos
     rationale: |
-      The site is dark monochrome theme. Colored logos would clash. Monochrome
-      logos (opacity-based, hover to full opacity) match the premium aesthetic.
-    consequences: "Need SVG logos for each framework — can use simple-icons or custom SVGs"
+      Simple Icons has 3000+ monochrome SVG brand icons including all 12
+      languages and ~18 of the 30+ frameworks. Free, open source, SVG
+      (crisp at all sizes). Monochrome by default — perfect for dark theme.
+    consequences: "Less popular frameworks (chi, gin, Axum, Crow, etc.) won't have logos — show as text chips"
     status: accepted
-  - id: route-example-per-language
-    decision: Show a code snippet of route detection per language
+  - id: full-grid-in-docs
+    decision: Full language/framework reference grid goes in help docs, not marketing site
     rationale: |
-      Seeing the actual syntax (e.g. @app.get vs @GetMapping vs [HttpGet])
-      helps developers understand what the scanner detects. It's concrete
-      and instantly recognisable.
-    consequences: "Each tab needs a short code example showing route syntax"
+      Marketing site should be concise (carousel). Help docs should be
+      comprehensive (full grid with all 12 languages and all 30+ frameworks).
+      This matches the docs vs marketing split.
+    consequences: "New help docs page: 'Language Support' with full grid"
     status: accepted
 
 flows:
-  - id: render-language-tabs
-    name: Render tabbed language support section
+  - id: render-logo-carousel
+    name: Render logo carousel on marketing site
     description: |
-      A new section on the marketing site between "Token Comparison" and
-      "Tool Logos". Tabs for each language, showing frameworks as logo
-      chips and a route detection code example.
+      Between Token Comparison and Tool Logos sections. 12 language logos
+      in a horizontal row. Default: TypeScript selected. Click a logo to
+      reveal frameworks + route detection code example.
     steps:
       - id: s1
         action: render
         target: "section heading 'Scans 12 languages, 30+ frameworks'"
       - id: s2
         action: render
-        target: "tab bar with 12 language tabs (TS, Python, Go, Rust, Java, C#, Ruby, PHP, Elixir, Swift, Scala, C++)"
+        target: "row of 12 language logos (Simple Icons SVGs, 50% opacity, selected at 100%)"
       - id: s3
         action: render
-        target: "active tab content: framework logo chips + route detection code example"
+        target: "active language: framework name chips (logo where available, text where not)"
       - id: s4
+        action: render
+        target: "active language: route detection code example in mono font"
+      - id: s5
         action: observe
-        target: "user clicks tab to switch language"
+        target: "user clicks a logo → content updates to that language"
+
+  - id: render-docs-grid
+    name: Render full language grid in help docs
+    description: |
+      New page in help docs: 'Language Support'. Full grid showing all 12
+      languages, all 30+ frameworks, manifest file, and route detection
+      pattern for each.
+    steps:
+      - id: s1
+        action: generate
+        target: "language-support.md from multi-lang-scan spec data"
+      - id: s2
+        action: render
+        target: "grid: language, manifest file, frameworks, route pattern"
+      - id: s3
+        action: write
+        target: ".usm-workspace/docs/language-support.md"
 
 contracts:
-  - id: all-languages-tabbed
-    description: All 12 languages have a tab with frameworks and code example
+  - id: carousel-shows-all-languages
+    description: All 12 language logos visible at once in the carousel
     must_have:
-      - "TypeScript tab: Next.js, Express, Hono logos + app.get example"
-      - "Python tab: FastAPI, Flask, Django logos + @app.get example"
-      - "Go tab: chi, gin, echo, net/http logos + r.GET example"
-      - "Rust tab: Axum, Actix, Rocket logos + .route() example"
-      - "Java tab: Spring Boot, Javalin, Quarkus logos + @GetMapping example"
-      - "C# tab: ASP.NET Core logos + [HttpGet] example"
-      - "Ruby tab: Rails, Sinatra logos + get '/path' example"
-      - "PHP tab: Laravel, Symfony, Slim logos + Route::get example"
-      - "Elixir tab: Phoenix logo + get '/path' example"
-      - "Swift tab: Vapor logo + routes.get example"
-      - "Scala tab: Akka HTTP, Play, Tapir logos + path example"
-      - "C++ tab: Crow, Drogon, Pistache logos + CROW_ROUTE example"
-  - id: monochrome-logos
-    description: Framework logos are monochrome, hover to full opacity
+      - "12 language logos in a horizontal row"
+      - "Logos at 50% opacity, selected at 100%"
+      - "Default: TypeScript selected"
+      - "Clicking a logo updates frameworks + code example below"
+  - id: framework-display
+    description: Frameworks shown as chips with logo where available
     must_have:
-      - "All logos rendered in white/grayscale at 50% opacity"
-      - "Hover increases to 100% opacity"
-      - "Logos are SVG (crisp at all sizes)"
-  - id: responsive-tabs
-    description: Tabs work on mobile
+      - "Frameworks with Simple Icons logo: logo + name"
+      - "Frameworks without logo: name only as text chip"
+      - "All frameworks for the selected language visible"
+  - id: code-example-per-language
+    description: Route detection code example shown for each language
     must_have:
-      - "Tab bar scrolls horizontally on mobile"
-      - "Active tab is clearly highlighted"
-      - "Code examples wrap on small screens"
+      - "TypeScript: app.get('/users', handler)"
+      - "Python: @app.get('/users')"
+      - "Go: r.GET('/users', handler)"
+      - "Rust: .route('/users', get(handler))"
+      - "Java: @GetMapping('/users')"
+      - "C#: [HttpGet('users')]"
+      - "Ruby: get '/users' do"
+      - "PHP: Route::get('/users', ...)"
+      - "Elixir: get('/users', UserController, :index)"
+      - "Swift: routes.get('users') { req in }"
+      - "Scala: path('users') { get { handler } }"
+      - "C++: CROW_ROUTE(app, '/users')"
+  - id: docs-grid-comprehensive
+    description: Help docs page lists all languages and frameworks
+    must_have:
+      - "Table with columns: Language, Manifest, Frameworks, Route Pattern"
+      - "All 12 languages present"
+      - "All 30+ frameworks listed"
+  - id: responsive-carousel
+    description: Carousel works on mobile
+    must_have:
+      - "Logo row scrolls horizontally on mobile"
+      - "Selected logo clearly highlighted"
+      - "Code example wraps on small screens"
 
 tests:
-  - id: all-tabs-present
+  - id: all-logos-visible
     setup:
       page_loaded: true
     expect:
-      - assertion: "12 language tabs visible"
-      - assertion: "clicking each tab shows frameworks + code example"
-  - id: default-tab
+      - assertion: "12 language logos visible in carousel"
+      - assertion: "TypeScript selected by default"
+  - id: click-to-switch
     setup:
       page_loaded: true
     expect:
-      - assertion: "TypeScript tab is active by default"
+      - assertion: "clicking Python logo shows FastAPI, Flask, Django"
+      - assertion: "code example updates to @app.get syntax"
   - id: mobile-scroll
     setup:
       mobile_viewport: true
     expect:
-      - assertion: "tab bar scrolls horizontally"
-      - assertion: "active tab visible without horizontal scroll"
+      - assertion: "logo row scrolls horizontally"
+      - assertion: "selected logo visible"
+  - id: docs-page-generated
+    setup:
+      generate_run: true
+    expect:
+      - assertion: "language-support.md exists in docs"
+      - assertion: "all 12 languages in table"
 
 implementation:
   primary: web/src/app/page.tsx
@@ -116,3 +163,4 @@ implementation:
 
 see_also:
   - "usm/cli-multi-lang-scan"
+  - "usm/gen-help-reference"
