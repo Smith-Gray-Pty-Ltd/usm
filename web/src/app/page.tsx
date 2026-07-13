@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LanguageCarousel } from "@/components/language-carousel";
+import { ToolLogos } from "@/components/tool-logos";
 import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,
@@ -453,17 +454,7 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-14 text-center">
           <FadeIn>
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-6">Works seamlessly with</p>
-            <div className="flex flex-wrap justify-center gap-3">
-              {tools.map((tool) => (
-                <div
-                  key={tool}
-                  className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all cursor-default"
-                >
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
-                  {tool}
-                </div>
-              ))}
-            </div>
+            <ToolLogos />
             <p className="text-xs text-muted-foreground mt-5">Any MCP-compatible AI coding tool</p>
           </FadeIn>
         </div>
