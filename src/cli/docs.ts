@@ -320,6 +320,9 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
   if (docExists("getting-started")) {
     gettingStarted.push({ text: "Getting Started", link: "/getting-started" });
   }
+  if (docExists("agent-setup-guide")) {
+    gettingStarted.push({ text: "Agent Setup Guide", link: "/agent-setup-guide" });
+  }
   gettingStarted.push({ text: "Overview", link: "/" });
   sidebar.push({ text: "System", items: gettingStarted });
 

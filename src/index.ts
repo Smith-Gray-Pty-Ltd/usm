@@ -19,6 +19,7 @@ export {
   generateSchemaReference,
   generateMcpReference,
   generateLanguageSupportDoc,
+  generateAgentSetupGuide,
   generateDataModelDoc,
   generateDataIndex,
   generatePerAppDecisions,

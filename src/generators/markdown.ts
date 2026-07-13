@@ -2390,6 +2390,168 @@ export function generateLanguageSupportDoc(root: string): GenerationResult {
 }
 
 /**
+ * Generate docs/agent-setup-guide.md — how to add USM to a project and prompt agents.
+ * Generic — same for all USM installations.
+ */
+export function generateAgentSetupGuide(root: string): GenerationResult {
+  const lines: string[] = [];
+  lines.push("# Adding USM to Your Project");
+  lines.push("");
+  lines.push("Install USM, scan your codebase, configure your AI agent, and start the spec-first workflow.");
+  lines.push("");
+  lines.push("## Step 1: Install");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("npm install -g @smithgray/usm");
+  lines.push("```");
+  lines.push("");
+  lines.push("## Step 2: Initialize and Scan");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("cd your-repo");
+  lines.push("usm init          # Creates usmconfig.json");
+  lines.push("usm scan          # Detects services, routes, data models");
+  lines.push("```");
+  lines.push("");
+  lines.push("## Step 3: Generate Docs");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("usm generate      # Produces markdown, Mermaid, OpenAPI, test specs");
+  lines.push("usm docs serve    # Preview docs at localhost:5173");
+  lines.push("```");
+  lines.push("");
+  lines.push("## Step 4: Start the MCP Server");
+  lines.push("");
+  lines.push("The MCP server lets your AI agent read the .usm system map.");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("usm mcp serve     # stdio MCP server (runs in background)");
+  lines.push("```");
+  lines.push("");
+  lines.push("### Configure MCP in Your AI Tool");
+  lines.push("");
+  lines.push("**Cursor** — add to `.cursor/mcp.json`:");
+  lines.push("```json");
+  lines.push('{');
+  lines.push('  "mcpServers": {');
+  lines.push('    "usm": {');
+  lines.push('      "command": "usm",');
+  lines.push('      "args": ["mcp", "serve"]');
+  lines.push('    }');
+  lines.push('  }');
+  lines.push('}');
+  lines.push("```");
+  lines.push("");
+  lines.push("**Claude Code / Claude Desktop** — add to config:");
+  lines.push("```json");
+  lines.push('{');
+  lines.push('  "mcpServers": {');
+  lines.push('    "usm": {');
+  lines.push('      "command": "usm",');
+  lines.push('      "args": ["mcp", "serve"]');
+  lines.push('    }');
+  lines.push('  }');
+  lines.push('}');
+  lines.push("```");
+  lines.push("");
+  lines.push("**OpenCode** — add to `opencode.jsonc`:");
+  lines.push("```json");
+  lines.push('"mcp": {');
+  lines.push('  "usm": {');
+  lines.push('    "type": "local",');
+  lines.push('    "command": ["usm", "mcp", "serve"],');
+  lines.push('    "enabled": true');
+  lines.push('  }');
+  lines.push('}');
+  lines.push("```");
+  lines.push("");
+  lines.push("**Any MCP-compatible tool:** The server is stdio-based.");
+  lines.push("");
+  lines.push("## Step 5: Generate Rules Files");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("usm generate --only rules");
+  lines.push("```");
+  lines.push("");
+  lines.push("Creates `.cursor/rules/usm.mdc`, `CLAUDE.md`, and `.github/copilot-instructions.md` —");
+  lines.push("teaching your agent the spec-first workflow automatically.");
+  lines.push("");
+  lines.push("## Step 6: (Optional) Enrich with LLM");
+  lines.push("");
+  lines.push("Scanned .usm files contain `TODO: describe` placeholders. Fill them with an LLM:");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("usm enrich --dry-run          # Preview changes");
+  lines.push("usm enrich                     # Fill TODOs (requires LLM config)");
+  lines.push("```");
+  lines.push("");
+  lines.push("Supports OpenAI, Anthropic, Ollama, and LiteLLM (any OpenAI-compatible model).");
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+  lines.push("## How to Prompt Your Agent");
+  lines.push("");
+  lines.push("### First-time setup");
+  lines.push("");
+  lines.push("> Install USM in this repo: run `npm install -g @smithgray/usm`, then `usm init`,");
+  lines.push("> `usm scan`, and `usm generate`. Start the MCP server with `usm mcp serve`.");
+  lines.push("> Read the generated .usm files to understand the project structure. Going forward,");
+  lines.push("> before implementing any feature, draft a .usm spec first using the MCP write tools,");
+  lines.push("> show me the markdown for review, then build from the approved spec.");
+  lines.push("");
+  lines.push("### New feature");
+  lines.push("");
+  lines.push("> I want to add [feature description]. Use USM to draft a feature spec first —");
+  lines.push("> call `usm_draft_feature` with the summary, intent, flows, and contracts. Show me");
+  lines.push("> the generated markdown. Once I approve, write the .usm file and implement the");
+  lines.push("> feature. Update the feature status to `built` when done.");
+  lines.push("");
+  lines.push("### Quick agent context");
+  lines.push("");
+  lines.push("> Read the .usm system map before starting work. Use `usm_list` to see all files,");
+  lines.push("> `usm_search` to find relevant features, and `usm_read` to get details.");
+  lines.push("");
+  lines.push("### Bug fix");
+  lines.push("");
+  lines.push("> Fix [bug description]. First, search the .usm files with `usm_search` to find");
+  lines.push("> the relevant feature spec. Read it with `usm_read` to understand the contracts");
+  lines.push("> and tests. Fix the bug, then update the feature spec if the behavior changed.");
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+  lines.push("## Available MCP Tools (12)");
+  lines.push("");
+  lines.push("**Read (8):** `usm_list`, `usm_read`, `usm_search`, `usm_validate`,");
+  lines.push("`usm_summary`, `usm_references`, `usm_get_contracts`, `usm_get_flows`");
+  lines.push("");
+  lines.push("**Write (4):** `usm_draft_feature`, `usm_write_feature`,");
+  lines.push("`usm_update_feature`, `usm_update_feature_status`");
+  lines.push("");
+  lines.push("## Verify It's Working");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("usm check                        # Validate all .usm files");
+  lines.push("usm info .usm/system.usm         # Show system summary");
+  lines.push("```");
+  lines.push("");
+  lines.push("## Next Steps");
+  lines.push("");
+  lines.push("- [CLI Reference](cli-reference.md)");
+  lines.push("- [Configuration](config-reference.md)");
+  lines.push("- [Schema Reference](schema-reference.md)");
+  lines.push("- [MCP Tools](mcp-reference.md)");
+  lines.push("- [Language Support](language-support.md)");
+  lines.push("");
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/agent-setup-guide.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
  * Generate data/models.md — from .usm/data/models.usm + Prisma schema.
  * Also accepts ServiceUsm files that live in .usm/data/ (scan generates
  * them with $type: service rather than $type: data).
