@@ -216,3 +216,20 @@ YAMLException: bad indentation of a mapping entry (224:44)
 - Or document this in the README more prominently
 
 **Frequency encountered**: hit 4-5 times in this session while writing USM specs for the agentic platform.
+
+## Bug 8: oauth2-proxy shows Sign In page instead of auto-redirecting to OIDC
+
+**Severity**: Medium — confusing UX, looks like the wrong service.
+
+**Repro**: 
+1. User visits `http://localhost:4180/` (oauth2-proxy)
+2. Expected: 302 redirect to OIDC provider (Zitadel)
+3. Actual: 403 with an HTML "Sign In" page (oauth2-proxy's built-in page with a button)
+4. User has to click "Sign in" button before the OIDC redirect happens
+
+**Root cause**: oauth2-proxy by default shows a sign-in page that requires a click, instead of auto-redirecting. This is for cases where multiple OIDC providers are configured and the user picks one.
+
+**Fix**: Add `skip_provider_button = true` to oauth2-proxy config. The user is auto-redirected to the OIDC provider on the first unauthenticated request.
+
+**Symptom that confused me**: The sign-in page is styled with `bulma.min.css` and looks similar to Langflow's login page, making it look like the user is being shown a Langflow login (but it's actually oauth2-proxy's "which OIDC provider?" page).
+
