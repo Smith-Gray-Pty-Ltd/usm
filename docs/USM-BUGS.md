@@ -178,3 +178,41 @@ The `usm generate` command doesn't pick up the new `apps/tenant/.usm/features/ad
 Filed by: jamesgray / Smith & Gray Pty Ltd
 USM version: `@smithgray/usm@0.1.0` (renamed from `@~usm/core`)
 Date: 2026-06-30
+## Bug 7: YAML unquoted colons in long text fields
+
+**Severity**: Medium — frequently hits during USM authoring.
+
+**Repro**: A multi-line rationale or description that contains phrases like:
+- `LLM Chat` (no problem on its own)
+- `POST to /api/flows` (colon inside)
+- `ssr: false` (colon + space inside)
+- `Use dynamic import with ssr: false in Next.js; or 'use client' directive`
+- Any string with `: <word>` patterns
+
+**Error**:
+```
+YAMLException: bad indentation of a mapping entry (224:44)
+  222 |  ... flow-ssr
+  223 |  ... reactflow requires browser-only APIs (window, document)
+  224 |  ... n: Use dynamic import with ssr: false in Next.js; or 'use cli ...
+  ------------------------------------------^
+```
+
+**Root cause**: js-yaml's safe loading treats `: <space>` as a key-value separator. When the value contains a colon (e.g., `Use dynamic import with ssr: false`), the parser interprets everything after the colon as a nested mapping.
+
+**Fix in USM authoring**:
+- Always wrap long text values in single quotes: `'value with: colons'`
+- Or use the `|` block scalar:
+  ```yaml
+  rationale: |
+    This is a long text
+    with: colons
+    and other punctuation.
+  ```
+
+**Suggested fix in USM tooling**:
+- Add a YAML linter to `usm validate` that warns about unquoted strings containing `: ` patterns
+- Or use `yaml` library's `safeLoad` with a custom resolver that auto-quotes suspicious strings
+- Or document this in the README more prominently
+
+**Frequency encountered**: hit 4-5 times in this session while writing USM specs for the agentic platform.
