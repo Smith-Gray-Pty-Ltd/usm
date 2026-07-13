@@ -1,0 +1,24 @@
+# CODEOWNERS
+# Each line maps a path pattern to GitHub users who should be requested
+# for review when a PR touches files in that path.
+
+# Default — all files
+*                       @jamebirrellgray
+
+# Core source
+/src/                   @jamebirrellgray
+/src/mcp/               @jamebirrellgray
+/src/scan/              @jamebirrellgray
+/src/generators/        @jamebirrellgray
+
+# Schema
+/schema/                @jamebirrellgray
+
+# USM specs
+/.usm/                  @jamebirrellgray
+
+# Marketing site
+/web/                   @jamebirrellgray
+
+# CI/CD
+/.github/               @jamebirrellgray

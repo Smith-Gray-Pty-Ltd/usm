@@ -142,7 +142,20 @@ USM describes itself).
 
 ## Contributing
 
-Issues and PRs welcome. See [issues](https://github.com/Smith-Gray-Pty-Ltd/usm/issues).
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Development setup (Node 22+, pnpm 11+)
+- Spec-first workflow for contributors (dogfood USM to spec your changes)
+- Code standards (ESLint, TypeScript strict, conventional commits)
+- PR process and checklist
+- How to add generators, languages, and MCP tools
+
+Quick start:
+```bash
+git clone git@github.com:YOUR_USERNAME/usm.git
+cd usm && pnpm install && pnpm run build && pnpm run test
+```
+
+[Open an issue](https://github.com/Smith-Gray-Pty-Ltd/usm/issues) · [Start a discussion](https://github.com/Smith-Gray-Pty-Ltd/usm/discussions)
 
 ## License
 
