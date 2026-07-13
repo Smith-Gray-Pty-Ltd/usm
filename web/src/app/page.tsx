@@ -51,7 +51,10 @@ const useCases = [
   { icon: Building2, title: "Enterprise & compliance", desc: "Generate ArchiMate, TOGAF, and OpenAPI from the same source. Audit-ready architecture artifacts." },
 ];
 
-const tools = ["Cursor", "Claude Code", "Claude Desktop", "Continue.dev", "Codex", "GitHub Copilot"];
+const tools = [
+  "Cursor", "Claude Code", "Claude Desktop", "Codex", "GitHub Copilot",
+  "Grok Code", "OpenCode", "Windsurf", "Continue.dev", "Zed",
+];
 
 const codeLines = [
   { text: "$ usm draft_feature \\", comment: false },
@@ -236,7 +239,7 @@ export default function Home() {
         {/* Workflow 1: Onboard existing codebase */}
         <FadeIn>
           <div className="mb-16">
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center justify-center gap-2 mb-6">
               <Search className="w-5 h-5 text-muted-foreground" />
               <h3 className="text-xl font-semibold">Onboard an existing codebase</h3>
             </div>
@@ -266,7 +269,7 @@ export default function Home() {
         {/* Workflow 2: Spec-first dev loop */}
         <FadeIn delay={150}>
           <div className="mb-16">
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center justify-center gap-2 mb-6">
               <FileCode className="w-5 h-5 text-muted-foreground" />
               <h3 className="text-xl font-semibold">The spec-first dev loop</h3>
             </div>
@@ -300,7 +303,7 @@ export default function Home() {
         {/* Workflow 3: LLM enrichment */}
         <FadeIn delay={300}>
           <div>
-            <div className="flex items-center gap-2 mb-6">
+            <div className="flex items-center justify-center gap-2 mb-6">
               <Wand2 className="w-5 h-5 text-muted-foreground" />
               <h3 className="text-xl font-semibold">LLM enrichment</h3>
             </div>
@@ -450,11 +453,15 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-14 text-center">
           <FadeIn>
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-6">Works seamlessly with</p>
-            <div className="flex flex-wrap justify-center gap-x-8 gap-y-3">
+            <div className="flex flex-wrap justify-center gap-3">
               {tools.map((tool) => (
-                <span key={tool} className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors cursor-default">
+                <div
+                  key={tool}
+                  className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all cursor-default"
+                >
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground/40" />
                   {tool}
-                </span>
+                </div>
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-5">Any MCP-compatible AI coding tool</p>
