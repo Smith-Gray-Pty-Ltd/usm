@@ -11,6 +11,7 @@ summary: >-
   structured .usm/feedback entries. Stops agents inventing ad-hoc bug-tracking files.
 $system: usm/system
 $service: usm/cli
+command: feedback
 intent: >-
   Agents using USM currently improvise when they discover issues — one agent autonomously created a
   root-level bugs.md because no canonical protocol exists. There is no taught, configurable

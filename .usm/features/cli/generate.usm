@@ -7,6 +7,7 @@ summary: The usm generate command reads all .usm files and produces markdown, Op
 
 $system: usm/system
 $service: usm/cli
+command: generate
 intent: |
   After scanning and enriching, generate produces all output artifacts from the .usm source. It runs 6 passes: per-file markdown, area overviews, aggregator docs, surface tables, Mermaid diagrams, and TOGAF deliverables.
 

@@ -7,6 +7,7 @@ summary: The usm scaffold-project command generates a starter .usm/ directory fo
 
 $system: usm/system
 $service: usm/cli
+command: scaffold-project
 intent: |
   New projects need an initial .usm/ structure with system, service, and a starter feature. Scaffold-project creates the directory tree and template files based on the project type (single-app, monorepo-sub, or monorepo-root).
 

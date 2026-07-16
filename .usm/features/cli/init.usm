@@ -7,6 +7,7 @@ summary: The usm init command analyzes the repo and generates a starter usmconfi
 
 $system: usm/system
 $service: usm/cli
+command: init
 intent: |
   New users need a config file that tells usm scan where to look. Init detects apps, packages, Prisma schemas, and Docker Compose services from the repo structure and writes a usmconfig.json so the next scan can work immediately.
 

@@ -9,6 +9,7 @@ summary: |
 
 $system: usm/system
 $service: usm/cli
+command: docs
 intent: |
   The spec-first workflow requires a human to review generated feature docs
   before the agent builds. Currently the only way to read generated docs is
