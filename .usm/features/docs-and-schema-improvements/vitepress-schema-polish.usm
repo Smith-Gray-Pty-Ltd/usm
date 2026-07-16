@@ -3,7 +3,7 @@ $id: usm/vitepress-schema-polish
 $type: feature
 $version: 1
 $last_updated: "2026-07-16"
-status: in-progress
+status: built
 summary: >-
   Evolve the generated VitePress docs into an outstanding, adoption-accelerating showcase and
   reference that demonstrates USM principles perfectly, and make the JSON schema a first-class,
