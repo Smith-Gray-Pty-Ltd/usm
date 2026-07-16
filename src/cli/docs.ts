@@ -670,6 +670,11 @@ export default withMermaid(
   ignoreDeadLinks: true,
   outDir: '.vitepress/dist',
   lastUpdated: true,
+  vite: {
+    ssr: {
+      noExternal: ['vitepress-plugin-mermaid', 'mermaid', 'dayjs', '@braintree/sanitize-url'],
+    },
+  },
   themeConfig: {
     ${navJson}
     sidebar: ${sidebarJson},
