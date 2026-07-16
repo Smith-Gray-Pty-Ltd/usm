@@ -511,6 +511,8 @@ export interface FeatureUsm extends UsmCommon {
   usage?: UsageExample[];
   options?: CliOption[];
   prerequisites?: string[];
+  /** Actual CLI command name (e.g. 'init'), shown by docs generators instead of the $id slug. */
+  command?: string;
 }
 
 // Union type

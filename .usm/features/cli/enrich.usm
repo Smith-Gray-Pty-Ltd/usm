@@ -7,6 +7,7 @@ summary: "The usm enrich command fills in TODO: describe placeholders in .usm fi
 
 $system: usm/system
 $service: usm/cli
+command: enrich
 intent: |
   Scanned .usm files contain TODO placeholders for summary, intent, decisions, flows, contracts, and tests. Enrich calls an LLM with source code context to fill these in, preserving existing human-written content.
 

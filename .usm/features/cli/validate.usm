@@ -7,6 +7,7 @@ summary: The usm validate command checks .usm files against the v1 JSON Schema a
 
 $system: usm/system
 $service: usm/cli
+command: validate
 intent: |
   Users need to verify that their .usm files conform to the schema before generating docs. Validate catches missing required fields, wrong types, and invalid enum values.
 

@@ -2027,7 +2027,7 @@ export function generateCliReference(root: string): GenerationResult {
       if (!feature.usage && !feature.options) continue;
       commands.push({
         id: feature.$id,
-        name: feature.$id.split("/").pop() || feature.$id,
+        name: feature.command || feature.$id.split("/").pop() || feature.$id,
         summary: feature.summary,
         usage: feature.usage as unknown[],
         options: feature.options as unknown[],

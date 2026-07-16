@@ -11,6 +11,7 @@ summary: >-
   or default setup, and bumps the project version on completion.
 $system: usm/system
 $service: usm/cli
+command: upgrade
 intent: >-
   There is no upgrade path today. Existing users who `npm update` USM get new code, but their
   system.usm is untouched — new optional blocks (feedback, and future ones) are silently absent,

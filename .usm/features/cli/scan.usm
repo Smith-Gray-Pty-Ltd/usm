@@ -7,6 +7,7 @@ summary: The usm scan command reads usmconfig.json, scans the codebase, and gene
 
 $system: usm/system
 $service: usm/cli
+command: scan
 intent: |
   After init creates the config, scan detects the actual structure — services from package.json, routes from app/ directories, data from Prisma schemas — and writes .usm files. Smart-merge preserves human edits on re-scan.
 

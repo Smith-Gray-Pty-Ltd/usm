@@ -1312,6 +1312,10 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "What needs to exist before using this feature"
+        },
+        "command": {
+          "type": "string",
+          "description": "The actual CLI command name as typed by users (e.g. 'init', 'scan'), without the 'usm' prefix or any internal grouping prefix. Used by docs generators to show the real command instead of the $id slug. Optional — generators fall back to the $id's last segment when absent."
         }
       },
       "required": [
