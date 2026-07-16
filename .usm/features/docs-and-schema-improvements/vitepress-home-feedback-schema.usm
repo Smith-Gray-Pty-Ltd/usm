@@ -1,0 +1,253 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/vitepress-home-feedback-schema
+$type: feature
+$version: 1
+$last_updated: "2026-07-16"
+summary: >-
+  Refine the VitePress docs homepage into a clean, scannable technical reference (not a marketing
+  duplicate), add a dual-mode Feedback/Report Issue button for humans and agents, and apply general
+  polish (cross-links, CTAs, callouts). Iterates on the built vitepress-schema-polish feature.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  The current docs homepage (from vitepress-schema-polish) is rich but marketing-heavy — it
+  duplicates the usm.dev marketing site with principle cards, benefit sections, and "Sound
+  familiar?" content. The docs should be a clean technical reference: short intro, quick stats,
+  quick start commands, and prominent links to key sections. Additionally, there is no way for
+  readers to report issues or give feedback from the docs site itself. This feature adds a dual-mode
+  feedback button (human → pre-filled GitHub issue; agent → MCP tool with page context + .usm map)
+  and applies general polish to cross-links, CTAs, and VitePress callout usage.
+status: built
+flows:
+  - id: homepage-simplify
+    name: Simplify homepage to technical reference
+    description: >-
+      Strip marketing-heavy content from the VitePress homepage. Keep it a clean, scannable
+      reference that links to usm.dev for marketing.
+    steps:
+      - id: s1
+        action: remove
+        target: Principle cards from VitePress features grid (keep in AGENTS.md only)
+      - id: s2
+        action: remove
+        target: "\"Sound familiar?\" / heavy benefit sections — replace with a single link to usm.dev"
+      - id: s3
+        action: keep
+        target: Short intro paragraph from system.summary
+      - id: s4
+        action: keep
+        target: Quick Stats table (features, services, packages)
+      - id: s5
+        action: add
+        target: Quick Start commands block (copy-pasteable install → init → scan → generate → serve)
+      - id: s6
+        action: add
+        target: >-
+          Prominent link cards to key sections: Schema Reference, Getting Started, Roadmap, CLI
+          Reference, MCP Tools
+      - id: s7
+        action: keep
+        target: Spec-first workflow Mermaid diagram
+      - id: s8
+        action: keep
+        target: Sidebar navigation fully visible (no collapsed groups by default on homepage)
+  - id: feedback-button
+    name: Add dual-mode Feedback / Report Issue button
+    description: >-
+      Add a visible feedback mechanism to the VitePress docs site. Supports two modes: human
+      (pre-filled GitHub issue) and agent (MCP tool with structured context).
+    steps:
+      - id: s1
+        action: add
+        target: >-
+          Feedback link in VitePress nav bar (themeConfig.nav) — "Report Issue" pointing to a
+          feedback page
+      - id: s2
+        action: add
+        target: Feedback link in sidebar footer — same destination
+      - id: s3
+        action: generate
+        target: "docs/feedback.md page with two clear paths: human and agent"
+      - id: s4
+        action: render
+        target: >-
+          Human path: pre-filled GitHub issue link with template (title, body with current page URL,
+          USM version, browser info)
+      - id: s5
+        action: render
+        target: >-
+          Agent path: MCP tool instructions — usm_report_feedback with page context + .usm map
+          reference
+      - id: s6
+        action: add
+        target: VitePress themeConfig.editLink pointing to .usm source on GitHub (already exists, verify)
+  - id: cross-links-ctas
+    name: Stronger cross-links and CTAs
+    description: >-
+      Add consistent next-steps sections, cross-links between related pages, and clear CTAs
+      throughout the docs.
+    steps:
+      - id: s1
+        action: add
+        target: >-
+          "Next steps" section at bottom of Getting Started, Schema Reference, CLI Reference, MCP
+          Reference
+      - id: s2
+        action: add
+        target: >-
+          Cross-links between related pages (e.g., Schema Reference ↔ CLI Reference, Getting Started
+          ↔ Agent Setup Guide)
+      - id: s3
+        action: add
+        target: "CTA banner on homepage: \"Using USM in production? → usm.dev\""
+      - id: s4
+        action: add
+        target: Footer link to usm.dev marketing site
+  - id: general-polish
+    name: General VitePress polish
+    description: >-
+      Better use of VitePress callouts, tables, and diagrams. Ensure dark mode, mobile, and search
+      work well.
+    steps:
+      - id: s1
+        action: verify
+        target: Mermaid dark-mode aware (already implemented in vitepress-schema-polish)
+      - id: s2
+        action: add
+        target: >-
+          VitePress tip/warning/danger callouts where appropriate (e.g., prerequisites, common
+          pitfalls)
+      - id: s3
+        action: add
+        target: Responsive tables with horizontal scroll on mobile
+      - id: s4
+        action: verify
+        target: VitePress local search indexes all pages
+      - id: s5
+        action: add
+        target: Version badge in footer (already present, verify)
+contracts:
+  - id: homepage-reference-first
+    description: Homepage is a clean technical reference, not a marketing duplicate.
+    must_have:
+      - Short intro paragraph (2-3 sentences)
+      - Quick Stats table (feature count, service count, package count)
+      - Quick Start commands (copy-pasteable)
+      - Prominent link cards to Schema Reference, Getting Started, Roadmap
+      - Spec-first workflow Mermaid diagram
+      - No principle cards, benefit sections, or "Sound familiar?" content
+      - Single link to usm.dev for marketing content
+      - Sidebar fully visible (no collapsed groups by default)
+  - id: feedback-dual-mode
+    description: Feedback button works for both humans and agents.
+    must_have:
+      - Visible "Report Issue" link in nav bar and/or sidebar
+      - Dedicated feedback page with two clear paths
+      - "Human path: pre-filled GitHub issue URL with template (title, body, page context)"
+      - "Agent path: MCP tool instructions (usm_report_feedback with page + .usm context)"
+      - VitePress editLink points to .usm source on GitHub
+  - id: all-content-generated
+    description: All new content is generated from .usm files — no hand-authored output pages.
+    must_have:
+      - Homepage content derived from system.usm
+      - Feedback page generated by markdown generator
+      - Cross-links derived from system.usm index and feature refs
+      - Smart-merge preserved; re-running generate is idempotent
+  - id: no-breakage
+    description: Existing pages, generators, and the docs build remain healthy.
+    must_have:
+      - usm validate passes with 0 errors
+      - usm generate produces all existing pages plus new ones
+      - usm docs serve / usm docs build succeed
+      - Existing feature/service/reference pages unchanged in substance
+tests:
+  - id: homepage-clean
+    setup:
+      run_usm_generate: true
+      inspect_homepage: true
+    expect:
+      - assertion: Homepage has short intro, Quick Stats, Quick Start commands, link cards
+      - assertion: No principle cards, benefit sections, or marketing-heavy content
+      - assertion: Single link to usm.dev present
+      - assertion: Sidebar fully visible with all groups expanded
+  - id: feedback-page-exists
+    setup:
+      run_usm_generate: true
+    expect:
+      - assertion: docs/feedback.md generated
+      - assertion: Contains human path with pre-filled GitHub issue link
+      - assertion: Contains agent path with MCP tool instructions
+      - assertion: Nav bar includes Report Issue link
+  - id: docs-build-succeeds
+    setup:
+      run_docs_build: true
+    expect:
+      - assertion: vitepress build exits 0
+      - assertion: Homepage renders clean reference layout
+      - assertion: Feedback page accessible and functional
+  - id: validate-clean
+    setup:
+      run_usm_validate: true
+    expect:
+      - assertion: 0 errors across all .usm files
+  - id: cross-links-present
+    setup:
+      inspect_generated_docs: true
+    expect:
+      - assertion: Getting Started has next-steps section
+      - assertion: Schema Reference has cross-links to CLI Reference and Getting Started
+      - assertion: CLI Reference has cross-links to MCP Reference and Schema Reference
+  - id: existing-pages-intact
+    setup:
+      run_usm_generate: true
+      diff_against_previous: true
+    expect:
+      - assertion: Feature docs unchanged in substance
+      - assertion: Service docs unchanged
+      - assertion: No dead links introduced
+decisions:
+  - id: homepage-simplify-not-remove
+    decision: >-
+      Simplify the homepage by removing marketing content, not by removing the homepage entirely.
+      Keep the spec-first diagram, quick stats, and quick start as the core reference content.
+    rationale: >-
+      The existing vitepress-schema-polish feature built a rich homepage. This feature refines it —
+      removing the marketing duplication while keeping the technical reference value. The marketing
+      content belongs on usm.dev (Next.js + shadcn), not docs.usm.dev (VitePress).
+    status: accepted
+  - id: feedback-as-generated-page
+    decision: >-
+      The feedback page is a generated markdown page (docs/feedback.md), not a custom Vue component.
+      The nav bar link is added via VitePress themeConfig.nav.
+    rationale: >-
+      Keeps the build lightweight (no custom Vue components). The feedback page content is generated
+      from system.usm (identity.repository for the issue tracker URL) and the USM version. The nav
+      link is injected into the VitePress config during docs serve/build.
+    status: accepted
+  - id: agent-feedback-via-existing-mcp
+    decision: >-
+      The agent feedback path reuses the existing usm_report_feedback MCP tool (from
+      usm/agent-feedback feature). The feedback page documents how agents should use it with page
+      context.
+    rationale: >-
+      No new MCP tool needed. The existing agent-feedback protocol already handles structured
+      feedback entries. The docs page teaches agents to include current page URL and .usm map
+      context.
+    status: accepted
+  - id: cross-links-in-generator
+    decision: >-
+      Cross-links and next-steps sections are added in the markdown generator, not hand-edited into
+      output.
+    rationale: >-
+      Dogfooding: all content must be generated from .usm. The generator already has access to
+      system.usm index for building link maps.
+    status: accepted
+implementation:
+  primary: src/generators/markdown.ts; src/cli/docs.ts; src/cli/index.ts; src/index.ts
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/vitepress-schema-polish
+  - usm/agent-feedback
+  - usm/gen-markdown
+  - usm/cli-docs

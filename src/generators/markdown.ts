@@ -103,8 +103,8 @@ function readPackageVersion(): string {
 }
 
 function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult {
-  // Rich, data-driven homepage (VitePress home layout) derived from system.usm.
-  // Used as both developer docs landing and help-docs landing (docs.usm.dev).
+  // Clean, scannable technical reference homepage (VitePress home layout).
+  // Derived from system.usm. Marketing content lives on usm.dev, not here.
   const lines: string[] = [];
   const name = file.identity.name;
   const tagline = (file.summary || "").split("\n")[0].trim();
@@ -112,7 +112,7 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   const version = readPackageVersion();
   const generatedAt = new Date().toISOString().slice(0, 10);
 
-  // VitePress home frontmatter
+  // VitePress home frontmatter — hero only, no principle cards
   lines.push("---");
   lines.push("layout: home");
   lines.push("");
@@ -132,43 +132,29 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
     lines.push('      text: GitHub');
     lines.push(`      link: ${JSON.stringify(repo)}`);
   }
-  lines.push("");
-
-  // Principle cards (from system.principles)
-  if (file.principles && file.principles.length > 0) {
-    lines.push("features:");
-    for (const p of file.principles.slice(0, 6)) {
-      lines.push(`  - title: ${JSON.stringify(p.name)}`);
-      lines.push(`    details: ${JSON.stringify(p.statement)}`);
-    }
-    lines.push("");
-  }
   lines.push("---");
   lines.push("");
 
-  lines.push(`# ${name}`);
-  lines.push("");
+  // Short intro
   lines.push(file.summary);
   lines.push("");
+
+  // Version + generation info
   lines.push(`::: info Version \`${version}\` · Generated ${generatedAt}`);
   lines.push("This site is **fully generated** from `.usm` files. Edit the source of truth, not the markdown.");
   lines.push(":::");
   lines.push("");
 
-  // Spec-first workflow diagram
-  lines.push("## Spec-first workflow");
+  // Quick Start commands
+  lines.push("## Quick Start");
   lines.push("");
-  lines.push("USM is designed for AI agents and humans to share one structured source of truth.");
-  lines.push("");
-  lines.push("```mermaid");
-  lines.push("flowchart LR");
-  lines.push("  A[Discuss feature] --> B[Draft .usm via MCP]");
-  lines.push("  B --> C[Human reviews markdown]");
-  lines.push("  C --> D[Write + validate .usm]");
-  lines.push("  D --> E[Implement in code]");
-  lines.push("  E --> F[usm generate]");
-  lines.push("  F --> G[Docs · Mermaid · OpenAPI · AGENTS.md]");
-  lines.push("  G --> H[Mark feature built]");
+  lines.push("```bash");
+  lines.push(`npm install -g @smithgray/usm@${version}`);
+  lines.push("cd your-project");
+  lines.push("usm init          # Creates usmconfig.json");
+  lines.push("usm scan          # Detects services, routes, data models");
+  lines.push("usm generate      # Produces docs, Mermaid, OpenAPI, AGENTS.md");
+  lines.push("usm docs serve    # Preview at http://localhost:5173");
   lines.push("```");
   lines.push("");
 
@@ -191,9 +177,37 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   lines.push("| Metric | Value |");
   lines.push("|--------|-------|");
   lines.push(`| Features | ${featureCount} (${builtCount} built) |`);
-  lines.push(`| App services | ${appServiceIds.size} |`);
-  lines.push(`| Shared services | ${sharedServiceIds.size} |`);
-  lines.push(`| Packages | ${packageIds.size} |`);
+  if (appServiceIds.size > 0) lines.push(`| App services | ${appServiceIds.size} |`);
+  if (sharedServiceIds.size > 0) lines.push(`| Shared services | ${sharedServiceIds.size} |`);
+  if (packageIds.size > 0) lines.push(`| Packages | ${packageIds.size} |`);
+  lines.push("");
+
+  // Prominent link cards to key sections
+  lines.push("## Explore");
+  lines.push("");
+  lines.push("| Section | Description |");
+  lines.push("|---------|-------------|");
+  lines.push("| [Getting Started](/getting-started) | Install, init, scan, generate — first-run walkthrough |");
+  lines.push("| [Schema Reference](/schema-reference) | Field-by-field reference for every `.usm` type |");
+  lines.push("| [CLI Reference](/cli-reference) | Every `usm` command and flag |");
+  lines.push("| [MCP Tools](/mcp-reference) | Agent tools for the spec-first workflow |");
+  lines.push("| [Agent Setup Guide](/agent-setup-guide) | Wire USM into Cursor, Claude, Copilot |");
+  lines.push("| [Roadmap](/roadmap) | What's shipping next |");
+  lines.push("");
+
+  // Spec-first workflow diagram
+  lines.push("## Spec-first workflow");
+  lines.push("");
+  lines.push("```mermaid");
+  lines.push("flowchart LR");
+  lines.push("  A[Discuss feature] --> B[Draft .usm via MCP]");
+  lines.push("  B --> C[Human reviews markdown]");
+  lines.push("  C --> D[Write + validate .usm]");
+  lines.push("  D --> E[Implement in code]");
+  lines.push("  E --> F[usm generate]");
+  lines.push("  F --> G[Docs · Mermaid · OpenAPI · AGENTS.md]");
+  lines.push("  G --> H[Mark feature built]");
+  lines.push("```");
   lines.push("");
 
   // Featured example (tabs: YAML vs what it produces)
@@ -233,6 +247,12 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
     }
   }
 
+  // CTA: link to marketing site
+  lines.push("::: tip Using USM in production?");
+  lines.push("Visit [usm.dev](https://usm.dev) for the full story, language support, and community links.");
+  lines.push(":::");
+  lines.push("");
+
   // Identity
   lines.push("## Identity");
   lines.push("");
@@ -264,22 +284,6 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
       lines.push(`- [${svc.name || slugToTitle(svc.id)}](/shared-services/${svc.id}/overview)`);
     }
     lines.push("");
-  }
-
-  // Principles (detailed, after cards)
-  if (file.principles && file.principles.length > 0) {
-    lines.push("## Principles");
-    lines.push("");
-    for (const p of file.principles) {
-      lines.push(`### ${p.name}`);
-      lines.push("");
-      lines.push(p.statement);
-      lines.push("");
-      if (p.rationale) {
-        lines.push(`**Why:** ${p.rationale}`);
-        lines.push("");
-      }
-    }
   }
 
   // Roles
@@ -2186,6 +2190,15 @@ export function generateCliReference(root: string): GenerationResult {
     }
   }
 
+  // Next steps
+  lines.push("## Next steps");
+  lines.push("");
+  lines.push("- [Schema Reference](/schema-reference) — understand every `.usm` field");
+  lines.push("- [MCP Tools](/mcp-reference) — agent tools for the spec-first workflow");
+  lines.push("- [Getting Started](/getting-started) — first-run walkthrough");
+  lines.push("- [Configuration Reference](/config-reference) — `usmconfig.json` fields");
+  lines.push("");
+
   return {
     outputs: [{
       path: `${root}/.usm-workspace/docs/cli-reference.md`,
@@ -2630,6 +2643,15 @@ export function generateMcpReference(root: string): GenerationResult {
     lines.push("");
   }
 
+  // Next steps
+  lines.push("## Next steps");
+  lines.push("");
+  lines.push("- [CLI Reference](/cli-reference) — every `usm` command and flag");
+  lines.push("- [Schema Reference](/schema-reference) — field-by-field `.usm` reference");
+  lines.push("- [Agent Setup Guide](/agent-setup-guide) — wire USM into your IDE");
+  lines.push("- [Getting Started](/getting-started) — first-run walkthrough");
+  lines.push("");
+
   return {
     outputs: [{
       path: `${root}/.usm-workspace/docs/mcp-reference.md`,
@@ -2891,6 +2913,118 @@ export function generateAgentSetupGuide(root: string): GenerationResult {
   return {
     outputs: [{
       path: `${root}/.usm-workspace/docs/agent-setup-guide.md`,
+      content: lines.join("\n"),
+    }],
+  };
+}
+
+/**
+ * Generate docs/feedback.md — dual-mode feedback page for humans and agents.
+ * Human path: pre-filled GitHub issue. Agent path: MCP tool instructions.
+ * Derived from system.usm (identity.repository for issue tracker URL).
+ */
+export function generateFeedbackPage(system: SystemUsm, root: string): GenerationResult {
+  const repo = system.identity?.repository || "";
+  const version = readPackageVersion();
+  const lines: string[] = [];
+
+  lines.push("# Report an Issue");
+  lines.push("");
+  lines.push("Found a bug, have a suggestion, or want to give feedback? Choose your path below.");
+  lines.push("");
+
+  // ── Human path ──────────────────────────────────────────────────────────────
+  lines.push("## For humans");
+  lines.push("");
+  if (repo) {
+    const issueTitle = encodeURIComponent("[docs] Issue with docs.usm.dev");
+    const issueBody = encodeURIComponent(
+      `**Page**: [fill in the page URL where you found the issue]\n\n` +
+      `**What I expected**:\n\n` +
+      `**What happened instead**:\n\n` +
+      `**USM version**: ${version}\n` +
+      `**Browser**: [e.g. Chrome 125, Firefox 128]\n\n` +
+      `---\n*Submitted via docs.usm.dev feedback page*`
+    );
+    const issueUrl = `${repo}/issues/new?title=${issueTitle}&body=${issueBody}&labels=docs,feedback`;
+
+    lines.push("::: tip Fastest path");
+    lines.push(`[Open a pre-filled GitHub issue](${issueUrl}) — title, template, and labels are ready. Just fill in the details.`);
+    lines.push(":::");
+    lines.push("");
+    lines.push("The link above opens a new issue with:");
+    lines.push("- A pre-filled title and body template");
+    lines.push("- The `docs` and `feedback` labels");
+    lines.push("- Your USM version pre-populated");
+    lines.push("");
+  } else {
+    lines.push("::: warning No issue tracker configured");
+    lines.push("This project hasn't configured a repository URL in `system.usm` → `identity.repository`. Add it to enable the pre-filled issue link.");
+    lines.push(":::");
+    lines.push("");
+  }
+  lines.push("### What makes a good report");
+  lines.push("");
+  lines.push("- **Include the page URL** — it helps us find the source `.usm` file quickly");
+  lines.push("- **Describe what you expected** vs what happened");
+  lines.push("- **Screenshots welcome** — drag and drop into the GitHub issue");
+  lines.push("");
+
+  // ── Agent path ──────────────────────────────────────────────────────────────
+  lines.push("## For AI agents");
+  lines.push("");
+  lines.push("If you're an AI agent and you've found a bug, inconsistency, or improvement opportunity:");
+  lines.push("");
+  lines.push("### Step 1: Check the feedback policy");
+  lines.push("");
+  lines.push("Read the project's configured feedback policy in `AGENTS.md` or the rules file. The default is **human-gate**: describe the issue to the human and ask before filing.");
+  lines.push("");
+  lines.push("### Step 2: Gather context");
+  lines.push("");
+  lines.push("Before reporting, collect:");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("# Current page context");
+  lines.push("usm_read .usm/features/<area>/<feature>.usm");
+  lines.push("");
+  lines.push("# System map for cross-references");
+  lines.push("usm_list");
+  lines.push("usm_search \"<relevant keywords>\"");
+  lines.push("```");
+  lines.push("");
+  lines.push("### Step 3: Report via MCP");
+  lines.push("");
+  lines.push("Use the `usm_report_feedback` MCP tool with structured context:");
+  lines.push("");
+  lines.push("```json");
+  lines.push("{");
+  lines.push('  "kind": "bug",');
+  lines.push('  "severity": "medium",');
+  lines.push('  "summary": "Short description of the issue",');
+  lines.push('  "description": "Detailed description with page URL, .usm file reference, and expected vs actual behavior",');
+  lines.push('  "page_url": "https://docs.usm.dev/schema-reference",');
+  lines.push('  "usm_file": ".usm/features/schema/v1.usm"');
+  lines.push("}");
+  lines.push("```");
+  lines.push("");
+  lines.push("::: tip Agent feedback protocol");
+  lines.push("The project's feedback policy (configured via `usm feedback`) governs how agents report issues. Never create ad-hoc tracking files at the repo root. The canonical location for structured feedback is `.usm/feedback/`.");
+  lines.push(":::");
+  lines.push("");
+
+  // ── Edit the source ────────────────────────────────────────────────────────
+  lines.push("## Prefer to fix it yourself?");
+  lines.push("");
+  if (repo) {
+    lines.push(`All docs are generated from [\`.usm/\` source files](${repo}/tree/main/.usm). Edit the relevant \`.usm\` file and submit a PR — the docs will regenerate automatically.`);
+  } else {
+    lines.push("All docs are generated from `.usm/` source files. Edit the relevant `.usm` file — the docs will regenerate on the next `usm generate`.");
+  }
+  lines.push("");
+
+  return {
+    outputs: [{
+      path: `${root}/.usm-workspace/docs/feedback.md`,
       content: lines.join("\n"),
     }],
   };

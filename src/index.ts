@@ -20,6 +20,7 @@ export {
   generateMcpReference,
   generateLanguageSupportDoc,
   generateAgentSetupGuide,
+  generateFeedbackPage,
   generateDataModelDoc,
   generateDataIndex,
   generatePerAppDecisions,
