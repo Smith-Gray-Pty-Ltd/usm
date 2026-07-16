@@ -1994,6 +1994,20 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
  * Scans all .usm feature files for usage examples and CLI options.
  * Generic — works for any project that adds usage/options to their feature specs.
  */
+
+/**
+ * Escape markdown-table cell content so angle brackets aren't parsed as HTML
+ * by VitePress/Vue (which breaks the build with "Element is missing end tag")
+ * and pipes don't break the column structure. Applied to description/default
+ * cells; flag cells are backtick-wrapped (already safe).
+ */
+function escapeTableCell(text: string): string {
+  return text
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\|/g, "\\|");
+}
+
 export function generateCliReference(root: string): GenerationResult {
   const lines: string[] = [];
   lines.push("# CLI Reference");
@@ -2038,7 +2052,7 @@ export function generateCliReference(root: string): GenerationResult {
   lines.push("|---------|-------------|");
   for (const cmd of commands) {
     const firstLine = cmd.summary.split("\n")[0].slice(0, 80);
-    lines.push(`| \`${cmd.name}\` | ${firstLine} |`);
+    lines.push(`| \`${cmd.name}\` | ${escapeTableCell(firstLine)} |`);
   }
   lines.push("");
 
@@ -2079,7 +2093,7 @@ export function generateCliReference(root: string): GenerationResult {
       lines.push("|------|-------------|---------|");
       for (const o of cmd.options) {
         const opt = o as { flag: string; description: string; default?: string };
-        lines.push(`| \`${opt.flag}\` | ${opt.description} | ${opt.default || "—"} |`);
+        lines.push(`| \`${opt.flag}\` | ${escapeTableCell(opt.description)} | ${opt.default ? escapeTableCell(opt.default) : "—"} |`);
       }
       lines.push("");
     }
@@ -2269,7 +2283,7 @@ export function generateMcpReference(root: string): GenerationResult {
   lines.push("|------|---------|");
   for (const tool of tools) {
     const firstLine = tool.summary.split("\n")[0].slice(0, 100);
-    lines.push(`| \`${tool.name}\` | ${firstLine} |`);
+    lines.push(`| \`${tool.name}\` | ${escapeTableCell(firstLine)} |`);
   }
   lines.push("");
 
