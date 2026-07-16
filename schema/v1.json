@@ -1315,7 +1315,7 @@
         },
         "command": {
           "type": "string",
-          "description": "The actual CLI command name as typed by users (e.g. 'init', 'scan'), without the 'usm' prefix or any internal grouping prefix. Used by docs generators to show the real command instead of the $id slug. Optional — generators fall back to the $id's last segment when absent."
+          "description": "The user-facing name shown in reference docs, decoupled from the internal $id grouping. For CLI features this is the command as typed (e.g. 'init', 'scan', without the 'usm' prefix). For MCP features this is the tool name (e.g. 'usm_read', 'usm_report_feedback'). Optional — generators fall back to the $id's last segment when absent."
         }
       },
       "required": [

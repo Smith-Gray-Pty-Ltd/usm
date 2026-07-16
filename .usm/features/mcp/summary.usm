@@ -7,6 +7,7 @@ summary: MCP summary tool — returns a quick summary of a .usm file with id, ty
 
 $system: usm/system
 $service: usm/mcp
+command: usm_summary
 intent: |
   Agents need a lightweight overview of a .usm file without reading the full content. Summary returns just the key metadata — id, type, version, summary, and counts (features, services, flows, contracts, tests) — for rapid triage.
 
