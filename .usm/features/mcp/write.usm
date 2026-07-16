@@ -9,6 +9,7 @@ summary: |
 
 $system: usm/system
 $service: usm/mcp
+command: usm_draft_feature, usm_write_feature, usm_update_feature, usm_update_feature_status
 intent: |
   The current MCP server is read-only — agents can list, read, search, and query
   existing .usm files, but cannot create or update them. The spec-first workflow

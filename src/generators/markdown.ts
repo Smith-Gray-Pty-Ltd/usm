@@ -2260,7 +2260,7 @@ export function generateMcpReference(root: string): GenerationResult {
       const feature = parsed as FeatureUsm;
       tools.push({
         id: feature.$id,
-        name: feature.$id.split("/").pop() || feature.$id,
+        name: feature.command || feature.$id.split("/").pop() || feature.$id,
         summary: feature.summary,
         intent: feature.intent,
       });

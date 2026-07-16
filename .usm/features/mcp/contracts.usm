@@ -7,6 +7,7 @@ summary: MCP contracts tool — extracts the contracts array from a feature .usm
 
 $system: usm/system
 $service: usm/mcp
+command: usm_get_contracts
 intent: |
   Agents need to review a feature's contracts to plan tests or verify guarantees. The contracts tool returns the full contracts array from a feature file, formatted for easy agent consumption.
 

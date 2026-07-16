@@ -7,6 +7,7 @@ summary: MCP flows tool — extracts the flows array from a feature .usm file, i
 
 $system: usm/system
 $service: usm/mcp
+command: usm_get_flows
 intent: |
   Agents need to understand user journeys described in feature files. The flows tool returns the complete flows array with step details, enabling agents to reason about the feature's behavior.
 

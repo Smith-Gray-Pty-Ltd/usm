@@ -7,6 +7,7 @@ summary: MCP list tool — lists all .usm files in a directory or monorepo with 
 
 $system: usm/system
 $service: usm/mcp
+command: usm_list
 intent: |
   AI agents need to discover what .usm files exist before reading them. The list tool returns a summary of all files, optionally filtered by type, so agents can navigate the system map without reading every file.
 

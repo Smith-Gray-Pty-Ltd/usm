@@ -7,6 +7,7 @@ summary: MCP read tool — reads and parses a .usm file, returning the full obje
 
 $system: usm/system
 $service: usm/mcp
+command: usm_read
 intent: |
   Agents need to read the full content of a specific .usm file to understand a service, feature, or system. The read tool parses the file and returns both the complete data and extracted metadata for quick agent scanning.
 

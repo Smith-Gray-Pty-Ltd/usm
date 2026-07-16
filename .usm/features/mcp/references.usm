@@ -7,6 +7,7 @@ summary: MCP references tool — finds all .usm files that reference a target $i
 
 $system: usm/system
 $service: usm/mcp
+command: usm_references
 intent: |
   Before modifying a service or feature, agents need to know what else depends on it. The references tool searches all .usm files for a target $id (e.g. smith-gray/zitadel) and returns every file and field that references it.
 

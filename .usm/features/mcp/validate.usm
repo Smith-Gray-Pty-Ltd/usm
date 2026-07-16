@@ -7,6 +7,7 @@ summary: MCP validate tool — validates a .usm file by path or inline YAML cont
 
 $system: usm/system
 $service: usm/mcp
+command: usm_validate
 intent: |
   Agents modifying .usm files need to validate their changes before writing. The validate tool checks a file path or inline YAML string against the schema, returning valid/errors without the agent needing to call the CLI.
 
