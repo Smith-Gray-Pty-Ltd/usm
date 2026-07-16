@@ -43,6 +43,62 @@ Follow this workflow when implementing features:
 `;
 
 /**
+ * Generate the Agent Feedback Protocol block.
+ *
+ * Renders policy-specific instructions driven by `system.feedback`, plus a hard
+ * rule against ad-hoc tracking files. Emitted into every rules file so all
+ * agents (Cursor, Claude, Codex, Copilot) behave consistently instead of
+ * improvising (e.g. creating their own bugs.md).
+ *
+ * Always emitted — even with no `feedback` block the default policy is
+ * `human-gate` and the no-ad-hoc-files rule is universally valuable.
+ */
+export function generateFeedbackProtocol(system: SystemUsm): string {
+  const fb = system.feedback;
+  const policy = fb?.policy ?? "human-gate";
+  const feedbackDir = fb?.feedback_dir ?? ".usm/feedback";
+  const repo = system.identity?.repository?.replace(/\/$/, "");
+  const tracker = fb?.tracker ?? (repo ? `${repo}/issues` : undefined);
+
+  const lines: string[] = [];
+  lines.push("## Agent Feedback Protocol");
+  lines.push("");
+  lines.push("> **If you are an AI agent, read this.** When you discover a bug, inconsistency, or improvement, follow this project's configured policy — do NOT improvise or invent your own tracking files.");
+  lines.push("");
+  lines.push(`**Active policy:** \`${policy}\``);
+  lines.push("");
+
+  if (policy === "human-gate") {
+    lines.push("- Surface the issue to the human in conversation. Describe what you found and **ask** whether to record or file it.");
+    lines.push("- Do **NOT** write any feedback file, create an issue, or commit a fix without explicit human approval.");
+  } else if (policy === "direct-to-feedback") {
+    lines.push(`- Record the issue directly as a structured entry in \`${feedbackDir}/\` — call the \`usm_report_feedback\` MCP tool if available, otherwise hand-write a \`$type: feedback\` file.`);
+    lines.push("- Required fields: `kind` (bug|improvement|question), `severity`, `summary`, `status`, `reported_by`.");
+    lines.push("- Skip trivial/cosmetic items — only record things a human would act on.");
+  } else if (policy === "direct-to-github") {
+    if (tracker) {
+      lines.push(`- File real bugs as GitHub issues at <${tracker}> using \`gh issue create\` (prefer the bug report template).`);
+    } else {
+      lines.push("- File real bugs via `gh issue create` (tracker URL not configured — set `identity.repository` or `feedback.tracker`).");
+    }
+    lines.push(`- Use \`${feedbackDir}/\` entries for ideas/improvements that aren't real bugs.`);
+    lines.push("- Include reproduction steps, expected vs actual, and environment info.");
+  }
+
+  lines.push("");
+  lines.push("**Hard rules (all policies):**");
+  lines.push("- **NEVER** create ad-hoc tracking files at the repo root (`bugs.md`, `ISSUES.md`, `TODO-agent.md`, etc.).");
+  lines.push(`- The **only** canonical location for structured feedback is \`${feedbackDir}/\`.`);
+  if (tracker) {
+    lines.push(`- Real bugs live in the issue tracker: <${tracker}>.`);
+  }
+  lines.push("- If ever unsure, default to asking the human.");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/**
  * Generate the USM section content that goes between markers in smart-merged files.
  */
 function generateUsmSection(system: SystemUsm, services: ServiceUsm[]): string {
@@ -85,10 +141,14 @@ function generateUsmSection(system: SystemUsm, services: ServiceUsm[]): string {
   lines.push("- `usm_write_feature` — write a .usm file to disk (validates first)");
   lines.push("- `usm_update_feature` — update fields on an existing feature");
   lines.push("- `usm_update_feature_status` — update feature status (planned→built)");
+  lines.push("- `usm_report_feedback` — report a bug/improvement as a structured $type: feedback entry (respects feedback policy)");
   lines.push("");
 
   // Workflow
   lines.push(WORKFLOW_INSTRUCTIONS);
+
+  // Agent feedback protocol (policy-dynamic)
+  lines.push(generateFeedbackProtocol(system));
 
   return lines.join("\n");
 }

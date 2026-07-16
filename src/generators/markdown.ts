@@ -2519,13 +2519,13 @@ export function generateAgentSetupGuide(root: string): GenerationResult {
   lines.push("");
   lines.push("---");
   lines.push("");
-  lines.push("## Available MCP Tools (12)");
+  lines.push("## Available MCP Tools (13)");
   lines.push("");
   lines.push("**Read (8):** `usm_list`, `usm_read`, `usm_search`, `usm_validate`,");
   lines.push("`usm_summary`, `usm_references`, `usm_get_contracts`, `usm_get_flows`");
   lines.push("");
-  lines.push("**Write (4):** `usm_draft_feature`, `usm_write_feature`,");
-  lines.push("`usm_update_feature`, `usm_update_feature_status`");
+  lines.push("**Write (5):** `usm_draft_feature`, `usm_write_feature`,");
+  lines.push("`usm_update_feature`, `usm_update_feature_status`, `usm_report_feedback`");
   lines.push("");
   lines.push("## Verify It's Working");
   lines.push("");

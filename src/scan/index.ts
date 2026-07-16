@@ -1,6 +1,24 @@
 // Public API exports for the scan module
 
 export { initConfig, writeConfig } from "./init.js";
+export {
+  promptFeedbackPolicy,
+  applyFeedbackToSystem,
+  resolveFeedbackPolicy,
+  resolveFeedbackDir,
+  FEEDBACK_POLICIES,
+  DEFAULT_FEEDBACK_POLICY,
+} from "./feedback.js";
+export {
+  detectUpgrade,
+  applyUpgrade,
+  getInstalledVersion,
+  getProjectVersion,
+  compareVersions,
+  type UpgradeReport,
+  type UpgradeApplyResult,
+} from "./upgrade.js";
+export { CAPABILITIES, registerCapability, type Capability, type CapabilitySetupResult } from "./capabilities.js";
 export { scanStructural } from "./structural.js";
 export { detectServices, extractRoutes } from "./multi-lang.js";
 export type { DetectedService, DetectedRoute } from "./multi-lang.js";

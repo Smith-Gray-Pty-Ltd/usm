@@ -1,7 +1,7 @@
 import yaml from "js-yaml";
 import fs from "node:fs";
 import path from "node:path";
-import type { UsmFile, SystemUsm, ServiceUsm, FeatureUsm } from "./types.js";
+import type { UsmFile, SystemUsm, ServiceUsm, FeatureUsm, FeedbackUsm } from "./types.js";
 
 /**
  * Parse a .usm YAML file into a typed object.
@@ -42,6 +42,13 @@ export function isServiceFile(file: UsmFile): file is ServiceUsm {
  */
 export function isFeatureFile(file: UsmFile): file is FeatureUsm {
   return file.$type === "feature";
+}
+
+/**
+ * Type guard: is this a feedback file?
+ */
+export function isFeedbackFile(file: UsmFile): file is FeedbackUsm {
+  return file.$type === "feedback";
 }
 
 /**

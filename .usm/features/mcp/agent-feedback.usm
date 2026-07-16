@@ -1,0 +1,253 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/agent-feedback
+$type: feature
+$version: 1
+$last_updated: "2026-07-16"
+status: built
+summary: >-
+  Agent feedback protocol — teaches AI agents a consistent, configurable way to surface bugs and
+  improvements, governed by a schema-driven policy set up at init time, rendered into every
+  agent-facing rules file, and backed by a usm_report_feedback MCP write tool that records
+  structured .usm/feedback entries. Stops agents inventing ad-hoc bug-tracking files.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Agents using USM currently improvise when they discover issues — one agent autonomously created a
+  root-level bugs.md because no canonical protocol exists. There is no taught, configurable
+  behaviour for how an agent should report a bug or suggest an improvement. This feature adds (1) a
+  system.feedback policy block to the v1 schema with three modes — human-gate (default, surface in
+  conversation and ask), direct-to-feedback (write structured entries to .usm/feedback), and
+  direct-to-github (file a real issue via gh); (2) interactive prompts in usm init / scan that ask
+  whether the dev agent has GitHub auth and which policy to use; (3) a shared Feedback Protocol
+  block generated into all four rules files (AGENTS.md, CLAUDE.md, .cursor/rules/usm.mdc,
+  copilot-instructions.md) that renders the project's configured policy and forbids ad-hoc tracking
+  files; and (4) a usm_report_feedback MCP write tool that validates and persists structured
+  feedback entries. One source of truth (system.usm feedback policy) drives consistent agent
+  behaviour across the whole ecosystem.
+flows:
+  - id: setup-feedback-policy
+    name: Configure feedback policy at init
+    description: >-
+      usm init (and usm scan --enrich) asks the human two questions and persists a system.feedback
+      block
+    steps:
+      - id: s1
+        action: prompt
+        target: >-
+          Does your dev agent have GitHub auth? (gh CLI authenticated) — sets feedback.github_auth:
+          true|false|unknown
+      - id: s2
+        action: prompt
+        target: >-
+          How should agents report bugs/improvements? — sets feedback.policy: human-gate (default) |
+          direct-to-feedback | direct-to-github
+      - id: s3
+        action: write
+        target: >-
+          system.usm feedback block with policy, github_auth, tracker (defaults to
+          identity.repository + /issues), feedback_dir (.usm/feedback)
+      - id: s4
+        action: validate
+        target: system.usm against v1 schema including new feedback block
+  - id: agent-reports-feedback
+    name: Agent surfaces an issue following the configured policy
+    description: >-
+      When an agent discovers a bug or improvement, its behaviour is governed entirely by
+      system.feedback.policy
+    steps:
+      - id: s1
+        action: detect
+        target: agent encounters a bug, inconsistency, or improvement opportunity
+      - id: s2
+        action: branch
+        target: read system.feedback.policy
+      - id: s3a
+        action: human-gate
+        target: >-
+          describe the issue to the human in conversation and ask whether to record/file it — do NOT
+          write anything without approval
+      - id: s3b
+        action: direct-to-feedback
+        target: call usm_report_feedback to write a structured .usm/feedback entry
+      - id: s3c
+        action: direct-to-github
+        target: run gh issue create using the bug_report template (only when github_auth is true)
+      - id: s4
+        action: forbidden
+        target: >-
+          NEVER create ad-hoc tracking files at the repo root (bugs.md, ISSUES.md, TODO-agent.md,
+          etc.)
+  - id: generate-protocol-instructions
+    name: Render feedback protocol into all rules files
+    description: >-
+      During usm generate, a shared Feedback Protocol block is emitted into every agent-facing file,
+      dynamic to the project policy
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm feedback block (policy, github_auth, tracker, feedback_dir)
+      - id: s2
+        action: generate
+        target: policy-specific instructions — the exact behaviour for the configured mode
+      - id: s3
+        action: render
+        target: >-
+          shared block into AGENTS.md, CLAUDE.md, .cursor/rules/usm.mdc,
+          .github/copilot-instructions.md
+      - id: s4
+        action: smart-merge
+        target: replace between USM markers, preserve hand-written content
+  - id: human-reviews-feedback
+    name: Human reviews collected feedback
+    description: >-
+      Feedback entries written to .usm/feedback are reviewable and convertible into issues or
+      features
+    steps:
+      - id: s1
+        action: list
+        target: usm list --type feedback or usm_report_feedback list shows open entries
+      - id: s2
+        action: triage
+        target: "human marks status: open -> acknowledged -> resolved | wontfix"
+      - id: s3
+        action: convert
+        target: promote a feedback entry into a feature .usm spec or a GitHub issue
+contracts:
+  - id: policy-respected
+    description: All generated instructions and the MCP tool must honour the configured system.feedback.policy
+    must_have:
+      - human-gate mode instructs the agent to ask the human and forbids autonomous writes
+      - direct-to-feedback mode instructs the agent to call usm_report_feedback
+      - direct-to-github mode is only offered/emitted when feedback.github_auth is true
+  - id: no-adhoc-tracking-files
+    description: The protocol must explicitly forbid agents from inventing their own bug/issue tracking files
+    must_have:
+      - "Hard rule present in every rules file: NEVER create ad-hoc tracking files at repo root"
+      - "Canonical feedback location named: .usm/feedback (overridable via feedback_dir)"
+  - id: feedback-schema-validated
+    description: Feedback entries are first-class .usm files validated against the schema
+    must_have:
+      - "$type: feedback recognised by the v1 schema"
+      - "Required fields: kind (bug|improvement|question), severity, summary, status, reported_by"
+      - usm_validate accepts a feedback file
+  - id: init-persists-policy
+    description: usm init writes a valid feedback block and never leaves policy ambiguous
+    must_have:
+      - Both prompts answered or defaulted (human-gate) if skipped
+      - Resulting system.usm passes schema validation
+  - id: smart-merge-preserved
+    description: Generator additions respect existing smart-merge guarantees
+    must_have:
+      - Feedback block rendered between USM markers only
+      - Hand-written content outside markers unchanged
+tests:
+  - id: setup-with-gh-auth
+    setup:
+      interactive_init: true
+      gh_authenticated: true
+    expect:
+      - assertion: Prompt offers all three policies
+      - assertion: Direct-to-github selectable
+      - assertion: Resulting system.usm feedback block validates
+  - id: setup-without-gh-auth
+    setup:
+      interactive_init: true
+      gh_authenticated: false
+    expect:
+      - assertion: Direct-to-github NOT offered or warned against
+      - assertion: Default selection is human-gate
+      - assertion: feedback.github_auth persisted as false
+  - id: human-gate-default
+    setup:
+      system_usm_with_feedback_policy: human-gate
+    expect:
+      - assertion: Rules files instruct agent to ask human before filing
+      - assertion: No instruction to autonomously write feedback files
+  - id: direct-to-github-renders-tracker
+    setup:
+      system_usm_feedback_policy: direct-to-github
+      identity_repository: https://github.com/org/repo
+    expect:
+      - assertion: Rules files reference https://github.com/org/repo/issues
+      - assertion: Mentions gh issue create and bug_report template
+  - id: mcp-tool-validates
+    setup:
+      malformed_feedback_payload: true
+    expect:
+      - assertion: usm_report_feedback rejects invalid kind/severity
+      - assertion: No file written on validation failure
+  - id: mcp-tool-writes-entry
+    setup:
+      valid_feedback_payload:
+        kind: bug
+        severity: high
+        summary: scan drops empty dirs
+    expect:
+      - assertion: File written to .usm/feedback/<slug>.usm
+      - assertion: "$type: feedback and schema-valid"
+decisions:
+  - id: default-human-gate
+    decision: human-gate is the default policy
+    rationale: >-
+      Matches USM's human-in-the-loop philosophy (ALWAYS show the human first). Prevents noisy
+      autonomous issues and unreviewed files. Projects with confidence and gh auth can opt into
+      direct modes.
+  - id: feedback-as-first-class-usm-type
+    decision: "Feedback entries are $type: feedback .usm files in .usm/feedback, not a free-form markdown log"
+    rationale: >-
+      Consistent with structured-source-of-truth principle. Validated, queryable via MCP,
+      convertible to features/issues. Avoids the drift that made ad-hoc bugs.md useless.
+  - id: one-shared-protocol-block
+    decision: A single Feedback Protocol block is rendered into all four rules files from one code path
+    rationale: >-
+      Same rationale as the existing WORKFLOW_INSTRUCTIONS — one source, avoids drift between agent
+      tools (Cursor/Claude/Codex/Copilot).
+  - id: setup-asks-two-questions
+    decision: "usm init asks exactly two questions: gh auth presence and policy choice"
+    rationale: >-
+      Minimal friction. gh_auth gates the direct-to-github option; policy drives everything else.
+      Tracker and feedback_dir have sensible defaults.
+  - id: mcp-tool-respects-policy
+    decision: usm_report_feedback consults system.feedback.policy before writing
+    rationale: >-
+      In human-gate mode the tool returns a draft preview for the human instead of writing, keeping
+      the agent honest even if it ignores the rules file.
+implementation:
+  primary: src/mcp/feedback.ts; src/scan/feedback.ts; src/generators/rulesFiles.ts
+  test_code: tests/generate.test.ts
+  test_code_status: manual
+see_also:
+  - usm/gen-rules-files
+  - usm/gen-agentsmd
+  - usm/mcp-write
+  - usm/schema-v1
+  - usm/cli-init
+usage:
+  - command: usm feedback
+    description: Interactive setup — prompts for GitHub auth and policy choice (TTY only)
+  - command: usm feedback --policy direct-to-feedback --github-auth
+    description: "Non-interactive: agents write structured .usm/feedback entries directly"
+  - command: usm feedback --policy human-gate
+    description: "Non-interactive: agents ask the human before filing (the default)"
+  - command: >-
+      usm feedback --policy direct-to-github --github-auth --tracker
+      https://github.com/org/repo/issues
+    description: "Non-interactive: agents file GitHub issues via gh"
+options:
+  - flag: "-r, --root <root>"
+    description: Repo root directory
+    default: .
+  - flag: "-s, --system <path>"
+    description: "Path to system.usm (default: <root>/.usm/system.usm)"
+  - flag: "-p, --policy <policy>"
+    description: "Policy: human-gate | direct-to-feedback | direct-to-github (skips interactive prompts)"
+  - flag: "-g, --github-auth"
+    description: Declare that the dev agent has GitHub (gh CLI) auth
+    default: "false"
+  - flag: "--no-github-auth"
+    description: Declare that the dev agent lacks GitHub auth
+    default: "false"
+  - flag: "-t, --tracker <url>"
+    description: "Override the issue tracker URL (default: identity.repository/issues)"
+prerequisites:
+  - An existing .usm/system.usm (create with 'usm init-file' or 'usm scan')

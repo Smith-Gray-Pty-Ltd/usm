@@ -12,6 +12,9 @@
     },
     {
       "$ref": "#/$defs/featureFile"
+    },
+    {
+      "$ref": "#/$defs/feedbackFile"
     }
   ],
   "$defs": {
@@ -37,7 +40,8 @@
             "api",
             "data",
             "policy",
-            "operations"
+            "operations",
+            "feedback"
           ],
           "description": "File type discriminator"
         },
@@ -97,7 +101,11 @@
         },
         "version": {
           "type": "string",
-          "description": "Project version (e.g. '0.1.0'). Tracks the project's own release version, separate from $version (schema version)."
+          "description": "The consuming project's OWN release version (e.g. '2.3.1'). NOT the USM tool version. Distinct from $version (schema format) and usm_version (tool alignment)."
+        },
+        "usm_version": {
+          "type": "string",
+          "description": "The USM tool version this project was last aligned with via `usm upgrade` (e.g. '0.1.0'). Used to detect stale projects and offer new capabilities. Absent = never upgraded (treated as 0.0.0). Do not confuse with `version` (the project's own release) or `$version` (the schema format)."
         },
         "identity": {
           "type": "object",
@@ -462,6 +470,32 @@
               }
             }
           }
+        },
+        "feedback": {
+          "type": "object",
+          "description": "Agent feedback policy — governs how AI agents report bugs and improvements. Set up via `usm init`. Drives the Feedback Protocol block rendered into all agent-facing rules files.",
+          "properties": {
+            "policy": {
+              "type": "string",
+              "enum": ["human-gate", "direct-to-feedback", "direct-to-github"],
+              "default": "human-gate",
+              "description": "human-gate: surface issues to the human and ask before filing (default). direct-to-feedback: write structured entries to feedback_dir. direct-to-github: file a GitHub issue via gh (requires github_auth: true)."
+            },
+            "github_auth": {
+              "type": "boolean",
+              "description": "Whether the dev agent has GitHub (gh CLI) authentication. Gates the direct-to-github policy option. Absent is treated as unknown/false."
+            },
+            "tracker": {
+              "type": "string",
+              "description": "Issue tracker URL. Defaults to identity.repository + /issues when omitted."
+            },
+            "feedback_dir": {
+              "type": "string",
+              "default": ".usm/feedback",
+              "description": "Directory for structured feedback entries written by agents."
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1289,6 +1323,87 @@
         "$system",
         "$service",
         "intent"
+      ],
+      "additionalProperties": false
+    },
+    "feedbackFile": {
+      "type": "object",
+      "description": "A structured feedback entry (bug, improvement, or question) reported by an agent or human. Lives in .usm/feedback/. First-class .usm file — queryable via MCP, convertible to features or issues.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "const": "https://usm.dev/schema/v1.json"
+        },
+        "$id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$",
+          "description": "Unique identifier: system/name (e.g. usm/scan-drops-empty-dirs)"
+        },
+        "$type": {
+          "type": "string",
+          "const": "feedback"
+        },
+        "$version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "$last_updated": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["bug", "improvement", "question"],
+          "description": "The nature of the feedback"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "title": {
+          "type": "string",
+          "description": "Short one-line title"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Description of the issue or suggestion"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "acknowledged", "resolved", "wontfix"],
+          "default": "open"
+        },
+        "reported_by": {
+          "type": "string",
+          "description": "Who reported this — e.g. 'agent:glm-5.2' or 'human:james'"
+        },
+        "feature": {
+          "type": "string",
+          "description": "Related feature $id (optional)"
+        },
+        "reproduction": {
+          "type": "string",
+          "description": "Steps to reproduce (for bugs)"
+        },
+        "suggested_fix": {
+          "type": "string",
+          "description": "Proposed resolution (optional)"
+        },
+        "created": {
+          "type": "string",
+          "description": "Date created (ISO 8601 date)"
+        }
+      },
+      "required": [
+        "$schema",
+        "$id",
+        "$type",
+        "$version",
+        "summary",
+        "kind",
+        "severity",
+        "status",
+        "reported_by"
       ],
       "additionalProperties": false
     }

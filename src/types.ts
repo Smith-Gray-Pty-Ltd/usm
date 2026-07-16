@@ -2,7 +2,7 @@
 export interface UsmCommon {
   $schema: string;
   $id: string;
-  $type: "system" | "service" | "feature" | "api" | "data" | "policy" | "operations";
+  $type: "system" | "service" | "feature" | "api" | "data" | "policy" | "operations" | "feedback";
   $version: number;
   $last_updated?: string;
   summary: string;
@@ -83,6 +83,7 @@ export interface SystemUsm extends UsmCommon {
   identity: SystemIdentity;
   status?: "planned" | "in-progress" | "built" | "deprecated";
   version?: string;
+  usm_version?: string;
   index?: FeatureRef[];
   services?: ServiceRef[];
   apis?: ApiRef[];
@@ -100,6 +101,18 @@ export interface SystemUsm extends UsmCommon {
   principles?: Principle[];
   roles?: Role[];
   local_development?: LocalDevelopment;
+  feedback?: FeedbackPolicy;
+}
+
+/**
+ * Agent feedback policy — governs how AI agents report bugs and improvements.
+ * Set up via `usm init`. Drives the Feedback Protocol block in all rules files.
+ */
+export interface FeedbackPolicy {
+  policy?: "human-gate" | "direct-to-feedback" | "direct-to-github";
+  github_auth?: boolean;
+  tracker?: string;
+  feedback_dir?: string;
 }
 
 export interface Principle {
@@ -519,7 +532,24 @@ export interface DataUsm {
   dev?: { command?: string; url?: string; env?: Record<string, string> };
 }
 
-export type UsmFile = SystemUsm | ServiceUsm | FeatureUsm | DataUsm;
+/**
+ * A structured feedback entry (bug, improvement, or question) reported by an
+ * agent or human. Lives in .usm/feedback/. First-class .usm file.
+ */
+export interface FeedbackUsm extends UsmCommon {
+  $type: "feedback";
+  kind: "bug" | "improvement" | "question";
+  severity: "low" | "medium" | "high" | "critical";
+  title?: string;
+  status?: "open" | "acknowledged" | "resolved" | "wontfix";
+  reported_by: string;
+  feature?: string;
+  reproduction?: string;
+  suggested_fix?: string;
+  created?: string;
+}
+
+export type UsmFile = SystemUsm | ServiceUsm | FeatureUsm | DataUsm | FeedbackUsm;
 
 // Validation result
 export interface ValidationResult {

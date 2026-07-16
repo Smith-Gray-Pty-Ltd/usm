@@ -1,7 +1,7 @@
 // @smith-gray/usm — Universal System Map SDK
 // Parse, validate, and generate from .usm spec files.
 
-export { parseUsm, parseUsmFile, isSystemFile, isServiceFile, isFeatureFile, findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "./parse.js";
+export { parseUsm, parseUsmFile, isSystemFile, isServiceFile, isFeatureFile, isFeedbackFile, findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "./parse.js";
 export { validateUsm, validateUsmString, validateUsmFile } from "./validate.js";
 export { generate, type Generator } from "./generate.js";
 export {
@@ -50,6 +50,7 @@ export {
 } from "./generators/archimate.js";
 export {
   generateRulesFiles,
+  generateFeedbackProtocol,
 } from "./generators/rulesFiles.js";
 export type {
   UsmCommon,
@@ -58,6 +59,8 @@ export type {
   ServiceUsm,
   FeatureUsm,
   DataUsm,
+  FeedbackUsm,
+  FeedbackPolicy,
   SystemIdentity,
   FeatureRef,
   ServiceRef,
@@ -103,6 +106,14 @@ export { getOutputPaths, resolveOutputPath, type OutputPaths } from "./outputs.j
 
 // Scan & Init (code-to-.usm direction)
 export { initConfig, writeConfig, scanStructural } from "./scan/index.js";
+export {
+  promptFeedbackPolicy,
+  applyFeedbackToSystem,
+  resolveFeedbackPolicy,
+  resolveFeedbackDir,
+  FEEDBACK_POLICIES,
+  DEFAULT_FEEDBACK_POLICY,
+} from "./scan/feedback.js";
 export { detectServices, extractRoutes } from "./scan/multi-lang.js";
 export type { DetectedService, DetectedRoute } from "./scan/multi-lang.js";
 export type {

@@ -15,6 +15,7 @@ import { draftFeatureSchema, draftFeatureTool } from "../mcp/write.js";
 import { writeFeatureSchema, writeFeatureTool } from "../mcp/write.js";
 import { updateFeatureSchema, updateFeatureTool } from "../mcp/write.js";
 import { updateFeatureStatusSchema, updateFeatureStatusTool } from "../mcp/write.js";
+import { reportFeedbackSchema, reportFeedbackTool } from "../mcp/feedback.js";
 
 const server = new McpServer({
   name: "usm-mcp",
@@ -115,6 +116,14 @@ server.tool(
   "Update the status of a feature (planned → in-progress → built → deprecated). Enforces valid transitions. Optionally update implementation paths. Validates before writing atomically.",
   updateFeatureStatusSchema,
   updateFeatureStatusTool,
+);
+
+// Tool 13: usm_report_feedback (write)
+server.tool(
+  "usm_report_feedback",
+  "Report a bug, improvement, or question as a structured $type: feedback entry in .usm/feedback/. Respects the configured feedback policy: human-gate returns a draft (no write), direct-to-feedback writes to disk, direct-to-github records locally and suggests a gh issue. Pass write=true to override human-gate after human approval. Validates against the v1 schema.",
+  reportFeedbackSchema,
+  reportFeedbackTool,
 );
 
 export async function startMcpServer() {

@@ -1,6 +1,7 @@
 import type { ServiceUsm, SystemUsm, GenerationResult } from "../types.js";
 import fs from "node:fs";
 import path from "node:path";
+import { generateFeedbackProtocol } from "./rulesFiles.js";
 
 // ─── Smart Merge ────────────────────────────────────────────────────────────
 
@@ -293,6 +294,10 @@ export function generateRootAgentsMd(
   lines.push("- **ALWAYS** update feature status after implementation");
   lines.push("- The .usm file IS the documentation — if it's wrong, the docs are wrong");
   lines.push("");
+
+  // Agent feedback protocol (policy-dynamic, sourced from system.feedback)
+  lines.push(generateFeedbackProtocol(system));
+
   lines.push(`<!-- USM:END -->`);
   lines.push("");
 

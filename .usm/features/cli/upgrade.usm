@@ -1,0 +1,237 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/upgrade
+$type: feature
+$version: 1
+$last_updated: "2026-07-16"
+status: built
+summary: >-
+  usm upgrade — detect stale USM projects and guide users through adopting new optional capabilities
+  (like the feedback policy) via a self-describing capability registry. Compares the installed USM
+  version against system.usm.version, reports missing/recommended capabilities, offers interactive
+  or default setup, and bumps the project version on completion.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  There is no upgrade path today. Existing users who `npm update` USM get new code, but their
+  system.usm is untouched — new optional blocks (feedback, and future ones) are silently absent,
+  `generate` omits the corresponding output, and the user gets no signal. The only version check is
+  a passive $version warning in validate. This feature adds a capability registry where each
+  optional block declares how to detect and set itself up, plus an `usm upgrade` command that
+  orchestrates detection, guided setup, and version bumping — so adoption of new features is
+  discovered and guided, not silent.
+visibility: public
+decisions:
+  - id: capability-registry-pattern
+    decision: >-
+      Capabilities self-describe (detect + setup + introducedIn); upgrade orchestrates without
+      hardcoding.
+    rationale: >-
+      Adding a future capability means one registry entry, zero changes to upgrade. Same
+      extensibility principle as the generators target list.
+    status: accepted
+  - id: usm-version-field-for-alignment
+    decision: Use system.usm.usm_version for USM-tool alignment, NOT the project's own version field.
+    rationale: >-
+      The `version` field tracks the consuming project's own release (e.g. 5.2.0). Repurposing it
+      would miscompare against the USM tool version. A dedicated usm_version field keeps project
+      version and tool alignment separate and unambiguous.
+    status: accepted
+    alternatives:
+      - option: Reuse the existing version field for alignment
+        rejected_because: >-
+          Overwrites the consuming project's own release version; a project at 5.2.0 would be
+          misread as 'ahead of' USM 0.1.0 and never offered upgrades.
+      - option: Use $version (schema format) for alignment
+        rejected_because: >-
+          Conflates schema-format changes with feature additions; additive schema changes (like
+          feedback) intentionally do not bump $version.
+  - id: schema-version-independence
+    decision: >-
+      Schema $version moves independently of the package version: additive schema changes do NOT
+      bump $version (still v1); breaking changes bump $version + CURRENT_SCHEMA_VERSION together and
+      ship a migration in usm upgrade.
+    rationale: >-
+      Decouples the file format from the tool release cadence. A 0.2.0 release may still be schema
+      v1. Additive changes (new optional fields) are backward compatible and must not force every
+      consumer to migrate.
+    status: accepted
+  - id: setup-owned-by-capability
+    decision: >-
+      Each registry entry owns its own setup function (interactive + default); upgrade just calls
+      it.
+    rationale: >-
+      Avoids subprocess fragility (no need for the binary on PATH) and keeps each capability's setup
+      logic co-located with its detection.
+    status: accepted
+  - id: interactive-with-flag-fallback
+    decision: TTY prompts per capability; --apply uses defaults for CI/scripts; --check is report-only.
+    rationale: >-
+      Composes with existing per-feature setup commands (e.g. usm feedback) while supporting
+      non-interactive and CI use cases.
+    status: accepted
+  - id: non-destructive
+    decision: Upgrade only adds missing blocks and bumps usm_version; existing config is never overwritten.
+    rationale: >-
+      detect() returns true for configured capabilities → they are skipped. Safe to re-run
+      idempotently.
+    status: accepted
+flows:
+  - id: upgrade-detect
+    name: Detect project version and missing capabilities
+    description: >-
+      Read the installed USM version and the project's system.usm.version, walk the capability
+      registry, and produce a status report.
+    steps:
+      - id: s1
+        action: read
+        target: installed USM version from package.json (resolved relative to the compiled module)
+      - id: s2
+        action: read
+        target: project version from system.usm.version (absent = 0.0.0)
+      - id: s3
+        action: compare
+        target: semver compare — stale if project < installed
+      - id: s4
+        action: walk
+        target: capability registry — call detect(system) for each entry
+      - id: s5
+        action: report
+        target: list missing (with recommended flag + setup hint), up-to-date, and version status
+  - id: upgrade-setup
+    name: Set up missing capabilities
+    description: >-
+      For each missing capability, either prompt interactively (TTY) or apply defaults (--apply),
+      calling the capability's own setup function.
+    steps:
+      - id: s1
+        action: branch
+        target: interactive (TTY) vs --apply (defaults) vs --check (report only)
+      - id: s2
+        action: prompt
+        target: for each missing recommended capability, ask whether to set it up
+      - id: s3
+        action: setup
+        target: call capability.setup(systemPath, { interactive }) — e.g. feedback writes its policy block
+      - id: s4
+        action: skip
+        target: capabilities where detect() returns true are never re-set-up
+  - id: upgrade-bump
+    name: Bump project version after applying
+    description: >-
+      After capabilities are applied, set system.usm.version to the installed version, validate, and
+      suggest regenerating outputs.
+    steps:
+      - id: s1
+        action: write
+        target: system.usm.version = installed version
+      - id: s2
+        action: validate
+        target: system.usm still passes schema validation
+      - id: s3
+        action: suggest
+        target: run 'usm generate' to refresh rules files and docs with the new capabilities
+contracts:
+  - id: version-compared
+    description: >-
+      Upgrade reads the installed package.json version and system.usm.version and reports stale or
+      up-to-date.
+    must_have:
+      - Installed version resolved from the USM package.json (not the project's)
+      - Absent system.usm.version treated as 0.0.0 (stale)
+      - Stale vs up-to-date clearly reported
+  - id: capabilities-detected
+    description: >-
+      Every registry capability is checked; missing and recommended ones are reported with a setup
+      hint.
+    must_have:
+      - All registry entries run through detect()
+      - Missing recommended capabilities surfaced prominently
+      - Each missing capability shows its setup hint
+  - id: setup-non-destructive
+    description: Setup never overwrites an existing block.
+    must_have:
+      - detect() returns true → capability skipped entirely
+      - No existing config field is overwritten
+  - id: version-bumped-on-completion
+    description: After a successful apply, system.usm.version is set to the installed version.
+    must_have:
+      - version field written only after setup succeeds
+      - Resulting system.usm validates against the schema
+  - id: non-interactive-safe
+    description: Non-interactive modes work without prompts and are CI-safe.
+    must_have:
+      - "--apply runs all recommended missing capabilities with defaults, no prompts"
+      - "--check reports only and exits non-zero if stale"
+      - Non-TTY defaults to report-only (no hanging on stdin)
+tests:
+  - id: stale-project-detected
+    setup:
+      system_version_absent: true
+    expect:
+      - assertion: upgrade reports project as stale
+      - assertion: exit code non-zero under --check
+  - id: up-to-date-noop
+    setup:
+      system_version_equals_installed: true
+      all_capabilities_configured: true
+    expect:
+      - assertion: upgrade reports nothing to do
+      - assertion: no files modified
+  - id: missing-capability-reported
+    setup:
+      system_has_no_feedback_block: true
+    expect:
+      - assertion: feedback listed as missing
+      - assertion: setup hint shown
+  - id: existing-capability-skipped
+    setup:
+      system_has_feedback_block: true
+    expect:
+      - assertion: feedback not offered for setup
+  - id: apply-uses-defaults
+    setup:
+      system_has_no_feedback_block: true
+      flag_apply: true
+    expect:
+      - assertion: feedback block written with default human-gate policy
+      - assertion: no prompt blocks on stdin
+  - id: version-bumped-after-apply
+    setup:
+      apply_succeeds: true
+    expect:
+      - assertion: system.usm.version equals installed version
+      - assertion: system.usm validates
+implementation:
+  primary: src/scan/upgrade.ts; src/scan/capabilities.ts; src/cli/index.ts
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/agent-feedback
+  - usm/cli-init
+  - usm/cli-check
+  - usm/cli-validate
+usage:
+  - command: usm upgrade
+    description: Detect stale capabilities and guide interactive setup (TTY)
+  - command: usm upgrade --apply
+    description: Apply all recommended missing capabilities with defaults (non-interactive, CI-safe)
+  - command: usm upgrade --check
+    description: Report only; exit non-zero if the project is stale (for CI)
+  - command: usm upgrade --capability feedback
+    description: Target a single capability by id
+options:
+  - flag: "-r, --root <root>"
+    description: Repo root directory
+    default: .
+  - flag: "-s, --system <path>"
+    description: "Path to system.usm (default: <root>/.usm/system.usm)"
+  - flag: "--apply"
+    description: Apply all recommended missing capabilities with defaults, no prompts
+    default: "false"
+  - flag: "--check"
+    description: Report only; exit non-zero if stale (CI mode)
+    default: "false"
+  - flag: "-c, --capability <id>"
+    description: Target a single capability (e.g. feedback)
+prerequisites:
+  - An existing .usm/system.usm (create with 'usm init-file' or 'usm scan')

@@ -174,6 +174,16 @@ index:
     ref: .usm/features/mcp/write.usm
     status: built
     tags: [mcp, authoring, spec-first]
+  - id: agent-feedback
+    name: Agent Feedback Protocol
+    ref: .usm/features/mcp/agent-feedback.usm
+    status: planned
+    tags: [mcp, agents, feedback, policy, schema, cross-cutting]
+  - id: upgrade
+    name: Project Upgrade
+    ref: .usm/features/cli/upgrade.usm
+    status: planned
+    tags: [cli, upgrade, capabilities, versioning]
   - id: schema-v1
     name: V1 JSON Schema
     ref: .usm/features/schema/v1.usm

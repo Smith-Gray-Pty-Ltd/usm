@@ -8,6 +8,8 @@ import { validateUsm, validateUsmFile } from "../validate.js";
 import { generate } from "../generate.js";
 import { findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "../parse.js";
 import { initConfig, writeConfig } from "../scan/init.js";
+import { promptFeedbackPolicy, applyFeedbackToSystem, resolveFeedbackPolicy, DEFAULT_FEEDBACK_POLICY } from "../scan/feedback.js";
+import { detectUpgrade, applyUpgrade } from "../scan/upgrade.js";
 import { scanStructural } from "../scan/structural.js";
 import { scanInfrastructure } from "../scan/infrastructure.js";
 import {
@@ -402,6 +404,201 @@ program
       console.log(`  Shared:   ${config.shared?.length || 0}`);
       console.log(`  Data:     ${config.data?.length || 0}`);
       console.log(`\nRun 'usm scan' to generate .usm files from this config.`);
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+// ─── feedback ───────────────────────────────────────────────────────────────
+
+program
+  .command("feedback")
+  .description("Configure the agent feedback policy (how AI agents report bugs/improvements)")
+  .option("-r, --root <root>", "Repo root", ".")
+  .option("-s, --system <path>", "Path to system.usm (default: <root>/.usm/system.usm)")
+  .option("-p, --policy <policy>", "Policy: human-gate | direct-to-feedback | direct-to-github (skips prompts)")
+  .option("-g, --github-auth", "Declare that the dev agent has GitHub (gh CLI) auth", false)
+  .option("--no-github-auth", "Declare that the dev agent lacks GitHub auth", false)
+  .option("-t, --tracker <url>", "Override the issue tracker URL (default: identity.repository/issues)")
+  .action(async (options: {
+    root: string;
+    system?: string;
+    policy?: string;
+    githubAuth?: boolean;
+    tracker?: string;
+  }) => {
+    try {
+      const systemPath = options.system
+        ? path.resolve(options.system)
+        : path.resolve(options.root, ".usm", "system.usm");
+
+      let policy: import("../types.js").FeedbackPolicy;
+
+      if (options.policy) {
+        // Non-interactive mode — resolve from flags
+        const valid = ["human-gate", "direct-to-feedback", "direct-to-github"];
+        if (!valid.includes(options.policy)) {
+          console.error(`Error: --policy must be one of ${valid.join(", ")}`);
+          process.exit(1);
+        }
+        // githubAuth is undefined if neither flag was passed; treat as false
+        const gh = options.githubAuth === true;
+        policy = resolveFeedbackPolicy({
+          githubAuth: gh,
+          policyChoice: options.policy,
+          tracker: options.tracker,
+        });
+        if (options.policy === "direct-to-github" && !gh) {
+          console.warn("Warning: direct-to-github requires --github-auth; downgraded to human-gate.");
+        }
+      } else {
+        // Interactive mode (TTY) — prompts; returns null if non-TTY
+        const prompted = await promptFeedbackPolicy();
+        policy = prompted ?? DEFAULT_FEEDBACK_POLICY;
+        if (prompted === null) {
+          console.log("Non-interactive shell — defaulting policy to human-gate. Re-run with --policy to set explicitly.");
+        }
+        if (options.tracker) policy.tracker = options.tracker;
+      }
+
+      const result = applyFeedbackToSystem(systemPath, policy);
+      if (!result.applied) {
+        console.error("Could not apply feedback policy:");
+        for (const e of result.errors || []) console.error(`  ${e.path}: ${e.message}`);
+        process.exit(1);
+      }
+
+      console.log(`Feedback policy written to ${result.path}`);
+      console.log(`  Policy:     ${policy.policy}`);
+      console.log(`  GitHub auth: ${policy.github_auth ?? "(unset)"}`);
+      if (policy.tracker) console.log(`  Tracker:    ${policy.tracker}`);
+      console.log(`\nRe-run 'usm generate' to update the Feedback Protocol in agent rules files.`);
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  });
+
+// ─── upgrade ─────────────────────────────────────────────────────────────────
+
+program
+  .command("upgrade")
+  .description("Detect stale USM projects and guide setup of new optional capabilities")
+  .option("-r, --root <root>", "Repo root", ".")
+  .option("-s, --system <path>", "Path to system.usm (default: <root>/.usm/system.usm)")
+  .option("--apply", "Apply all recommended missing capabilities with defaults (no prompts)", false)
+  .option("--check", "Report only; exit non-zero if stale (CI mode)", false)
+  .option("-c, --capability <id>", "Target a single capability (e.g. feedback)")
+  .action(async (options: {
+    root: string;
+    system?: string;
+    apply: boolean;
+    check: boolean;
+    capability?: string;
+  }) => {
+    try {
+      const systemPath = options.system
+        ? path.resolve(options.system)
+        : path.resolve(options.root, ".usm", "system.usm");
+
+      if (!fs.existsSync(systemPath)) {
+        console.error(`system.usm not found at ${systemPath}. Create it with 'usm init-file' or 'usm scan' first.`);
+        process.exit(1);
+      }
+
+      const system = parseUsmFile(systemPath) as SystemUsm;
+      const report = detectUpgrade(system);
+
+      // ── Report ────────────────────────────────────────────────────────────
+      const staleTag = report.stale ? "stale" : "up to date";
+      console.log(`USM ${report.installedVersion} — project is at ${report.projectVersion} (${staleTag})`);
+      console.log("");
+
+      if (report.missing.length === 0 && !report.stale) {
+        console.log("✓ Everything is configured and up to date. Nothing to do.");
+        return;
+      }
+
+      if (report.recommendedMissing.length > 0) {
+        console.log("Missing recommended capabilities:");
+        for (const s of report.recommendedMissing) {
+          const newTag = s.isNew ? " [new]" : "";
+          console.log(`  ⚠ ${s.capability.id}${newTag}  ${s.capability.name}`);
+          console.log(`      ${s.capability.description}`);
+        }
+        console.log("");
+      }
+
+      if (report.missing.length > report.recommendedMissing.length) {
+        const optional = report.missing.filter((s) => !s.capability.recommended);
+        console.log("Other available capabilities:");
+        for (const s of optional) {
+          console.log(`    ${s.capability.id}  ${s.capability.name}`);
+        }
+        console.log("");
+      }
+
+      if (report.configured.length > 0) {
+        console.log("Already configured:");
+        for (const s of report.configured) {
+          console.log(`  ✓ ${s.capability.id}`);
+        }
+        console.log("");
+      }
+
+      // ── --check: report only, exit non-zero if stale ─────────────────────
+      if (options.check) {
+        if (report.stale || report.recommendedMissing.length > 0) {
+          console.log("Run 'usm upgrade' to set up missing capabilities.");
+          process.exit(1);
+        }
+        return;
+      }
+
+      // ── --apply: non-interactive setup of recommended missing ────────────
+      if (options.apply) {
+        const targets = options.capability ? [options.capability] : [];
+        const result = await applyUpgrade(systemPath, targets, false);
+        for (const a of result.applied) console.log(`✓ ${a.id}: ${a.message}`);
+        for (const f of result.failed) console.error(`✗ ${f.id}: ${f.message}`);
+        if (result.versionBumped) {
+          console.log(`\nProject version bumped to ${report.installedVersion}.`);
+          console.log("Run 'usm generate' to refresh rules files and docs.");
+        }
+        process.exit(result.failed.length > 0 ? 1 : 0);
+      }
+
+      // ── Interactive (TTY) ────────────────────────────────────────────────
+      if (!process.stdin.isTTY) {
+        console.log("Non-interactive shell — showing report only. Re-run with --apply to configure, or in a TTY for guided setup.");
+        return;
+      }
+
+      const { default: readline } = await import("node:readline/promises");
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        const targets: string[] = [];
+        for (const s of report.recommendedMissing) {
+          const ans = (await rl.question(`Set up ${s.capability.id} (${s.capability.name})? [Y/n] `)).trim().toLowerCase();
+          if (ans === "" || ans === "y" || ans === "yes") {
+            targets.push(s.capability.id);
+          }
+        }
+        if (targets.length === 0) {
+          console.log("No capabilities selected. Exiting.");
+          return;
+        }
+        const result = await applyUpgrade(systemPath, targets, true);
+        for (const a of result.applied) console.log(`✓ ${a.id}: ${a.message}`);
+        for (const f of result.failed) console.error(`✗ ${f.id}: ${f.message}`);
+        if (result.versionBumped) {
+          console.log(`\nProject version bumped to ${report.installedVersion}.`);
+          console.log("Run 'usm generate' to refresh rules files and docs.");
+        }
+      } finally {
+        rl.close();
+      }
     } catch (err) {
       console.error(`Error: ${(err as Error).message}`);
       process.exit(1);

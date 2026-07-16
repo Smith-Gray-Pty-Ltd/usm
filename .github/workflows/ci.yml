@@ -42,3 +42,32 @@ jobs:
 
       - name: USM check
         run: node dist/cli/index.js check
+
+  # Enforces the schema-versioning policy: a change to schema/v1.json must be
+  # accompanied by a changeset (.changeset/*.md) describing the bump.
+  changeset-guard:
+    name: Changeset required for schema changes
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check schema changes have a changeset
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha }}"
+          # Did schema/v1.json change in this PR?
+          if git diff --name-only "$BASE"...HEAD | grep -q '^schema/v1\.json$'; then
+            echo "schema/v1.json was modified — checking for a changeset..."
+            # Is there at least one changeset file (excluding config/README)?
+            if ! git diff --name-only "$BASE"...HEAD | grep -q '^\.changeset/.*\.md$'; then
+              echo "::error::schema/v1.json changed but no changeset was added. Run 'pnpm changeset' and describe the schema change (major for breaking, minor for additive)."
+              exit 1
+            fi
+            echo "Changeset present — OK."
+          else
+            echo "schema/v1.json unchanged — skipping changeset guard."
+          fi
