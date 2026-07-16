@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- ce4311f: Added the Agent Feedback Protocol and `usm upgrade`.
+
+  - **Agent Feedback Protocol** (`system.feedback`): a configurable policy (`human-gate` / `direct-to-feedback` / `direct-to-github`) that governs how AI agents report bugs and improvements, rendered into every agent-facing rules file (AGENTS.md, CLAUDE.md, .cursor/rules, copilot-instructions). Includes a hard rule against ad-hoc tracking files and a canonical `.usm/feedback/` location.
+  - **`usm_report_feedback` MCP tool** (tool #13): validates and writes structured `$type: feedback` entries, respecting the configured policy.
+  - **`usm feedback` CLI command**: interactive or flag-based setup of the feedback policy.
+  - **`usm upgrade` CLI command**: detects stale projects via a capability registry, compares the installed USM version against `system.usm.usm_version`, and offers guided or default setup of new capabilities (feedback is the first registered).
+  - **`usm_version` field**: dedicated field for USM-tool alignment (distinct from the project's own `version` and the schema `$version`).
+  - **`$type: feedback`**: new first-class schema file type for structured feedback entries.
+  - **Changesets**: added for package versioning; schema `$version` rules documented.
+
 All notable changes to USM are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
@@ -13,6 +27,7 @@ USM is in alpha. The spec-first workflow, MCP tools, and docs generation are
 functional but the API and schema may change before 1.0.
 
 ### Added
+
 - Spec-first workflow: discuss → agent writes .usm → human reviews → agent builds
 - `usm generate` — produce markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md, Vitest specs
 - `usm generate --only <target>` — generate a specific output only
@@ -36,6 +51,7 @@ functional but the API and schema may change before 1.0.
 - VitePress integration with search, edit links, and auto-generated sidebar
 
 ### Migrated from @smith-gray/usm v0.1.0
+
 - Same codebase, but now:
   - Public package: `@smithgray/usm` (was `@smith-gray/usm` private)
   - Standalone repo: `github.com/Smith-Gray-Pty-Ltd/usm`
@@ -45,13 +61,15 @@ functional but the API and schema may change before 1.0.
 ## [1.0.0-renamed] - 2026-06-29
 
 ### Renamed to `@smithgray/usm`
+
 - Package renamed from `@~usm/core` (unusual `~` org name) to `@smithgray/usm` (proper npm org under Smith & Gray account)
 - Old `@~usm/core@1.0.0` marked deprecated with redirect message to the new package name
 - Install URL bug note: `npm install @smithgray/usm` may fail with a 404 due to a known npm CLI URL-encoding issue with org names without hyphens. Workaround:
+
   ```bash
   # Install via direct tarball
   npm install https://registry.npmjs.org/@smithgray/usm/-/usm-0.1.0.tgz
-  
+
   # OR pin to a specific version
   npm install '@smithgray/usm@0.1.0'
   ```
