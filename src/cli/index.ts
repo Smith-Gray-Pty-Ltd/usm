@@ -1336,18 +1336,40 @@ program
   .arguments("<action>")
   .option("-p, --port <port>", "Dev server port (default: 5173)", "5173")
   .option("-a, --audience <audience>", "Audience: developer (default) or help", "developer")
-  .action(async (action: string, options: { port: string; audience: string }) => {
+  .option("--auto-port", "Auto-select next free port if the requested port is in use")
+  .option("--restart", "Kill existing server and restart")
+  .option("--watch", "Watch .usm/ files and auto-regenerate docs on change")
+  .option("--open", "Open browser at the served URL")
+  .action(async (action: string, options: {
+    port: string;
+    audience: string;
+    autoPort?: boolean;
+    restart?: boolean;
+    watch?: boolean;
+    open?: boolean;
+  }) => {
     const root = path.resolve(process.cwd());
-    const { docsBuild, docsServe } = await import("./docs.js");
+    const { docsBuild, docsServe, docsStatus, docsStop } = await import("./docs.js");
 
     const audience: "help" | "developer" = options.audience === "help" ? "help" : "developer";
 
     if (action === "build") {
       await docsBuild(root, audience);
     } else if (action === "serve") {
-      await docsServe(root, parseInt(options.port, 10), audience);
+      await docsServe(root, {
+        port: parseInt(options.port, 10),
+        audience,
+        autoPort: options.autoPort,
+        restart: options.restart,
+        watch: options.watch,
+        open: options.open,
+      });
+    } else if (action === "status") {
+      docsStatus(root, audience);
+    } else if (action === "stop") {
+      docsStop(root, audience);
     } else {
-      console.error(`Unknown docs action: ${action}. Use 'build' or 'serve'.`);
+      console.error(`Unknown docs action: ${action}. Use 'build', 'serve', 'status', or 'stop'.`);
       process.exit(1);
     }
   });

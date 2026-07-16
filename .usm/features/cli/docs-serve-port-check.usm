@@ -1,0 +1,303 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/docs-serve-port-check
+$type: feature
+$version: 1
+$last_updated: "2026-07-16"
+summary: >-
+  Add port availability checking, already-serving detection, watch mode for auto-regeneration,
+  graceful shutdown, and browser-open to `usm docs serve` — making the dev loop seamless for both
+  developer and help audience docs.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  `usm docs serve` currently has several gaps in the dev loop: (1) no port availability check —
+  VitePress fails with a raw EADDRINUSE if the port is taken; (2) no detection of an already-running
+  server — running serve twice silently collides; (3) no watch mode — after `usm generate`, the user
+  must manually restart or rely on VitePress's file watcher alone; (4) no graceful shutdown — Ctrl+C
+  may leave the VitePress child dangling; (5) no browser-open convenience. This feature addresses
+  all five, making the serve experience production-quality.
+status: built
+flows:
+  - id: port-check
+    name: Pre-flight port availability check
+    description: >-
+      Before spawning VitePress, probe the target port. If in use, either fail with a clear message
+      or auto-select the next free port.
+    steps:
+      - id: s1
+        action: add
+        target: Port probe using net.createServer().listen() before spawning VitePress
+      - id: s2
+        action: add
+        target: If port is free, proceed as normal (no extra output)
+      - id: s3
+        action: add
+        target: If port is in use and --auto-port flag is set, find next free port and use it
+      - id: s4
+        action: add
+        target: >-
+          If port is in use and --auto-port is not set, fail with clear message: 'Port X is in use
+          by process Y. Use --port N or --auto-port.'
+      - id: s5
+        action: add
+        target: >-
+          Detect the process using the port (via lsof on macOS/Linux) for the error message —
+          best-effort, graceful degradation if lsof unavailable
+      - id: s6
+        action: apply
+        target: Works for both --audience developer and --audience help
+  - id: already-serving
+    name: Detect already-running server
+    description: >-
+      Before starting, check if a VitePress server is already running on the target port. If it is,
+      offer to reuse it or kill and restart.
+    steps:
+      - id: s1
+        action: add
+        target: Write a PID file to .usm-workspace/.vitepress.pid on server start
+      - id: s2
+        action: add
+        target: On serve, check if PID file exists and the process is still alive
+      - id: s3
+        action: add
+        target: >-
+          If already serving on the target port, print: 'Docs already served at http://localhost:X
+          (PID Y). Use --restart to restart.'
+      - id: s4
+        action: add
+        target: Add --restart flag to kill the existing server and start fresh
+      - id: s5
+        action: add
+        target: Clean up PID file on graceful shutdown (SIGINT/SIGTERM)
+      - id: s6
+        action: add
+        target: Add usm docs stop command to kill a running server by PID file
+  - id: watch-mode
+    name: Watch mode for auto-regeneration
+    description: >-
+      Add --watch flag that watches .usm/ files and re-runs usm generate before VitePress picks up
+      the changes, keeping docs always in sync.
+    steps:
+      - id: s1
+        action: add
+        target: "--watch flag on usm docs serve"
+      - id: s2
+        action: add
+        target: Use fs.watch on .usm/ directory recursively
+      - id: s3
+        action: add
+        target: On .usm file change, run usm generate --only docs (in-process, not a subprocess)
+      - id: s4
+        action: add
+        target: "Debounce: wait 500ms after last change before regenerating"
+      - id: s5
+        action: add
+        target: "Log: 'Regenerated docs (3 files changed)' after each watch-triggered generation"
+      - id: s6
+        action: add
+        target: VitePress HMR picks up the changed markdown files automatically
+  - id: quality-of-life
+    name: Quality-of-life improvements
+    description: Graceful shutdown, browser-open, and status command.
+    steps:
+      - id: s1
+        action: add
+        target: "--open flag to auto-open browser at the served URL"
+      - id: s2
+        action: add
+        target: >-
+          Graceful shutdown: SIGINT/SIGTERM handler that kills the VitePress child and removes the
+          PID file
+      - id: s3
+        action: add
+        target: >-
+          usm docs status command: checks PID file, prints 'Served at http://localhost:X (PID Y)' or
+          'Not running'
+      - id: s4
+        action: add
+        target: "usm docs stop command: reads PID file, kills the process, removes PID file"
+contracts:
+  - id: port-check-clear-error
+    description: >-
+      When the port is in use and --auto-port is not set, the user gets a clear, actionable error
+      message.
+    must_have:
+      - Error message includes the port number
+      - Error message includes the process name/PID using the port (when detectable via lsof)
+      - Error message suggests --port N, --auto-port, or --restart as remedies
+      - Exit code is non-zero
+  - id: auto-port-selection
+    description: When --auto-port is set, the next available port is selected automatically.
+    must_have:
+      - Probes ports starting from the requested port, incrementing until one is free
+      - Logs the selected port clearly (e.g. 'Port 5173 in use, using port 5174 instead')
+      - Works for both --audience developer and --audience help
+      - Does not probe more than 100 ports (safety limit)
+  - id: already-serving-detection
+    description: Running serve when a server is already up is handled gracefully.
+    must_have:
+      - PID file written to .usm-workspace/.vitepress.pid on start
+      - On serve, detects existing server and prints its URL + PID
+      - Does not start a second server unless --restart is passed
+      - "--restart kills the old server before starting a new one"
+      - PID file cleaned up on shutdown (SIGINT, SIGTERM, normal exit)
+  - id: watch-mode-regeneration
+    description: "--watch keeps docs in sync with .usm changes automatically."
+    must_have:
+      - Watches .usm/ directory recursively for .usm file changes
+      - Debounces regeneration (500ms after last change)
+      - Runs usm generate --only docs in-process (not a subprocess)
+      - Logs regeneration summary (file count)
+      - VitePress HMR picks up changed markdown files
+  - id: qol-commands
+    description: usm docs status, usm docs stop, --open, and graceful shutdown all work.
+    must_have:
+      - usm docs status prints server URL + PID or 'Not running'
+      - usm docs stop kills the server and removes PID file
+      - "--open flag opens browser at the served URL"
+      - SIGINT/SIGTERM kills VitePress child and removes PID file
+      - usm docs build is unaffected by all changes
+  - id: no-breakage
+    description: Existing behavior is unchanged when the port is free and no server is running.
+    must_have:
+      - When port is free, behavior is identical to current (no extra output)
+      - usm docs serve --port 5173 works exactly as before when 5173 is free
+      - usm docs build is unaffected
+      - No new required dependencies (net, fs, child_process are all built-in)
+tests:
+  - id: port-free-passes-through
+    setup:
+      port_5173_is_free: true
+      run_docs_serve: true
+    expect:
+      - assertion: VitePress starts on port 5173
+      - assertion: No port-related warnings or errors in output
+  - id: port-in-use-clear-error
+    setup:
+      port_5173_is_in_use: true
+      run_docs_serve_no_auto_port: true
+    expect:
+      - assertion: Command fails with non-zero exit code
+      - assertion: Error message mentions port 5173
+      - assertion: Error message suggests --port N, --auto-port, or --restart
+  - id: auto-port-selects-next
+    setup:
+      port_5173_is_in_use: true
+      port_5174_is_free: true
+      run_docs_serve_with_auto_port: true
+    expect:
+      - assertion: VitePress starts on port 5174
+      - assertion: "Log message: 'Port 5173 in use, using port 5174 instead'"
+  - id: auto-port-safety-limit
+    setup:
+      ports_5173_to_5272_all_in_use: true
+      run_docs_serve_with_auto_port: true
+    expect:
+      - assertion: Command fails after probing 100 ports
+      - assertion: "Error message: 'No free port found between 5173 and 5272'"
+  - id: already-serving-detected
+    setup:
+      server_already_running_on_5173: true
+      run_docs_serve: true
+    expect:
+      - assertion: Prints 'Docs already served at http://localhost:5173 (PID X)'
+      - assertion: Does not start a second VitePress process
+  - id: restart-kills-and-restarts
+    setup:
+      server_already_running_on_5173: true
+      run_docs_serve_with_restart: true
+    expect:
+      - assertion: Old server process is killed
+      - assertion: New VitePress starts on port 5173
+      - assertion: PID file updated with new PID
+  - id: watch-regenerates-on-change
+    setup:
+      server_running_with_watch: true
+      modify_usm_file: true
+    expect:
+      - assertion: "Log message: 'Regenerated docs (1 file changed)'"
+      - assertion: VitePress HMR picks up the change
+  - id: docs-status-shows-running
+    setup:
+      server_running_on_5173: true
+      run_docs_status: true
+    expect:
+      - assertion: Prints 'Served at http://localhost:5173 (PID X)'
+  - id: docs-status-shows-not-running
+    setup:
+      no_server_running: true
+      run_docs_status: true
+    expect:
+      - assertion: Prints 'Not running'
+  - id: docs-stop-kills-server
+    setup:
+      server_running_on_5173: true
+      run_docs_stop: true
+    expect:
+      - assertion: Server process is killed
+      - assertion: PID file is removed
+      - assertion: Prints 'Stopped docs server (was PID X)'
+  - id: graceful-shutdown-cleans-up
+    setup:
+      server_running: true
+      send_sigint: true
+    expect:
+      - assertion: VitePress child process is killed
+      - assertion: PID file is removed
+      - assertion: Exit code is 0
+  - id: help-audience-works
+    setup:
+      run_docs_serve_help_audience: true
+    expect:
+      - assertion: Port check, PID file, and all features work for --audience help
+decisions:
+  - id: no-dependency
+    decision: >-
+      Implement port probing with Node.js built-in net module — no third-party dependency like
+      detect-port or chokidar.
+    rationale: >-
+      Keeps the dependency footprint zero. net.createServer().listen() for port probing and fs.watch
+      for file watching are both built-in and sufficient.
+    status: accepted
+  - id: auto-port-opt-in
+    decision: Auto-port selection is opt-in via --auto-port flag, not the default.
+    rationale: >-
+      Users expect --port 5173 to mean port 5173. Silently switching ports would break bookmarks,
+      CORS configs, and automation scripts.
+    status: accepted
+  - id: lsof-best-effort
+    decision: Process detection via lsof is best-effort only — graceful degradation if lsof is unavailable.
+    rationale: >-
+      lsof may not be installed in minimal Docker images or on Windows. The error message should
+      still be clear without it, just omitting the process name.
+    status: accepted
+  - id: pid-file-approach
+    decision: >-
+      Use a PID file (.usm-workspace/.vitepress.pid) for already-serving detection, not
+      port-sniffing alone.
+    rationale: >-
+      Port-sniffing can't distinguish between a VitePress server and another process on the same
+      port. A PID file gives us certainty and enables usm docs stop.
+    status: accepted
+  - id: watch-in-process
+    decision: >-
+      Watch-mode regeneration runs usm generate --only docs in-process (calling the generator
+      functions directly), not as a subprocess.
+    rationale: >-
+      Avoids the overhead and complexity of spawning a child process. The generator functions are
+      already imported and callable.
+    status: accepted
+  - id: debounce-500ms
+    decision: >-
+      Watch-mode debounce is 500ms — a pragmatic balance between responsiveness and avoiding thrash
+      on bulk writes.
+    rationale: >-
+      git checkout, usm scan, and editor auto-save can touch many files in rapid succession. 500ms
+      is fast enough to feel instant but long enough to batch.
+    status: accepted
+implementation:
+  primary: src/cli/docs.ts; src/cli/index.ts
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/cli-docs

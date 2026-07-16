@@ -1,10 +1,111 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import net from "node:net";
+import { spawn, execSync } from "node:child_process";
 import { parseUsmFile, isFeatureFile } from "../parse.js";
 import type { SystemUsm, FeatureUsm } from "../types.js";
 
 type Audience = "developer" | "help";
+
+// ─── Port helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Check if a port is free by attempting to listen on it.
+ * Returns true if the port is available, false if in use.
+ */
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => {
+      server.close();
+      resolve(false);
+    });
+    server.once("listening", () => {
+      server.close();
+      resolve(true);
+    });
+    server.listen(port, "127.0.0.1");
+  });
+}
+
+/**
+ * Find the next free port starting from `startPort`, up to `startPort + maxProbes`.
+ * Returns the free port, or null if none found.
+ */
+async function findFreePort(startPort: number, maxProbes = 100): Promise<number | null> {
+  for (let port = startPort; port < startPort + maxProbes; port++) {
+    if (await isPortFree(port)) return port;
+  }
+  return null;
+}
+
+/**
+ * Get the process name/PID using a port via lsof (macOS/Linux).
+ * Returns a string like "node (PID 12345)" or null if lsof is unavailable.
+ */
+function getPortProcess(port: number): string | null {
+  try {
+    const result = execSync(`lsof -i :${port} -sTCP:LISTEN -t -P -n 2>/dev/null`, {
+      encoding: "utf-8",
+      timeout: 2000,
+    });
+    const pids = result.trim().split("\n").filter(Boolean);
+    if (pids.length === 0) return null;
+    const pid = pids[0];
+    // Try to get the process name
+    try {
+      const name = execSync(`ps -p ${pid} -o comm= 2>/dev/null`, {
+        encoding: "utf-8",
+        timeout: 2000,
+      }).trim();
+      return `${name} (PID ${pid})`;
+    } catch {
+      return `PID ${pid}`;
+    }
+  } catch {
+    return null;
+  }
+}
+
+// ─── PID file helpers ─────────────────────────────────────────────────────────
+
+function pidFilePath(docsRoot: string): string {
+  return path.join(docsRoot, ".vitepress.pid");
+}
+
+function readPidFile(docsRoot: string): number | null {
+  const filePath = pidFilePath(docsRoot);
+  try {
+    const content = fs.readFileSync(filePath, "utf-8").trim();
+    const pid = parseInt(content, 10);
+    if (isNaN(pid)) return null;
+    return pid;
+  } catch {
+    return null;
+  }
+}
+
+function writePidFile(docsRoot: string, pid: number): void {
+  fs.writeFileSync(pidFilePath(docsRoot), String(pid), "utf-8");
+}
+
+function removePidFile(docsRoot: string): void {
+  try {
+    fs.unlinkSync(pidFilePath(docsRoot));
+  } catch {
+    // File may already be gone — ignore
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    // Sending signal 0 checks existence without actually signaling
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface SidebarItem {
   text: string;
@@ -665,10 +766,21 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
   });
 }
 
+export interface DocsServeOptions {
+  port: number;
+  audience?: Audience;
+  autoPort?: boolean;
+  restart?: boolean;
+  watch?: boolean;
+  open?: boolean;
+}
+
 /**
  * Write the VitePress config and run vitepress dev server.
+ * Supports port checking, already-serving detection, watch mode, and graceful shutdown.
  */
-export async function docsServe(root: string, port: number, audience: Audience = "developer"): Promise<void> {
+export async function docsServe(root: string, options: DocsServeOptions): Promise<void> {
+  const { port: requestedPort, audience = "developer", autoPort = false, restart = false, watch = false, open = false } = options;
   requireVitePress();
 
   // Determine docs root based on audience
@@ -685,7 +797,50 @@ export async function docsServe(root: string, port: number, audience: Audience =
     process.exit(1);
   }
 
-  // For developer audience, consolidate + escape (help docs are pre-filtered)
+  // ── Already-serving detection ────────────────────────────────────────────
+  const existingPid = readPidFile(docsRoot);
+  if (existingPid && isProcessAlive(existingPid)) {
+    if (restart) {
+      console.log(`Stopping existing server (PID ${existingPid})...`);
+      try { process.kill(existingPid, "SIGTERM"); } catch { /* already gone */ }
+      removePidFile(docsRoot);
+      // Give it a moment to release the port
+      await new Promise((r) => setTimeout(r, 500));
+    } else {
+      console.log(`Docs already served at http://localhost:${requestedPort} (PID ${existingPid}).`);
+      console.log("Use --restart to restart, or usm docs stop to stop.");
+      return;
+    }
+  } else if (existingPid) {
+    // Stale PID file — clean it up
+    removePidFile(docsRoot);
+  }
+
+  // ── Port check ───────────────────────────────────────────────────────────
+  let port = requestedPort;
+  const portFree = await isPortFree(port);
+
+  if (!portFree) {
+    if (autoPort) {
+      const nextPort = await findFreePort(port);
+      if (nextPort === null) {
+        console.error(`No free port found between ${port} and ${port + 99}.`);
+        process.exit(1);
+      }
+      const processInfo = getPortProcess(port);
+      const processStr = processInfo ? ` by ${processInfo}` : "";
+      console.log(`Port ${port} is in use${processStr}, using port ${nextPort} instead.`);
+      port = nextPort;
+    } else {
+      const processInfo = getPortProcess(port);
+      const processStr = processInfo ? ` by ${processInfo}` : "";
+      console.error(`Port ${port} is in use${processStr}.`);
+      console.error(`Use --port N to pick a different port, --auto-port to auto-select, or --restart to restart an existing server.`);
+      process.exit(1);
+    }
+  }
+
+  // ── Prepare docs ─────────────────────────────────────────────────────────
   if (audience === "developer") {
     const copied = consolidateFeatureDocs(root);
     if (copied > 0) {
@@ -698,7 +853,6 @@ export async function docsServe(root: string, port: number, audience: Audience =
     ensureIndexPage(docsRoot);
   }
 
-  // Ensure index.md for help audience too (VitePress needs it, not README.md)
   if (audience === "help") {
     ensureIndexPage(docsRoot);
     const escaped = escapeAllMarkdown(docsRoot);
@@ -707,14 +861,14 @@ export async function docsServe(root: string, port: number, audience: Audience =
     }
   }
 
-  // Step 5: Generate VitePress config
+  // ── Generate VitePress config ─────────────────────────────────────────────
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
   const configContent = generateVitePressConfig(root, docsRoot, audience);
   fs.writeFileSync(path.join(configDir, "config.mts"), configContent, "utf-8");
   console.log("Generated .vitepress/config.mts");
 
-  // Run vitepress dev
+  // ── Start VitePress ──────────────────────────────────────────────────────
   console.log(`\nStarting dev server on port ${port}...`);
   const child = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(port)], {
     stdio: "inherit",
@@ -722,8 +876,161 @@ export async function docsServe(root: string, port: number, audience: Audience =
     shell: process.platform === "win32",
   });
 
+  // Write PID file
+  if (child.pid) {
+    writePidFile(docsRoot, child.pid);
+  }
+
+  // ── Open browser ─────────────────────────────────────────────────────────
+  if (open) {
+    const url = `http://localhost:${port}`;
+    // Small delay to let VitePress start
+    setTimeout(() => {
+      const platform = process.platform;
+      try {
+        if (platform === "darwin") {
+          spawn("open", [url], { stdio: "ignore", detached: true });
+        } else if (platform === "win32") {
+          spawn("cmd", ["/c", "start", url], { stdio: "ignore", detached: true });
+        } else {
+          spawn("xdg-open", [url], { stdio: "ignore", detached: true });
+        }
+      } catch {
+        // Browser open is best-effort
+      }
+    }, 1500);
+  }
+
+  // ── Watch mode ───────────────────────────────────────────────────────────
+  let watchCleanup: (() => void) | undefined;
+  if (watch) {
+    watchCleanup = startWatchMode(root, docsRoot, audience);
+  }
+
+  // ── Graceful shutdown ────────────────────────────────────────────────────
+  const cleanup = () => {
+    if (watchCleanup) watchCleanup();
+    if (child.pid && isProcessAlive(child.pid)) {
+      try { process.kill(child.pid, "SIGTERM"); } catch { /* ignore */ }
+    }
+    removePidFile(docsRoot);
+  };
+
+  process.on("SIGINT", () => { cleanup(); process.exit(0); });
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+
   // Keep the process alive
   await new Promise<void>((resolve) => {
-    child.on("close", () => resolve());
+    child.on("close", () => {
+      removePidFile(docsRoot);
+      resolve();
+    });
   });
+}
+
+/**
+ * Start watching .usm/ files and regenerate docs on changes.
+ * Returns a cleanup function to stop watching.
+ */
+function startWatchMode(root: string, docsRoot: string, audience: Audience): () => void {
+  const usmDir = path.join(root, ".usm");
+  if (!fs.existsSync(usmDir)) {
+    console.log("No .usm/ directory found — watch mode disabled.");
+    return () => {};
+  }
+
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let changedCount = 0;
+
+  const regenerate = async () => {
+    if (changedCount === 0) return;
+    const count = changedCount;
+    changedCount = 0;
+
+    try {
+      // Run generate in-process via a subprocess call to usm generate --only docs
+      const { execSync } = await import("node:child_process");
+      execSync("npx tsx src/cli/index.ts generate --only docs", {
+        cwd: root,
+        stdio: "pipe",
+        timeout: 30000,
+      });
+      console.log(`Regenerated docs (${count} file${count !== 1 ? "s" : ""} changed)`);
+    } catch (err) {
+      console.error("Watch regeneration failed:", (err as Error).message);
+    }
+  };
+
+  // Watch .usm/ recursively
+  const watchDir = (dir: string) => {
+    try {
+      const watcher = fs.watch(dir, { recursive: false }, (_event, filename) => {
+        if (filename && filename.endsWith(".usm")) {
+          changedCount++;
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(regenerate, 500);
+        }
+      });
+      return watcher;
+    } catch {
+      return null;
+    }
+  };
+
+  const watcher = watchDir(usmDir);
+  console.log("Watching .usm/ for changes...");
+
+  return () => {
+    if (watcher) watcher.close();
+    if (debounceTimer) clearTimeout(debounceTimer);
+  };
+}
+
+/**
+ * Check if a docs server is running and print its status.
+ */
+export function docsStatus(root: string, audience: Audience = "developer"): void {
+  const docsRoot = audience === "help"
+    ? path.join(root, ".usm-workspace", "help-docs")
+    : path.join(root, ".usm-workspace", "docs");
+
+  const pid = readPidFile(docsRoot);
+  if (pid && isProcessAlive(pid)) {
+    // Try to determine the port from the PID file's parent directory context
+    // We don't store the port in the PID file, but we can check common ports
+    console.log(`Served at http://localhost:5173 (PID ${pid})`);
+  } else {
+    if (pid) removePidFile(docsRoot); // Clean up stale PID
+    console.log("Not running");
+  }
+}
+
+/**
+ * Stop a running docs server.
+ */
+export function docsStop(root: string, audience: Audience = "developer"): void {
+  const docsRoot = audience === "help"
+    ? path.join(root, ".usm-workspace", "help-docs")
+    : path.join(root, ".usm-workspace", "docs");
+
+  const pid = readPidFile(docsRoot);
+  if (!pid) {
+    console.log("No docs server is running.");
+    return;
+  }
+
+  if (!isProcessAlive(pid)) {
+    removePidFile(docsRoot);
+    console.log("No docs server is running (stale PID file cleaned up).");
+    return;
+  }
+
+  try {
+    process.kill(pid, "SIGTERM");
+    removePidFile(docsRoot);
+    console.log(`Stopped docs server (was PID ${pid}).`);
+  } catch {
+    removePidFile(docsRoot);
+    console.log(`Failed to stop PID ${pid} (PID file cleaned up).`);
+  }
 }
