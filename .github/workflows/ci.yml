@@ -71,3 +71,29 @@ jobs:
           else
             echo "schema/v1.json unchanged — skipping changeset guard."
           fi
+
+  # Aggregate job named "CI" so the branch-protection required status check
+  # (configured as "CI") can be satisfied. Without this, the protection
+  # requires a check named "CI" but the workflow only reports job-level names,
+  # so no PR could ever merge through the normal process. This job runs after
+  # the others and fails if any required gate failed (a skipped
+  # changeset-guard on push-to-main is allowed).
+  CI:
+    name: CI
+    runs-on: ubuntu-latest
+    needs: [build, changeset-guard]
+    if: always()
+    steps:
+      - name: Report upstream results
+        run: |
+          echo "build=${{ needs.build.result }} changeset-guard=${{ needs.changeset-guard.result }}"
+      - name: Require build success
+        if: needs.build.result != 'success'
+        run: |
+          echo "::error::build job did not succeed (was ${{ needs.build.result }})"
+          exit 1
+      - name: Require changeset-guard success (when it ran)
+        if: github.event_name == 'pull_request' && needs.changeset-guard.result == 'failure'
+        run: |
+          echo "::error::changeset-guard failed — schema/v1.json changed without a changeset"
+          exit 1
