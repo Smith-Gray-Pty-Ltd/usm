@@ -38,6 +38,8 @@ function escapeMermaidText(s: string | undefined | null): string {
     .replace(/\}/g, "&#125;")        // } — close rhombus
     .replace(/\n/g, " ")             // newlines → spaces
     .replace(/\r/g, "")              // strip CR
+    // Restore <br/> tags — Mermaid supports HTML line breaks in labels
+    .replace(/&lt;br\s*\/?&gt;/gi, "<br/>")
     .trim();
 }
 
