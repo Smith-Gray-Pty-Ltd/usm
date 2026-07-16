@@ -2374,7 +2374,7 @@ export function generateLanguageSupportDoc(root: string): GenerationResult {
   lines.push('      { "pattern": "**/my-framework.config", "language": "custom", "frameworks": ["my-framework"] }');
   lines.push('    ],');
   lines.push('    "routes": [');
-  lines.push('      { "framework": "my-framework", "pattern": "route\\\\.(get|post)\\\\([\'\"]([^\'\"]+)", "method_group": 1, "path_group": 2 }');
+  lines.push('      { "framework": "my-framework", "pattern": "route\\\\.(get|post)\\\\([\'"]([^\'"]+)", "method_group": 1, "path_group": 2 }');
   lines.push('    ]');
   lines.push('  }');
   lines.push('}');
