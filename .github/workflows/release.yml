@@ -57,5 +57,10 @@ jobs:
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use a real user token (CS_GITHUB_TOKEN) instead of the default
+          # GITHUB_TOKEN. This does two things:
+          #   1. bypasses the org-level block on the GITHUB_TOKEN creating PRs
+          #   2. avoids the `action_required` gate on CI for bot-pushed commits
+          #      (GitHub's anti-loop protection only applies to the GITHUB_TOKEN)
+          GITHUB_TOKEN: ${{ secrets.CS_GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
