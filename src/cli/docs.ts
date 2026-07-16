@@ -661,13 +661,18 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
 
   // Mermaid: dark-mode aware + SPA-aware (VitePress renders content after DOMContentLoaded).
   // Uses a MutationObserver on the body to detect when mermaid code blocks appear,
-  // and re-runs on dark mode toggle. Debounced to avoid thrashing on VitePress navigation.
+  // and re-runs on dark mode toggle. Retries up to 2s if the CDN script hasn't loaded yet.
   const mermaidBoot =
     "(function(){" +
-    "var timer=null,ranOnce=false;" +
+    "var timer=null,ranOnce=false,retries=0,maxRetries=20;" +
     "function theme(){return document.documentElement.classList.contains('dark')?'dark':'default';}" +
     "function run(){" +
-    "if(typeof mermaid==='undefined')return;" +
+    // If mermaid CDN hasn't loaded yet, retry (up to 2s)
+    "if(typeof mermaid==='undefined'){" +
+    "if(retries<maxRetries){retries++;setTimeout(run,100);}" +
+    "return;" +
+    "}" +
+    "retries=0;" +
     "var nodes=document.querySelectorAll('pre code.language-mermaid, .mermaid');" +
     "if(nodes.length===0)return;" +
     "mermaid.initialize({startOnLoad:false,theme:theme(),securityLevel:'loose'});" +
@@ -683,14 +688,14 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
     "try{" +
     "new MutationObserver(function(mutations){" +
     "var hasNewNodes=mutations.some(function(m){return m.addedNodes.length>0;});" +
-    "if(hasNewNodes)debounce();" +
+    "if(hasNewNodes){retries=0;debounce();}" +
     "}).observe(document.body||document.documentElement,{childList:true,subtree:true});" +
     "}catch(e){}" +
     // Watch for dark mode toggle (re-render mermaid with new theme)
     "try{" +
     "new MutationObserver(function(){if(ranOnce)debounce();}).observe(document.documentElement,{attributes:true,attributeFilter:['class']});" +
     "}catch(e){}" +
-    // Initial run (may catch mermaid blocks already in the initial HTML shell)
+    // Initial run
     "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',debounce);}else{debounce();}" +
     "})();";
 
