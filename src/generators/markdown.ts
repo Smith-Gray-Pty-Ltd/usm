@@ -89,15 +89,149 @@ export function generateMarkdown(
 
 // ─── System → Platform README ─────────────────────────────────────────────────
 
-function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult {
-  // The system file now generates the platform-level README.md (JUST THE LIST)
-  // It no longer generates architecture/overview.md
-  const lines: string[] = [];
+/**
+ * Read the installed package version for badges (best-effort).
+ */
+function readPackageVersion(): string {
+  try {
+    const pkgPath = path.resolve(__dirname, "..", "..", "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8")) as { version?: string };
+    return pkg.version || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 
-  lines.push(`# ${file.identity.name}`);
+function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult {
+  // Rich, data-driven homepage (VitePress home layout) derived from system.usm.
+  // Used as both developer docs landing and help-docs landing (docs.usm.dev).
+  const lines: string[] = [];
+  const name = file.identity.name;
+  const tagline = (file.summary || "").split("\n")[0].trim();
+  const repo = file.identity.repository || "";
+  const version = readPackageVersion();
+  const generatedAt = new Date().toISOString().slice(0, 10);
+
+  // VitePress home frontmatter
+  lines.push("---");
+  lines.push("layout: home");
+  lines.push("");
+  lines.push("hero:");
+  lines.push(`  name: ${JSON.stringify(name)}`);
+  lines.push(`  text: ${JSON.stringify("Structured source of truth for agentic systems")}`);
+  lines.push(`  tagline: ${JSON.stringify(tagline.slice(0, 160))}`);
+  lines.push("  actions:");
+  lines.push("    - theme: brand");
+  lines.push('      text: Get Started');
+  lines.push("      link: /getting-started");
+  lines.push("    - theme: alt");
+  lines.push('      text: Schema Reference');
+  lines.push("      link: /schema-reference");
+  if (repo) {
+    lines.push("    - theme: alt");
+    lines.push('      text: GitHub');
+    lines.push(`      link: ${JSON.stringify(repo)}`);
+  }
+  lines.push("");
+
+  // Principle cards (from system.principles)
+  if (file.principles && file.principles.length > 0) {
+    lines.push("features:");
+    for (const p of file.principles.slice(0, 6)) {
+      lines.push(`  - title: ${JSON.stringify(p.name)}`);
+      lines.push(`    details: ${JSON.stringify(p.statement)}`);
+    }
+    lines.push("");
+  }
+  lines.push("---");
+  lines.push("");
+
+  lines.push(`# ${name}`);
   lines.push("");
   lines.push(file.summary);
   lines.push("");
+  lines.push(`::: info Version \`${version}\` · Generated ${generatedAt}`);
+  lines.push("This site is **fully generated** from `.usm` files. Edit the source of truth, not the markdown.");
+  lines.push(":::");
+  lines.push("");
+
+  // Spec-first workflow diagram
+  lines.push("## Spec-first workflow");
+  lines.push("");
+  lines.push("USM is designed for AI agents and humans to share one structured source of truth.");
+  lines.push("");
+  lines.push("```mermaid");
+  lines.push("flowchart LR");
+  lines.push("  A[Discuss feature] --> B[Draft .usm via MCP]");
+  lines.push("  B --> C[Human reviews markdown]");
+  lines.push("  C --> D[Write + validate .usm]");
+  lines.push("  D --> E[Implement in code]");
+  lines.push("  E --> F[usm generate]");
+  lines.push("  F --> G[Docs · Mermaid · OpenAPI · AGENTS.md]");
+  lines.push("  G --> H[Mark feature built]");
+  lines.push("```");
+  lines.push("");
+
+  // Quick stats
+  const allServiceRefs = file.services || [];
+  const appServiceIds = new Set<string>();
+  const sharedServiceIds = new Set<string>();
+  const packageIds = new Set<string>();
+  for (const svc of allServiceRefs) {
+    const classification = classifyServiceById(svc);
+    if (classification === "app") appServiceIds.add(svc.id);
+    else if (classification === "shared-service") sharedServiceIds.add(svc.id);
+    else packageIds.add(svc.id);
+  }
+  const featureCount = (file.index || []).length;
+  const builtCount = (file.index || []).filter((f) => f.status === "built" || f.status === "active").length;
+
+  lines.push("## At a glance");
+  lines.push("");
+  lines.push("| Metric | Value |");
+  lines.push("|--------|-------|");
+  lines.push(`| Features | ${featureCount} (${builtCount} built) |`);
+  lines.push(`| App services | ${appServiceIds.size} |`);
+  lines.push(`| Shared services | ${sharedServiceIds.size} |`);
+  lines.push(`| Packages | ${packageIds.size} |`);
+  lines.push("");
+
+  // Featured example (tabs: YAML vs what it produces)
+  if (file.index && file.index.length > 0) {
+    const exampleFeature = file.index.find(
+      (f) => f.status === "built" || f.status === "active" || !f.status,
+    );
+    if (exampleFeature) {
+      const usmPath = path.resolve(root, exampleFeature.ref);
+      if (fs.existsSync(usmPath)) {
+        const usmContent = fs.readFileSync(usmPath, "utf-8");
+        const exampleLines = usmContent.split("\n").slice(0, 28);
+        const truncated = usmContent.split("\n").length > 28;
+        lines.push("## Featured example");
+        lines.push("");
+        lines.push(`A real feature from this project: **${exampleFeature.name || exampleFeature.id}** (\`${exampleFeature.ref}\`).`);
+        lines.push("");
+        lines.push("::: code-group");
+        lines.push("");
+        lines.push("```yaml [feature.usm]");
+        lines.push(exampleLines.join("\n"));
+        if (truncated) lines.push("# … truncated");
+        lines.push("```");
+        lines.push("");
+        lines.push("```bash [what it generates]");
+        lines.push("usm generate");
+        lines.push("# → markdown docs (this site)");
+        lines.push("# → Mermaid diagrams");
+        lines.push("# → OpenAPI / ArchiMate / TOGAF (when present)");
+        lines.push("# → AGENTS.md + rules files for Cursor / Claude / Copilot");
+        lines.push("# → Vitest specs from contracts + tests");
+        lines.push("```");
+        lines.push("");
+        lines.push(":::");
+        lines.push("");
+      }
+    }
+  }
 
   // Identity
   lines.push("## Identity");
@@ -106,194 +240,75 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   lines.push("|-------|-------|");
   lines.push(`| Name | ${file.identity.name} |`);
   lines.push(`| Domain | ${file.identity.domain} |`);
-  if (file.identity.contact) {
-    lines.push(`| Contact | ${file.identity.contact} |`);
-  }
+  if (file.identity.contact) lines.push(`| Contact | ${file.identity.contact} |`);
+  if (repo) lines.push(`| Repository | <${repo}> |`);
   lines.push("");
 
-  // Quick Stats — derived from services, features, etc.
-  // Dynamically classify services from system.usm services[] into apps, shared-services, packages
-  const allServiceRefs = file.services || [];
-  const appServiceIds = new Set<string>();
-  const sharedServiceIds = new Set<string>();
-  const packageIds = new Set<string>();
-
-  for (const svc of allServiceRefs) {
-    const classification = classifyServiceById(svc);
-    if (classification === "app") {
-      appServiceIds.add(svc.id);
-    } else if (classification === "shared-service") {
-      sharedServiceIds.add(svc.id);
-    } else {
-      packageIds.add(svc.id);
-    }
-  }
-
-  const appCount = appServiceIds.size;
-  const sharedSvcCount = sharedServiceIds.size;
-  const packageCount = packageIds.size;
-  const featureCount = (file.index || []).length;
-  const riskCount = (file.risks || []).length;
-  const roadmapCount = (file.roadmap || []).length;
-
-  lines.push("## Quick Stats");
-  lines.push("");
-  lines.push("| Metric | Value |");
-  lines.push("|--------|-------|");
-  lines.push(`| App Services | ${appCount} |`);
-  lines.push(`| Shared Services | ${sharedSvcCount} |`);
-  lines.push(`| Packages | ${packageCount} |`);
-  lines.push(`| Features | ${featureCount} |`);
-  lines.push(`| Risks | ${riskCount} |`);
-  lines.push(`| Roadmap Items | ${roadmapCount} |`);
-  lines.push("");
-
-  // App Services — links to per-app docs (only if any exist)
-  const appServicesFromSystem = allServiceRefs.filter(s => appServiceIds.has(s.id));
-  if (appServiceIds.size > 0) {
-    lines.push("## App Services");
+  // Services lists (kept for navigation)
+  const appServicesFromSystem = allServiceRefs.filter((s) => appServiceIds.has(s.id));
+  if (appServicesFromSystem.length > 0) {
+    lines.push("## App services");
     lines.push("");
     for (const svc of appServicesFromSystem) {
-      const port = svc.port ? `, port ${svc.port}` : "";
-      const slug = svc.id;
-      const svcName = svc.name || slugToTitle(slug);
-      lines.push(`- [${svcName}](apps/${slug}/.usm-workspace/docs/README.md) —${port}`);
+      const port = svc.port ? ` (port ${svc.port})` : "";
+      lines.push(`- **${svc.name || slugToTitle(svc.id)}**${port}`);
     }
     lines.push("");
   }
 
-  // Shared Services — links to shared-services docs (only if any exist)
-  const sharedServicesFromSystem = allServiceRefs.filter(s => sharedServiceIds.has(s.id));
-  if (sharedServiceIds.size > 0) {
-    lines.push("## Shared Services");
+  const sharedServicesFromSystem = allServiceRefs.filter((s) => sharedServiceIds.has(s.id));
+  if (sharedServicesFromSystem.length > 0) {
+    lines.push("## Shared services");
     lines.push("");
     for (const svc of sharedServicesFromSystem) {
-      const slug = svc.id;
-      const svcName = svc.name || slugToTitle(slug);
-      lines.push(`- [${svcName}](shared-services/${slug}/overview.md)`);
+      lines.push(`- [${svc.name || slugToTitle(svc.id)}](/shared-services/${svc.id}/overview)`);
     }
     lines.push("");
   }
 
-  // Packages — links to package docs (only if any exist)
-  const packagesFromSystem = allServiceRefs.filter(s => packageIds.has(s.id));
-  if (packageIds.size > 0) {
-    lines.push("## Packages");
-    lines.push("");
-    for (const pkg of packagesFromSystem) {
-      const slug = pkg.id;
-      const pkgName = pkg.name || slugToTitle(slug);
-      lines.push(`- [${pkgName}](shared-services/${slug}/overview.md)`);
-    }
-    lines.push("");
-  }
-
-  // Platform-Level — only show links for content that exists
-  const platformLinks: string[] = [];
-  platformLinks.push("- [Architecture](architecture/architecture.md)");
-  platformLinks.push("- [Data Models](data/models.md)");
-  if (riskCount > 0) {
-    platformLinks.push("- [Risks](risks.md)");
-  }
-  if (roadmapCount > 0) {
-    platformLinks.push("- [Roadmap](roadmap.md)");
-  }
-  lines.push("## Platform-Level");
-  lines.push("");
-  lines.push(...platformLinks);
-  lines.push("");
-
-  // Agent Context — from system.usm agent_context field
-  if (file.agent_context) {
-    lines.push("## Agent Context");
-    lines.push("");
-    lines.push(file.agent_context);
-    lines.push("");
-  }
-
-  // Conventions — from system.usm conventions field
-  if (file.conventions && file.conventions.length > 0) {
-    lines.push("## Conventions");
-    lines.push("");
-    for (const conv of file.conventions) {
-      lines.push(`- ${conv}`);
-    }
-    lines.push("");
-  }
-
-  // Mandatory Reading — from system.usm mandatory_reading field
-  if (file.mandatory_reading && file.mandatory_reading.length > 0) {
-    lines.push("## Mandatory Reading");
-    lines.push("");
-    lines.push("> **MANDATORY FOR ALL AI AGENTS**: Before any work, read in order:");
-    lines.push("> ");
-    for (const item of file.mandatory_reading) {
-      const desc = item.description ? ` — ${item.description}` : "";
-      lines.push(`> ${file.mandatory_reading.indexOf(item) + 1}. \`${item.path}\`${desc}`);
-    }
-    lines.push(">");
-    lines.push("> These documents are the single source of truth and resolve previous issues with context bloat, conflicting seeds, and methodology drift.");
-    lines.push("");
-  }
-
-  // Next.js Breaking Changes — from system.usm nextjs_breaking_changes field
-  if (file.nextjs_breaking_changes) {
-    lines.push("## Next.js Breaking Changes");
-    lines.push("");
-    lines.push(file.nextjs_breaking_changes);
-    lines.push("");
-  }
-
-  // Architecture Principles — from system.usm principles field
+  // Principles (detailed, after cards)
   if (file.principles && file.principles.length > 0) {
-    lines.push("## Architecture Principles");
+    lines.push("## Principles");
     lines.push("");
-    lines.push("TOGAF-style principles that govern all architecture decisions.");
-    lines.push("");
-    for (let i = 0; i < file.principles.length; i++) {
-      const p = file.principles[i];
-      lines.push(`### ${i + 1}. ${p.name} (\`${p.key}\`)`);
+    for (const p of file.principles) {
+      lines.push(`### ${p.name}`);
       lines.push("");
-      lines.push(`**Statement**: ${p.statement}`);
+      lines.push(p.statement);
       lines.push("");
-      lines.push(`**Rationale**: ${p.rationale}`);
-      lines.push("");
-      if (p.implications && p.implications.length > 0) {
-        lines.push("**Implications**:");
-        lines.push("");
-        for (const impl of p.implications) {
-          lines.push(`- ${impl}`);
-        }
+      if (p.rationale) {
+        lines.push(`**Why:** ${p.rationale}`);
         lines.push("");
       }
     }
   }
 
-  // Roles — from system.usm roles field
+  // Roles
   if (file.roles && file.roles.length > 0) {
-    lines.push("## Roles");
-    lines.push("");
-    lines.push("Who uses this system and what they need.");
+    lines.push("## Who it's for");
     lines.push("");
     for (const role of file.roles) {
-      lines.push(`### ${role.name}`);
-      lines.push("");
-      lines.push(role.description);
-      lines.push("");
-      if (role.needs && role.needs.length > 0) {
-        lines.push("**Needs**:");
-        lines.push("");
-        for (const need of role.needs) {
-          lines.push(`- ${need}`);
-        }
-        lines.push("");
-      }
+      lines.push(`- **${role.name}** — ${role.description.split("\n")[0].trim()}`);
     }
+    lines.push("");
   }
 
-  // Local Development — from system.usm local_development field
-  if (file.local_development) {
-    renderLocalDevelopment(lines, file.local_development);
+  // Next steps
+  lines.push("## Next steps");
+  lines.push("");
+  lines.push("| Go here | If you want to… |");
+  lines.push("|--------|------------------|");
+  lines.push("| [Getting Started](/getting-started) | Install USM and run your first `init` → `scan` → `generate` |");
+  lines.push("| [Schema Reference](/schema-reference) | Understand every field in a `.usm` file |");
+  lines.push("| [CLI Reference](/cli-reference) | See every `usm` command and flag |");
+  lines.push("| [MCP Tools](/mcp-reference) | Wire agents into the spec-first loop |");
+  lines.push("| [Agent Setup Guide](/agent-setup-guide) | Connect Cursor / Claude / Copilot |");
+  lines.push("");
+
+  if (repo) {
+    lines.push("::: tip Contribute");
+    lines.push(`Source of truth: [\`.usm/\` on GitHub](${repo}/tree/main/.usm). Edit the specs, not the generated markdown.`);
+    lines.push(":::");
+    lines.push("");
   }
 
   return {
@@ -1833,67 +1848,127 @@ export function generateDeploymentDoc(system: SystemUsm, root: string): Generati
  */
 export function generateGettingStartedDoc(system: SystemUsm, root: string): GenerationResult {
   const lines: string[] = [];
+  const version = readPackageVersion();
   lines.push("# Getting Started");
   lines.push("");
   lines.push(system.summary);
   lines.push("");
+  lines.push("::: tip Five minutes to a living system map");
+  lines.push("Install → `usm init` → `usm scan` → `usm generate` → `usm docs serve`. Everything below is copy-pasteable.");
+  lines.push(":::");
+  lines.push("");
 
-  // Quick Start — practical commands (generic, works for any USM project)
-  lines.push("## Quick Start");
+  // First-run sequence diagram
+  lines.push("## The first-run loop");
   lines.push("");
-  lines.push("```bash");
-  lines.push("# Install USM globally");
-  lines.push("npm install -g '@smithgray/usm@0.1.0'");
-  lines.push("");
-  lines.push("# Initialize a .usm/ scope in your project");
-  lines.push("usm init");
-  lines.push("");
-  lines.push("# Scan your codebase for structure");
-  lines.push("usm scan");
-  lines.push("");
-  lines.push("# Generate docs (markdown, Mermaid, OpenAPI, etc.)");
-  lines.push("usm generate");
-  lines.push("");
-  lines.push("# Serve docs locally with VitePress");
-  lines.push("usm docs serve");
-  lines.push("");
-  lines.push("# Start the MCP server for AI agents");
-  lines.push("usm mcp serve");
+  lines.push("```mermaid");
+  lines.push("sequenceDiagram");
+  lines.push("  participant You");
+  lines.push("  participant USM as usm CLI");
+  lines.push("  participant Disk as .usm/ + docs");
+  lines.push("  You->>USM: npm i -g @smithgray/usm");
+  lines.push("  You->>USM: usm init");
+  lines.push("  USM->>Disk: usmconfig.json");
+  lines.push("  You->>USM: usm scan");
+  lines.push("  USM->>Disk: .usm/**/*.usm");
+  lines.push("  You->>USM: usm generate");
+  lines.push("  USM->>Disk: docs, Mermaid, AGENTS.md, OpenAPI…");
+  lines.push("  You->>USM: usm docs serve --audience help");
+  lines.push("  USM-->>You: http://localhost:5173");
   lines.push("```");
   lines.push("");
 
-  // Example — show a real .usm file from this project (generic — any project has features)
+  // Tabbed quick start
+  lines.push("## Quick start");
+  lines.push("");
+  lines.push("::: code-group");
+  lines.push("");
+  lines.push("```bash [1. Install]");
+  lines.push(`npm install -g @smithgray/usm@${version}`);
+  lines.push("# or: pnpm add -g @smithgray/usm");
+  lines.push("usm --version");
+  lines.push("```");
+  lines.push("");
+  lines.push("```bash [2. Init + scan]");
+  lines.push("cd your-project");
+  lines.push("usm init                 # creates usmconfig.json");
+  lines.push("usm scan                 # detects services, routes, data");
+  lines.push("# Review .usm/ — this is your source of truth");
+  lines.push("```");
+  lines.push("");
+  lines.push("```bash [3. Generate + serve]");
+  lines.push("usm generate");
+  lines.push("pnpm add -D vitepress    # once, if you want local docs");
+  lines.push("usm docs serve --audience help");
+  lines.push("# Open the printed localhost URL");
+  lines.push("```");
+  lines.push("");
+  lines.push("```bash [4. Wire agents]");
+  lines.push("usm mcp serve            # MCP for Cursor / Claude / Copilot");
+  lines.push("# See Agent Setup Guide for IDE config");
+  lines.push("```");
+  lines.push("");
+  lines.push(":::");
+  lines.push("");
+
+  // Example — show a real .usm file from this project
   if (system.index && system.index.length > 0) {
-    // Find the first built/active feature to use as an example
     const exampleFeature = system.index.find(
-      (f) => f.status === "built" || f.status === "active" || !f.status
+      (f) => f.status === "built" || f.status === "active" || !f.status,
     );
     if (exampleFeature) {
       const usmPath = path.resolve(root, exampleFeature.ref);
       if (fs.existsSync(usmPath)) {
         const usmContent = fs.readFileSync(usmPath, "utf-8");
-        // Show first ~40 lines as an example
-        const exampleLines = usmContent.split("\n").slice(0, 40);
-        const truncated = usmContent.split("\n").length > 40;
-        lines.push("## Example");
-  lines.push("");
-        lines.push(`Here's a feature spec from this project (\`${exampleFeature.ref}\`):`);
+        const exampleLines = usmContent.split("\n").slice(0, 36);
+        const truncated = usmContent.split("\n").length > 36;
+        lines.push("## Example feature spec");
+        lines.push("");
+        lines.push(`From this project (\`${exampleFeature.ref}\`):`);
         lines.push("");
         lines.push("```yaml");
         lines.push(exampleLines.join("\n"));
-        if (truncated) lines.push("# ... (truncated)");
+        if (truncated) lines.push("# … truncated");
         lines.push("```");
         lines.push("");
-        lines.push("Run `usm generate` to produce markdown, Mermaid diagrams, OpenAPI specs,");
-        lines.push("and test specs from this file. Run `usm docs serve` to view the rendered docs.");
+        lines.push("`usm generate` turns this into markdown, Mermaid, OpenAPI, AGENTS.md, and tests.");
         lines.push("");
       }
     }
   }
 
-  // Who uses this? — brief roles summary
+  // Common first-run issues
+  lines.push("## Common first-run issues");
+  lines.push("");
+  lines.push("::: details Node / package manager");
+  lines.push("USM requires **Node ≥ 18**. Prefer pnpm 9+ in monorepos. If `usm` is not found after install, check your global bin is on `PATH`.");
+  lines.push(":::");
+  lines.push("");
+  lines.push("::: details `usm docs serve` fails with \"VitePress is not installed\"");
+  lines.push("VitePress is an optional peer dependency. Install it once in the project:");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("pnpm add -D vitepress");
+  lines.push("# or: npm install -D vitepress");
+  lines.push("```");
+  lines.push(":::");
+  lines.push("");
+  lines.push("::: details Validation warnings about `$version`");
+  lines.push("A warning (not an error) means a file's `$version` differs from the schema version this USM understands. Additive schema changes do not require a bump — only breaking ones do. Run `usm upgrade` to adopt new optional capabilities.");
+  lines.push(":::");
+  lines.push("");
+  lines.push("::: details Agents inventing `bugs.md` / ad-hoc tracking files");
+  lines.push("Configure feedback policy with `usm feedback` (or `usm upgrade --apply`). Default is `human-gate`: agents must ask before filing. Rules files forbid root-level ad-hoc trackers.");
+  lines.push(":::");
+  lines.push("");
+  lines.push("::: details GitHub Actions can't create the version PR");
+  lines.push("The release workflow uses a user token (`CS_GITHUB_TOKEN`) so version PRs auto-create. See the contributing docs / release workflow comments if you self-host the package.");
+  lines.push(":::");
+  lines.push("");
+
+  // Who uses this?
   if (system.roles && system.roles.length > 0) {
-    lines.push("## Who Uses This System");
+    lines.push("## Who uses this system");
     lines.push("");
     for (const role of system.roles) {
       const firstLine = role.description.split("\n")[0].trim();
@@ -1901,6 +1976,18 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
     }
     lines.push("");
   }
+
+  // Next steps
+  lines.push("## Where to go next");
+  lines.push("");
+  lines.push("| Page | Why |");
+  lines.push("|------|-----|");
+  lines.push("| [Schema Reference](/schema-reference) | Field-by-field answers for every `.usm` type |");
+  lines.push("| [CLI Reference](/cli-reference) | Every command and flag |");
+  lines.push("| [MCP Tools](/mcp-reference) | Spec-first tools for agents |");
+  lines.push("| [Agent Setup Guide](/agent-setup-guide) | Cursor / Claude / Copilot wiring |");
+  lines.push("| [Roadmap](/roadmap) | What's shipping next |");
+  lines.push("");
 
   // Local development — from system.usm (if present)
   if (system.local_development) {
@@ -2178,6 +2265,222 @@ export function generateConfigReference(root: string): GenerationResult {
  * Reads the JSON schema and produces a field reference for each .usm type.
  * Generic — the schema is the same for all USM projects.
  */
+/**
+ * Format a JSON-Schema property type for display (handles enum, $ref, array, oneOf).
+ */
+function formatSchemaType(prop: Record<string, unknown>): string {
+  if (prop.const !== undefined) return `\`${JSON.stringify(prop.const)}\``;
+  if (Array.isArray(prop.enum)) {
+    return prop.enum.map((e) => `\`${e}\``).join(" \\| ");
+  }
+  if (prop.$ref && typeof prop.$ref === "string") {
+    const ref = prop.$ref.split("/").pop() || prop.$ref;
+    return `[\`${ref}\`](#${ref.toLowerCase().replace(/[^a-z0-9]+/g, "-")})`;
+  }
+  if (prop.type === "array") {
+    const items = prop.items as Record<string, unknown> | undefined;
+    if (items) return `${formatSchemaType(items)}[]`;
+    return "array";
+  }
+  if (Array.isArray(prop.type)) return prop.type.join(" \\| ");
+  if (prop.type) return String(prop.type);
+  if (prop.oneOf || prop.anyOf) return "union";
+  return "object";
+}
+
+/**
+ * Build a short YAML example snippet for a field based on its schema.
+ */
+function exampleForField(key: string, prop: Record<string, unknown>): string {
+  if (prop.const !== undefined) return `${key}: ${JSON.stringify(prop.const)}`;
+  if (Array.isArray(prop.enum) && prop.enum.length > 0) return `${key}: ${JSON.stringify(prop.enum[0])}`;
+  const t = prop.type;
+  if (t === "string") {
+    if (key === "summary" || key === "intent" || key === "description") {
+      return `${key}: |\n  One or two sentences describing this.`;
+    }
+    if (key.includes("path") || key.includes("dir")) return `${key}: "src/example.ts"`;
+    if (key.includes("url") || key === "repository") return `${key}: "https://github.com/org/repo"`;
+    if (key === "email" || key === "contact") return `${key}: "team@example.com"`;
+    return `${key}: "example-value"`;
+  }
+  if (t === "integer" || t === "number") return `${key}: 1`;
+  if (t === "boolean") return `${key}: true`;
+  if (t === "array") return `${key}:\n  - example-item`;
+  if (t === "object" || prop.properties || prop.$ref) return `${key}:\n  # nested fields…`;
+  return `${key}: …`;
+}
+
+/**
+ * Impact notes for well-known fields (generators / MCP / validation).
+ */
+const FIELD_IMPACT: Record<string, string> = {
+  summary: "Rendered on every generated doc page; used by MCP `usm_list` / `usm_search`.",
+  intent: "Feature docs lead with intent; agents use it to understand *why* before building.",
+  status: "Drives help-docs filtering (only `built`/`public` appear); badges in sidebar.",
+  visibility: "Overrides status for help-docs inclusion (`public` always shown).",
+  flows: "Drives Mermaid sequence diagrams and numbered steps in feature docs.",
+  contracts: "Acceptance criteria in feature docs; feed test-planning via `usm_get_contracts`.",
+  tests: "Given/When/Then blocks; auto-generate Vitest specs when present.",
+  decisions: "ADR-style decision records in feature docs.",
+  usage: "Powers CLI reference pages (`usm generate --only docs`).",
+  options: "Powers CLI option tables in the CLI reference.",
+  command: "Display name for CLI/MCP reference (preferred over `$id` slug).",
+  identity: "Homepage hero, VitePress title/description, footer/repo links.",
+  principles: "Homepage feature cards + AGENTS.md principles section.",
+  index: "Feature index, sidebar feature groups, getting-started example selection.",
+  services: "Service overview pages + homepage service lists.",
+  infrastructure: "Deployment docs and ArchiMate/TOGAF outputs.",
+  feedback: "Agent Feedback Protocol in all rules files; `usm upgrade` / `usm feedback`.",
+  usm_version: "Compared by `usm upgrade` against the installed tool version.",
+  version: "Project's own release version — not the USM tool version.",
+  $id: "Stable identity used by MCP tools, cross-refs, and generators.",
+  $type: "Discriminator for validation (`oneOf`) and type-specific generators.",
+  $schema: "Pins the JSON Schema version used by `usm validate`.",
+  $version: "Schema format version; mismatch produces a validation warning.",
+  $system: "Links features/services back to their system file.",
+  $service: "Groups features under a service for docs and MCP context.",
+};
+
+/**
+ * Best-practice notes for well-known fields.
+ */
+const FIELD_PRACTICE: Record<string, string> = {
+  summary: "Keep to 1–3 sentences. Lead with the outcome, not the implementation.",
+  intent: "Answer *why this exists* — not *how it works*. Agents read this first.",
+  status: "Only advance planned → in-progress → built → deprecated. Use MCP status tools.",
+  visibility: "Default is internal-safe. Set `public` only for features safe for help docs.",
+  flows: "Prefer 3–7 steps. Use stable `id`s so diagrams and contracts can reference them.",
+  contracts: "Write `must_have` as checkable assertions, not vague wishes.",
+  tests: "One test per contract when possible. Keep setup keys machine-readable.",
+  decisions: "Record rejected alternatives — future agents will re-propose them otherwise.",
+  command: "Bare name only (`init`, `usm_read`) — no `usm` prefix for CLI, full tool name for MCP.",
+  $id: "Format `org/name`. Immutable after write — never rename casually.",
+  feedback: "Default policy is `human-gate`. Never invent ad-hoc `bugs.md` files.",
+  usm_version: "Written only by `usm upgrade`. Do not hand-edit unless you know why.",
+};
+
+/**
+ * Resolve a $ref like `#/$defs/systemFile` against the root schema.
+ */
+function resolveSchemaRef(
+  root: Record<string, unknown>,
+  ref: string,
+): Record<string, unknown> | null {
+  if (!ref.startsWith("#/")) return null;
+  const parts = ref.slice(2).split("/");
+  let cur: unknown = root;
+  for (const p of parts) {
+    if (!cur || typeof cur !== "object") return null;
+    cur = (cur as Record<string, unknown>)[p];
+  }
+  return (cur && typeof cur === "object") ? (cur as Record<string, unknown>) : null;
+}
+
+/**
+ * Render one schema object definition (file type or nested type) as markdown.
+ */
+function renderSchemaDef(
+  lines: string[],
+  defName: string,
+  def: Record<string, unknown>,
+  opts: { headingLevel: number; anchorPrefix?: string } = { headingLevel: 2 },
+): void {
+  const props = def.properties as Record<string, Record<string, unknown>> | undefined;
+  if (!props) return;
+
+  const required = (def.required as string[]) || [];
+  const h = "#".repeat(opts.headingLevel);
+  const title = defName
+    .replace(/File$/, " Files")
+    .replace(/([a-z])([A-Z])/g, "$1 $2");
+  const desc = (def.description as string) || "";
+
+  lines.push(`${h} ${title}`);
+  lines.push("");
+  if (desc) {
+    lines.push(desc);
+    lines.push("");
+  }
+
+  // Summary table
+  lines.push("| Field | Type | Required | Description |");
+  lines.push("|-------|------|----------|-------------|");
+  for (const [key, val] of Object.entries(props)) {
+    const typeStr = formatSchemaType(val);
+    const req = required.includes(key) ? "yes" : "—";
+    const shortDesc = ((val.description as string) || "").split("\n")[0].slice(0, 80);
+    // Plain field name in the table (no HTML anchors — VitePress-safe)
+    lines.push(`| \`${key}\` | ${typeStr} | ${req} | ${escapeTableCell(shortDesc)} |`);
+  }
+  lines.push("");
+
+  // Per-field detail (collapsible). Keep container titles plain — nested
+  // backticks/quotes inside ::: details titles break VitePress's Vue compiler.
+  lines.push(`${h}# Field details`);
+  lines.push("");
+  for (const [key, val] of Object.entries(props)) {
+    const typeStr = formatSchemaType(val);
+    const plainType = typeStr.replace(/`/g, "").replace(/\|/g, "/").slice(0, 60);
+    const req = required.includes(key) ? "required" : "optional";
+    const description = (val.description as string) || "No description in schema.";
+    const impact = FIELD_IMPACT[key] || "Validated by `usm validate`; available to generators and MCP tools.";
+    const practice = FIELD_PRACTICE[key];
+    const constraints: string[] = [];
+    if (Array.isArray(val.enum)) constraints.push(`enum: ${val.enum.map((e) => `\`${e}\``).join(", ")}`);
+    if (val.const !== undefined) constraints.push(`const: \`${JSON.stringify(val.const)}\``);
+    if (typeof val.minLength === "number") constraints.push(`minLength: ${val.minLength}`);
+    if (typeof val.minimum === "number") constraints.push(`minimum: ${val.minimum}`);
+    if (typeof val.pattern === "string") constraints.push(`pattern: \`${val.pattern}\``);
+    if (val.default !== undefined) constraints.push(`default: \`${JSON.stringify(val.default)}\``);
+
+    // Escape angle brackets in free text so VitePress/Vue never sees bare <tag>
+    const safeDesc = description.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safeImpact = impact.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safePractice = practice ? practice.replace(/</g, "&lt;").replace(/>/g, "&gt;") : undefined;
+
+    lines.push(`::: details ${key} (${req}, ${plainType})`);
+    lines.push("");
+    // Avoid Vue-hostile constructs: no raw HTML anchors, no {#custom-id} near $
+    lines.push(`#### \`${key}\``);
+    lines.push("");
+    lines.push("**Description and intent**");
+    lines.push("");
+    lines.push(safeDesc);
+    lines.push("");
+    lines.push("**Type and constraints**");
+    lines.push("");
+    lines.push(`- Type: ${typeStr}`);
+    lines.push(`- Required: ${req === "required" ? "yes" : "no"}`);
+    if (constraints.length > 0) {
+      for (const c of constraints) lines.push(`- ${c}`);
+    }
+    lines.push("");
+    lines.push("**YAML example**");
+    lines.push("");
+    lines.push("```yaml");
+    lines.push(exampleForField(key, val));
+    lines.push("```");
+    lines.push("");
+    lines.push("**Impact**");
+    lines.push("");
+    lines.push(safeImpact);
+    lines.push("");
+    if (safePractice) {
+      lines.push("**Best practice**");
+      lines.push("");
+      lines.push(safePractice);
+      lines.push("");
+    }
+    lines.push(":::");
+    lines.push("");
+  }
+}
+
+/**
+ * Generate docs/schema-reference.md — comprehensive field-by-field reference
+ * derived from schema/v1.json (authoritative type/required/constraints + descriptions).
+ */
 export function generateSchemaReference(root: string): GenerationResult {
   const schemaPath = path.resolve(__dirname, "..", "..", "schema", "v1.json");
   if (!fs.existsSync(schemaPath)) {
@@ -2185,44 +2488,72 @@ export function generateSchemaReference(root: string): GenerationResult {
   }
 
   const schema = JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as Record<string, unknown>;
-  const oneOf = schema.oneOf as Array<Record<string, unknown>> | undefined;
-  if (!oneOf) {
-    return { outputs: [] };
-  }
+  const defs = (schema.$defs || {}) as Record<string, Record<string, unknown>>;
 
   const lines: string[] = [];
   lines.push("# Schema Reference");
   lines.push("");
-  lines.push("Fields for each `.usm` file type, derived from the [v1 JSON Schema](https://usm.dev/schema/v1.json).");
+  lines.push("A living, field-by-field reference for every major `.usm` type. **Sourced from the [v1 JSON Schema](https://usm.dev/schema/v1.json)** — type, required, constraints, and descriptions are never hand-maintained here.");
+  lines.push("");
+  lines.push("::: tip How to use this page");
+  lines.push("Scan the summary tables for a quick answer, then expand a field for intent, YAML example, generator/MCP impact, and best practices.");
+  lines.push(":::");
+  lines.push("");
+  lines.push("## File types at a glance");
+  lines.push("");
+  lines.push("| `$type` | Purpose | Required header fields |");
+  lines.push("|--------|---------|------------------------|");
+  lines.push("| `system` | Whole-system map (identity, services, features index) | `$schema`, `$id`, `$type`, `$version`, `summary`, `identity` |");
+  lines.push("| `service` | One deployable service or shared package | `$schema`, `$id`, `$type`, `$version`, `summary`, `$system` |");
+  lines.push("| `feature` | One capability with flows, contracts, tests | `$schema`, `$id`, `$type`, `$version`, `summary`, `$system`, `$service`, `intent` |");
+  lines.push("| `feedback` | Structured agent/human feedback entry | `$schema`, `$id`, `$type`, `$version`, `summary`, `kind`, `severity`, `status`, `reported_by` |");
   lines.push("");
 
-  for (const subSchema of oneOf) {
-    const props = subSchema.properties as Record<string, Record<string, unknown>> | undefined;
-    if (!props) continue;
+  // Primary file types (from $defs)
+  const primaryDefs = ["systemFile", "serviceFile", "featureFile", "feedbackFile"];
+  for (const name of primaryDefs) {
+    if (defs[name]) renderSchemaDef(lines, name, defs[name], { headingLevel: 2 });
+  }
 
-    const typeVal = (props.$type as Record<string, unknown>)?.const as string | undefined;
-    const typeName = typeVal || "unknown";
-    lines.push(`## ${typeName.charAt(0).toUpperCase() + typeName.slice(1)} Files`);
-    lines.push("");
+  // Shared nested shapes used across features
+  lines.push("## Shared building blocks");
+  lines.push("");
+  lines.push("These shapes appear inside feature (and other) files — flows, contracts, tests, decisions, CLI usage.");
+  lines.push("");
 
-    const required = (subSchema.required as string[]) || [];
-    lines.push("| Field | Type | Required | Description |");
-    lines.push("|-------|------|----------|-------------|");
-
-    for (const [key, val] of Object.entries(props)) {
-      if (key.startsWith("$")) {
-        // Show $ fields with their const values
-        const constVal = val.const as string | undefined;
-        const desc = (val.description as string) || "";
-        lines.push(`| \`${key}\` | ${constVal ? `\`${constVal}\`` : (val.type as string || "—")} | ${required.includes(key) ? "✅" : "—"} | ${desc} |`);
-      } else {
-        const type = (val.type as string) || (val.$ref ? "object" : "—");
-        const desc = (val.description as string) || "";
-        lines.push(`| \`${key}\` | ${type} | ${required.includes(key) ? "✅" : "—"} | ${desc} |`);
+  // Pull nested item schemas from featureFile where possible
+  const featureDef = defs.featureFile;
+  if (featureDef?.properties) {
+    const fprops = featureDef.properties as Record<string, Record<string, unknown>>;
+    const nested: Array<{ name: string; def: Record<string, unknown> }> = [];
+    for (const nestKey of ["flows", "contracts", "tests", "decisions", "usage", "options"]) {
+      const arr = fprops[nestKey];
+      if (!arr) continue;
+      const items = arr.items as Record<string, unknown> | undefined;
+      if (items && items.properties) {
+        nested.push({ name: nestKey, def: items });
+      } else if (items?.$ref && typeof items.$ref === "string") {
+        const resolved = resolveSchemaRef(schema, items.$ref);
+        if (resolved) nested.push({ name: nestKey, def: resolved });
       }
     }
-    lines.push("");
+    for (const n of nested) {
+      renderSchemaDef(lines, n.name, n.def, { headingLevel: 3 });
+    }
   }
+
+  // commonFields if present
+  if (defs.commonFields) {
+    renderSchemaDef(lines, "commonFields", defs.commonFields, { headingLevel: 2 });
+  }
+
+  lines.push("## See also");
+  lines.push("");
+  lines.push("- [CLI Reference](/cli-reference) — commands that create and validate these files");
+  lines.push("- [MCP Tools](/mcp-reference) — agent tools for reading/writing `.usm`");
+  lines.push("- [Getting Started](/getting-started) — first-run workflow");
+  lines.push("- [Agent Setup Guide](/agent-setup-guide) — wire USM into Cursor / Claude / Copilot");
+  lines.push("");
 
   return {
     outputs: [{

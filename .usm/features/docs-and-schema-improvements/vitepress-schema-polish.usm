@@ -1,0 +1,255 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/vitepress-schema-polish
+$type: feature
+$version: 1
+$last_updated: "2026-07-16"
+status: built
+summary: >-
+  Evolve the generated VitePress docs into an outstanding, adoption-accelerating showcase and
+  reference that demonstrates USM principles perfectly, and make the JSON schema a first-class,
+  living, field-by-field reference. Covers a rich data-driven homepage, restructured sidebar,
+  comprehensive schema reference, upgraded Getting Started, and general polish — all generated from
+  .usm/schema with smart-merge preserved.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  The current docs are functional but plain: the homepage is a flat list, the sidebar groups don't
+  match how users explore, the schema reference is shallow, Mermaid is hardcoded to the light theme
+  (breaks dark mode), and there is no visual showcase of USM's spec-first loop. This feature turns
+  the docs into USM's best onboarding and marketing surface while strictly honoring dogfooding:
+  every page is generated from .usm/schema, no hand-authored output that can drift.
+visibility: public
+decisions:
+  - id: schema-as-single-source
+    decision: >-
+      The schema reference is generated entirely from schema/v1.json; terse field descriptions are
+      enriched in-place in the schema so the reference is self-generating and never drifts.
+    rationale: >-
+      schema/v1.json is already the authoritative source for type/required/constraints. Co-locating
+      rich descriptions avoids a second hand-maintained doc and honors 'generated from .usm/schema'.
+    alternatives:
+      - option: A separate .usm annotation file describing each field
+        rejected_because: duplicates the schema and will drift from it
+    status: accepted
+  - id: homepage-from-system-usm
+    decision: >-
+      Homepage hero, tagline, principle cards, and CTAs are derived from system.usm (identity,
+      summary, principles, repository) so every USM project gets a reflective homepage.
+    rationale: "Dogfooding: the generator must work for any project, not just USM's own docs."
+    status: accepted
+  - id: mermaid-dark-mode-aware
+    decision: >-
+      Inject a small theme-bridge script so Mermaid follows VitePress isDark instead of the
+      hardcoded 'default' theme.
+    rationale: Hardcoded 'default' makes diagrams unreadable in dark mode.
+    status: accepted
+  - id: declarative-sidebar-groups
+    decision: >-
+      Sidebar group order/names are driven by a declarative group-to-paths mapping while still only
+      emitting links to pages that exist.
+    rationale: >-
+      Makes the requested group structure explicit and easy to evolve without breaking
+      existence-checking that prevents dead links.
+    status: accepted
+  - id: native-vitepress-containers
+    decision: >-
+      Use VitePress native containers and Mermaid code fences for visuals — no custom Vue components
+      or heavy deps.
+    rationale: Keeps the build lightweight and avoids custom-component maintenance.
+    status: accepted
+  - id: priority-ordering
+    decision: Deliver schema-reference and homepage/getting-started first; visuals/polish last.
+    rationale: Schema reference + onboarding are the highest-leverage surfaces; polish is additive.
+    status: accepted
+flows:
+  - id: schema-reference-overhaul
+    name: Comprehensive schema reference (HIGHEST PRIORITY)
+    description: >-
+      Rebuild generateSchemaReference to produce a deep, scannable, field-by-field reference for
+      every major type, sourced from schema/v1.json + enriched descriptions.
+    steps:
+      - id: s1
+        action: parse
+        target: >-
+          schema/v1.json — extract every $def (systemFile, serviceFile, featureFile, feedbackFile,
+          and shared sub-schemas) with properties, types, required, enums, constraints
+      - id: s2
+        action: render
+        target: one section per type, each with a field table and per-field detail blocks
+      - id: s3
+        action: render
+        target: >-
+          per-field detail: description+intent, type, required/optional, constraints, YAML example,
+          generator/MCP/validation impact, best-practice & pitfall
+      - id: s4
+        action: render
+        target: VitePress details containers for scannable collapsible groups; cross-link examples
+      - id: s5
+        action: enrich
+        target: update terse descriptions in schema/v1.json as the single rich source
+  - id: rich-homepage
+    name: Rich, data-driven homepage
+    description: Replace the flat-list README with a showcase homepage generated from system.usm.
+    steps:
+      - id: s1
+        action: render
+        target: VitePress hero (name, tagline from summary, action buttons) from system.identity
+      - id: s2
+        action: render
+        target: Mermaid workflow diagram of the spec-first loop
+      - id: s3
+        action: render
+        target: benefit/principle cards from system.principles in a features grid
+      - id: s4
+        action: render
+        target: featured example with tabs (minimal .usm YAML vs generated output)
+      - id: s5
+        action: render
+        target: CTAs + footer with version badge and last-generated timestamp
+  - id: getting-started-upgrade
+    name: Upgrade Getting Started
+    description: Make first-run smooth and visual.
+    steps:
+      - id: s1
+        action: render
+        target: tabbed examples (install/init/scan/generate) with copyable code
+      - id: s2
+        action: render
+        target: Mermaid of the first-run sequence
+      - id: s3
+        action: render
+        target: Common first-run issues callout (node/pnpm, vitepress, $version, gh auth)
+      - id: s4
+        action: render
+        target: next-steps links into Core Concepts / Workflows / Schema Reference
+  - id: sidebar-restructure
+    name: Restructure sidebar navigation
+    description: Regroup the auto-generated sidebar to match how users explore.
+    steps:
+      - id: s1
+        action: render
+        target: >-
+          group order Getting Started, Core Concepts, Workflows, Schema Reference, Generated
+          Outputs, Roadmap, Contributing
+      - id: s2
+        action: refactor
+        target: declarative group-to-paths mapping, only existing pages linked
+      - id: s3
+        action: render
+        target: feature areas nest appropriately; status badges preserved
+  - id: visuals-and-polish
+    name: Visuals + general polish
+    description: Dark-mode-aware diagrams, callouts, tables, typography, mobile, badges, CTAs.
+    steps:
+      - id: s1
+        action: fix
+        target: Mermaid dark-mode aware (theme follows VitePress isDark)
+      - id: s2
+        action: render
+        target: VitePress containers/callouts and improved tables across pages
+      - id: s3
+        action: render
+        target: version badge + last-generated timestamp
+      - id: s4
+        action: polish
+        target: typography, mobile responsiveness, search, GitHub/Discord CTAs
+contracts:
+  - id: fully-generated-from-usm
+    description: >-
+      All new homepage/schema/getting-started content is generated from .usm files and
+      schema/v1.json — no hand-authored output pages that can drift.
+    must_have:
+      - Homepage hero/cards/example derived from system.usm + schema, not hardcoded literals
+      - Schema reference fully derived from schema/v1.json
+      - Smart-merge preserved; re-running generate is idempotent
+  - id: schema-reference-comprehensive
+    description: The schema reference answers 'what does this field do?' for every major type.
+    must_have:
+      - >-
+        Covers system, service, feature, feedback file types plus shared sub-schemas (flow step,
+        contract, test, decision, usage, options)
+      - >-
+        Each field shows description/intent, type, required/optional, constraints, YAML example,
+        generator/MCP/validation impact, best-practice
+      - Scannable tables + collapsible detail blocks; cross-links to examples
+  - id: no-breakage
+    description: Existing pages, generators, and the docs build remain healthy.
+    must_have:
+      - usm validate passes with 0 errors
+      - usm generate produces all existing pages plus the new ones (no dead links, none removed)
+      - usm docs serve / usm docs build succeed
+      - Existing feature/service/reference pages unchanged in substance
+  - id: dark-mode-and-mobile
+    description: The site looks correct in both themes and on mobile.
+    must_have:
+      - Mermaid diagrams switch theme with VitePress light/dark
+      - Layout, tables, code blocks responsive on narrow viewports
+      - Typography/contrast consistent across themes
+  - id: smart-merge-preserved
+    description: Generator changes never clobber hand-edits.
+    must_have:
+      - Pages still written between USM markers; content outside markers untouched
+      - Re-generating over an existing tree does not discard human edits
+  - id: lightweight
+    description: The site stays fast with no heavy runtime dependencies.
+    must_have:
+      - Mermaid loaded via CDN only; no new heavy client bundles
+      - VitePress local search retained; build time does not regress materially
+tests:
+  - id: validate-clean
+    setup:
+      run_usm_validate: true
+    expect:
+      - assertion: 0 errors across all .usm files
+  - id: generate-clean
+    setup:
+      run_usm_generate: true
+    expect:
+      - assertion: schema-reference.md, README/index homepage, getting-started.md all produced
+      - assertion: no dead links introduced; existing pages intact
+  - id: docs-build-succeeds
+    setup:
+      run_docs_build: true
+    expect:
+      - assertion: vitepress build exits 0
+      - assertion: homepage renders hero + mermaid + cards + example
+  - id: schema-reference-covers-types
+    setup:
+      inspect_schema_reference: true
+    expect:
+      - assertion: sections for system, service, feature, feedback + flow/contract/test/decision sub-schemas
+      - assertion: each field has type, required, constraints, example, impact, best-practice
+  - id: homepage-data-driven
+    setup:
+      inspect_homepage: true
+    expect:
+      - assertion: hero text from system.identity/summary, not a hardcoded literal
+      - assertion: principle cards from system.principles
+      - assertion: featured example shows YAML and a generated output
+  - id: sidebar-groups
+    setup:
+      inspect_sidebar: true
+    expect:
+      - assertion: >-
+          groups include Getting Started, Core Concepts, Workflows, Schema Reference, Generated
+          Outputs, Roadmap, Contributing
+      - assertion: only existing pages linked (no dead links)
+  - id: mermaid-dark-mode
+    setup:
+      inspect_vitepress_config: true
+    expect:
+      - assertion: mermaid theme follows site dark/light, not hardcoded 'default'
+  - id: smart-merge-idempotent
+    setup:
+      generate_twice: true
+    expect:
+      - assertion: hand-edits outside USM markers preserved
+      - assertion: second generate produces no destructive diff
+implementation:
+  primary: src/generators/markdown.ts; src/cli/docs.ts
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/gen-markdown
+  - usm/cli-docs
+  - usm/schema-v1
