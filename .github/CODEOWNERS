@@ -3,22 +3,22 @@
 # for review when a PR touches files in that path.
 
 # Default — all files
-*                       @jamebirrellgray
+*                       @jamesbirrellgray
 
 # Core source
-/src/                   @jamebirrellgray
-/src/mcp/               @jamebirrellgray
-/src/scan/              @jamebirrellgray
-/src/generators/        @jamebirrellgray
+/src/                   @jamesbirrellgray
+/src/mcp/               @jamesbirrellgray
+/src/scan/              @jamesbirrellgray
+/src/generators/        @jamesbirrellgray
 
 # Schema
-/schema/                @jamebirrellgray
+/schema/                @jamesbirrellgray
 
 # USM specs
-/.usm/                  @jamebirrellgray
+/.usm/                  @jamesbirrellgray
 
 # Marketing site
-/web/                   @jamebirrellgray
+/web/                   @jamesbirrellgray
 
 # CI/CD
-/.github/               @jamebirrellgray
+/.github/               @jamesbirrellgray
