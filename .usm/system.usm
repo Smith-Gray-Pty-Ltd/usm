@@ -184,6 +184,11 @@ index:
     ref: .usm/features/cli/upgrade.usm
     status: planned
     tags: [cli, upgrade, capabilities, versioning]
+  - id: vitepress-schema-polish
+    name: VitePress Docs + Schema Polish
+    ref: .usm/features/docs-and-schema-improvements/vitepress-schema-polish.usm
+    status: in-progress
+    tags: [docs, vitepress, schema, help-docs, generators]
   - id: schema-v1
     name: V1 JSON Schema
     ref: .usm/features/schema/v1.usm

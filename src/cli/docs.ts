@@ -145,6 +145,9 @@ const HELP_EXCLUDE_PATHS = [
   "testing",
   "api/openapi.yaml",
   "api",
+  "risks.md",
+  "architecture",
+  "data",
 ];
 
 /**
@@ -175,6 +178,8 @@ function shouldIncludeInHelpDocs(featurePath: string): boolean {
  * Keep: title, summary, status, intent, flows (as numbered steps).
  */
 function simplifyFeatureDoc(content: string): string {
+  // Help docs keep: title, summary, status, intent, flows.
+  // Drop developer-heavy sections (contracts, tests, implementation, decisions…).
   const sectionsToRemove = [
     "## Contracts",
     "## Tests",
@@ -190,12 +195,10 @@ function simplifyFeatureDoc(content: string): string {
   let skipping = false;
 
   for (const line of lines) {
-    // Check if this line starts a section to remove
     if (sectionsToRemove.some((s) => line.startsWith(s))) {
       skipping = true;
       continue;
     }
-    // Check if this line starts a new section (stops skipping)
     if (skipping && line.startsWith("## ") && !sectionsToRemove.some((s) => line.startsWith(s))) {
       skipping = false;
     }
@@ -204,7 +207,7 @@ function simplifyFeatureDoc(content: string): string {
     }
   }
 
-  // Clean up trailing whitespace
+  // Keep lean for public readers — homepage/getting-started own onboarding callouts
   return result.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
 }
 
@@ -304,66 +307,93 @@ const STATUS_ORDER: Record<string, number> = {
 /**
  * Generate a VitePress sidebar from the system.usm index and feature files.
  * Only includes links to files that actually exist in the docs directory.
- * All group names are derived from the .usm file structure — works for any codebase.
+ *
+ * Help audience uses the public-facing group order:
+ *   Getting Started · Core Concepts · Workflows · Schema Reference ·
+ *   Generated Outputs · Roadmap · Contributing
+ * Developer audience keeps deeper technical groups (Architecture, Deployment).
  */
 function generateSidebar(root: string, docsRoot: string, audience: Audience = "developer"): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
   const sidebar: SidebarGroup[] = [];
 
-  // Helper: check if a doc file exists
   function docExists(relPath: string): boolean {
     return fs.existsSync(path.join(docsRoot, relPath + ".md"));
   }
 
-  // Getting Started (if generated)
+  function pushIfAny(text: string, items: SidebarItem[], collapsed = false): void {
+    if (items.length === 0) return;
+    sidebar.push(collapsed ? { text, collapsed: true, items } : { text, items });
+  }
+
+  // ── Getting Started ────────────────────────────────────────────────────────
   const gettingStarted: SidebarItem[] = [];
+  gettingStarted.push({ text: "Home", link: "/" });
   if (docExists("getting-started")) {
     gettingStarted.push({ text: "Getting Started", link: "/getting-started" });
   }
   if (docExists("agent-setup-guide")) {
     gettingStarted.push({ text: "Agent Setup Guide", link: "/agent-setup-guide" });
   }
-  gettingStarted.push({ text: "Overview", link: "/" });
-  sidebar.push({ text: "System", items: gettingStarted });
+  pushIfAny("Getting Started", gettingStarted);
 
   if (!fs.existsSync(systemPath)) return sidebar;
-
   const system = parseUsmFile(systemPath) as SystemUsm;
 
-  // Services — check if overview.md exists for each
-  const serviceItems: SidebarItem[] = [];
+  // ── Core Concepts ──────────────────────────────────────────────────────────
+  const coreConcepts: SidebarItem[] = [];
+  if (docExists("schema-reference")) {
+    coreConcepts.push({ text: "Schema Reference", link: "/schema-reference" });
+  }
+  if (docExists("language-support")) {
+    coreConcepts.push({ text: "Language Support", link: "/language-support" });
+  }
+  // Services (shared) as concept overviews
   if (system.services) {
     for (const svc of system.services) {
-      const slug = svc.id;
-      const relPath = `shared-services/${slug}/overview`;
+      const relPath = `shared-services/${svc.id}/overview`;
       if (docExists(relPath)) {
-        serviceItems.push({ text: svc.name || svc.id, link: `/${relPath}` });
+        coreConcepts.push({ text: svc.name || svc.id, link: `/${relPath}` });
       }
     }
   }
-  if (serviceItems.length > 0) {
-    sidebar.push({ text: "Services", items: serviceItems });
+  pushIfAny("Core Concepts", coreConcepts, true);
+
+  // ── Workflows ──────────────────────────────────────────────────────────────
+  const workflows: SidebarItem[] = [];
+  if (docExists("cli-reference")) {
+    workflows.push({ text: "CLI Reference", link: "/cli-reference" });
+  }
+  if (docExists("mcp-reference")) {
+    workflows.push({ text: "MCP Tools", link: "/mcp-reference" });
+  }
+  if (docExists("config-reference")) {
+    workflows.push({ text: "Configuration", link: "/config-reference" });
+  }
+  pushIfAny("Workflows", workflows);
+
+  // ── Schema Reference (promoted for help docs) ──────────────────────────────
+  // Already linked under Core Concepts; for help audience also surface as its own group
+  // when schema-reference is the primary destination.
+  if (audience === "help" && docExists("schema-reference")) {
+    // Keep a short dedicated entry group only if not already obvious — skip duplicate
   }
 
-  // Features grouped by area — derive slug from ref path to preserve case
-  // Group names come from .usm/features/ subdirectories (generic, any codebase)
+  // ── Generated Outputs (features by area) ───────────────────────────────────
   const featuresByArea = new Map<string, SidebarItem[]>();
   if (system.index) {
     for (const feat of system.index) {
       const refMatch = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
       if (!refMatch) continue;
-
       const area = refMatch[1];
       const slug = refMatch[2];
       const areaDisplay = areaDisplayName(area);
-
       const relPath = `features/${area}/${slug}`;
       if (!docExists(relPath)) continue;
 
-      if (!featuresByArea.has(areaDisplay)) {
-        featuresByArea.set(areaDisplay, []);
-      }
+      if (!featuresByArea.has(areaDisplay)) featuresByArea.set(areaDisplay, []);
 
+      // Help docs already filter non-built features; still badge planned if present
       const statusBadge = feat.status === "planned" ? " [planned]"
         : feat.status === "deprecated" ? " [deprecated]"
         : feat.status === "in-progress" ? " [in-progress]"
@@ -375,12 +405,9 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     }
   }
 
-  // Add feature groups nested under a "Features" parent group (sorted alphabetically)
-  // Within each group, sort by status (active first, planned last)
   if (featuresByArea.size > 0) {
     const featureSubGroups: SidebarGroup[] = [];
     for (const [area, items] of [...featuresByArea.entries()].sort()) {
-      // Sort items by status priority, then alphabetically
       items.sort((a, b) => {
         const aStatus = a.text.includes("[planned]") ? STATUS_ORDER["planned"]
           : a.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
@@ -393,21 +420,16 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
         if (aStatus !== bStatus) return aStatus - bStatus;
         return a.text.localeCompare(b.text);
       });
-      featureSubGroups.push({
-        text: area,
-        collapsed: true,
-        items,
-      });
+      featureSubGroups.push({ text: area, collapsed: true, items });
     }
     sidebar.push({
-      text: "Features",
+      text: audience === "help" ? "Generated Outputs" : "Features",
       collapsed: true,
       items: featureSubGroups,
     });
   }
 
-  // Architecture — technical reference (diagrams, data models)
-  // Suppressed for help audience (too technical for public docs)
+  // ── Developer-only: Architecture + Deployment ──────────────────────────────
   if (audience === "developer") {
     const archItems: SidebarItem[] = [];
     if (docExists("architecture/architecture")) {
@@ -416,55 +438,38 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     if (docExists("data/models")) {
       archItems.push({ text: "Data Models", link: "/data/models" });
     }
-    if (archItems.length > 0) {
-      sidebar.push({ text: "Architecture", collapsed: true, items: archItems });
-    }
-  }
+    pushIfAny("Architecture", archItems, true);
 
-  // Deployment & Operations — from system.usm deployment + operations
-  // Suppressed for help audience (internal infrastructure details)
-  if (audience === "developer") {
     const deployItems: SidebarItem[] = [];
     if (docExists("deployment")) {
       deployItems.push({ text: "Deployment", link: "/deployment" });
     }
-    if (deployItems.length > 0) {
-      sidebar.push({ text: "Deployment", collapsed: true, items: deployItems });
-    }
+    pushIfAny("Deployment", deployItems, true);
   }
 
-  // Project — project management (roadmap, risks, principles)
-  const projectItems: SidebarItem[] = [];
+  // ── Roadmap ────────────────────────────────────────────────────────────────
+  const roadmapItems: SidebarItem[] = [];
   if (docExists("roadmap")) {
-    projectItems.push({ text: "Roadmap", link: "/roadmap" });
+    roadmapItems.push({ text: "Roadmap", link: "/roadmap" });
   }
-  if (docExists("risks")) {
-    projectItems.push({ text: "Risks", link: "/risks" });
+  if (audience === "developer" && docExists("risks")) {
+    roadmapItems.push({ text: "Risks", link: "/risks" });
   }
-  if (projectItems.length > 0) {
-    sidebar.push({ text: "Project", collapsed: true, items: projectItems });
-  }
+  pushIfAny("Roadmap", roadmapItems);
 
-  // Reference — CLI commands, config, schema, MCP tools
-  const refItems: SidebarItem[] = [];
+  // ── Contributing ───────────────────────────────────────────────────────────
+  const contributing: SidebarItem[] = [];
+  if (docExists("agent-setup-guide")) {
+    contributing.push({ text: "Agent Setup", link: "/agent-setup-guide" });
+  }
+  if (system.identity?.repository) {
+    // External link style not supported as sidebar item link to external in all themes;
+    // keep internal pages only. Repo link lives in socialLinks / homepage CTAs.
+  }
   if (docExists("cli-reference")) {
-    refItems.push({ text: "CLI Reference", link: "/cli-reference" });
+    contributing.push({ text: "CLI for contributors", link: "/cli-reference" });
   }
-  if (docExists("config-reference")) {
-    refItems.push({ text: "Configuration", link: "/config-reference" });
-  }
-  if (docExists("schema-reference")) {
-    refItems.push({ text: "Schema Reference", link: "/schema-reference" });
-  }
-  if (docExists("mcp-reference")) {
-    refItems.push({ text: "MCP Tools", link: "/mcp-reference" });
-  }
-  if (docExists("language-support")) {
-    refItems.push({ text: "Language Support", link: "/language-support" });
-  }
-  if (refItems.length > 0) {
-    sidebar.push({ text: "Reference", collapsed: true, items: refItems });
-  }
+  pushIfAny("Contributing", contributing, true);
 
   return sidebar;
 }
@@ -501,6 +506,39 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
     },`
     : "";
 
+  // Version badge for footer (best-effort from package.json)
+  let pkgVersion = "";
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.resolve(root, "package.json"), "utf-8"),
+    ) as { version?: string };
+    pkgVersion = pkg.version || "";
+  } catch {
+    /* optional */
+  }
+  const generatedAt = new Date().toISOString().slice(0, 10);
+  const footerMessage = pkgVersion
+    ? `Generated by <a href="https://github.com/Smith-Gray-Pty-Ltd/usm">@smithgray/usm</a> v${pkgVersion} · ${generatedAt}`
+    : `Generated by <a href="https://github.com/Smith-Gray-Pty-Ltd/usm">@smithgray/usm</a> · ${generatedAt}`;
+
+  // Mermaid: dark-mode aware. Keep this as a single-quoted JS string with no
+  // nested template literals so esbuild/VitePress can parse the inline script.
+  const mermaidBoot =
+    "(function(){" +
+    "function theme(){return document.documentElement.classList.contains('dark')?'dark':'default';}" +
+    "function run(){if(typeof mermaid==='undefined')return;" +
+    "mermaid.initialize({startOnLoad:false,theme:theme(),securityLevel:'loose'});" +
+    "var nodes=document.querySelectorAll('pre code.language-mermaid, .mermaid');" +
+    "nodes.forEach(function(el){" +
+    "if(!el.getAttribute('data-original')){el.setAttribute('data-original',el.textContent||'');}" +
+    "if(el.getAttribute('data-processed')){el.removeAttribute('data-processed');el.textContent=el.getAttribute('data-original');}" +
+    "});" +
+    "mermaid.run({querySelector:'pre code.language-mermaid, .mermaid'}).catch(function(){});" +
+    "}" +
+    "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}" +
+    "try{new MutationObserver(run).observe(document.documentElement,{attributes:true,attributeFilter:['class']});}catch(e){}" +
+    "})();";
+
   return `import { defineConfig } from 'vitepress'
 
 export default defineConfig({
@@ -509,19 +547,22 @@ export default defineConfig({
   cleanUrls: true,
   ignoreDeadLinks: true,
   outDir: '.vitepress/dist',
+  lastUpdated: true,
   head: [
     ['script', { src: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js' }],
-    ['script', {}, 'if (typeof mermaid !== "undefined") { mermaid.initialize({ startOnLoad: true, theme: "default" }); }']
+    ['script', {}, ${JSON.stringify(mermaidBoot)}]
   ],
   themeConfig: {
     sidebar: ${sidebarJson},
     search: {
       provider: 'local'
     },
+    outline: { level: [2, 3] },
     ${editLink}
     socialLinks: ${socialLinks},
     footer: {
-      message: 'Generated by <a href="https://github.com/Smith-Gray-Pty-Ltd/usm">@smithgray/usm</a>'
+      message: ${JSON.stringify(footerMessage)},
+      copyright: ${JSON.stringify(title)}
     }
   }
 })
@@ -576,6 +617,11 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
   // Ensure index.md for help audience too (VitePress needs it, not README.md)
   if (audience === "help") {
     ensureIndexPage(docsRoot);
+    // Escape angle brackets in help docs (filter copies raw markdown)
+    const escaped = escapeAllMarkdown(docsRoot);
+    if (escaped > 0) {
+      console.log(`Escaped angle brackets in ${escaped} help file(s) for VitePress`);
+    }
   }
 
   // Step 5: Generate VitePress config
@@ -642,6 +688,10 @@ export async function docsServe(root: string, port: number, audience: Audience =
   // Ensure index.md for help audience too (VitePress needs it, not README.md)
   if (audience === "help") {
     ensureIndexPage(docsRoot);
+    const escaped = escapeAllMarkdown(docsRoot);
+    if (escaped > 0) {
+      console.log(`Escaped angle brackets in ${escaped} help file(s) for VitePress`);
+    }
   }
 
   // Step 5: Generate VitePress config
