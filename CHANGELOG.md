@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1
+
+### Patch Changes
+
+- 411f24a: Fix docs sidebar omitting Features — flat feature specs and area-overview pages are now discovered from the docs/features directory instead of relying solely on nested system.index refs; docExists also recognises <path>/index.md. (fixes #11)
+- 411f24a: Release the fixed Mermaid renderer in generated VitePress docs — the dynamic CDN loader with MutationObserver (SPA nav) and dark-mode re-render landed hours after 0.3.0 was published, so 0.3.0 users still had the broken boot script that raced Shiki. Verified rendering end-to-end in a browser against a static build. (fixes #12)
+- 411f24a: Add parse-integrity warnings to usm generate and usm validate — list entries (e.g. contracts) absorbed into a YAML block-scalar are detected and reported loudly instead of silently vanishing from generated docs. (fixes #13)
+- 411f24a: Fix MCP usm_update_feature silent data loss — id-bearing arrays (contracts, flows, tests, decisions) now merge by id instead of being replaced wholesale; replacement requires the explicit new `replace` param. Response reports merge_details per field. (fixes #14)
+
 ## 0.3.0
 
 ### Minor Changes
