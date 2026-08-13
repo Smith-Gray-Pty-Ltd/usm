@@ -72,6 +72,12 @@ export function generateFeedbackProtocol(system: SystemUsm): string {
   const tracker = fb?.tracker ?? (repo ? `${repo}/issues` : undefined);
   const upstream = fb?.upstream_tracker ?? USM_UPSTREAM_TRACKER;
   const upstreamRepo = upstream.replace(/\/issues\/?$/, "");
+  // Self-referential case: this project's tracker IS the USM upstream tracker
+  // (i.e. we're generating inside the USM repo itself). The two-scope table
+  // would name the same URL twice with contradictory "file here"/"never file
+  // here" instructions — collapse to coherent single-tracker text instead.
+  const normUrl = (u: string) => u.replace(/\/+$/, "").toLowerCase();
+  const selfReferential = tracker !== undefined && normUrl(tracker) === normUrl(upstream);
 
   const lines: string[] = [];
   lines.push("## Agent Feedback Protocol");
@@ -82,20 +88,28 @@ export function generateFeedbackProtocol(system: SystemUsm): string {
   // ── Scope classification: project vs USM tool itself ──────────────────────
   lines.push("### Step 1 — Where does the bug live?");
   lines.push("");
-  lines.push("| Scope | Covers | Where it goes |");
-  lines.push("|-------|--------|---------------|");
-  lines.push(`| **This project** | App code, infra, this repo's own \`.usm\` specs | Step 2 below — this project's policy |`);
-  lines.push(`| **The USM tool itself** | \`@smithgray/usm\` CLI commands, MCP tool behaviour, generator output, schema validation | Upstream: <${upstream}> |`);
-  lines.push("");
-  lines.push(`USM tool bugs are NOT this project's bugs. Include the \`@smithgray/usm\` version (\`npm ls @smithgray/usm\`), the command or MCP tool invoked, reproduction steps, and expected vs actual.`);
-  if (policy === "human-gate") {
-    lines.push(`For a USM tool bug: describe it to the human and **ask** whether to file it upstream (they may prefer to file it themselves).`);
-  } else if (policy === "direct-to-github") {
-    lines.push(`For a USM tool bug: file it with \`gh issue create -R ${upstreamRepo} --title "bug: ..." --body "<repro + version>"\`.`);
+
+  if (selfReferential) {
+    // This repo IS the USM project — one tracker serves both scopes.
+    lines.push(`This project **is** the USM project: its tracker and the USM upstream tracker are the same place (<${tracker}>). File bugs in this codebase **and** bugs in the USM tool itself (CLI, MCP tools, generators, schema) there.`);
+    lines.push("");
+    lines.push(`For bugs in the tool itself, include the \`@smithgray/usm\` version (\`npm ls @smithgray/usm\`), the command or MCP tool invoked, reproduction steps, and expected vs actual. Structured non-bug feedback still goes in \`${feedbackDir}/\` per the policy below.`);
   } else {
-    lines.push(`For a USM tool bug: surface it to the human with the upstream URL (<${upstream}>) — do not bury it in this project's feedback entries.`);
+    lines.push("| Scope | Covers | Where it goes |");
+    lines.push("|-------|--------|---------------|");
+    lines.push(`| **This project** | App code, infra, this repo's own \`.usm\` specs | Step 2 below — this project's policy |`);
+    lines.push(`| **The USM tool itself** | \`@smithgray/usm\` CLI commands, MCP tool behaviour, generator output, schema validation | Upstream: <${upstream}> |`);
+    lines.push("");
+    lines.push(`USM tool bugs are NOT this project's bugs. Include the \`@smithgray/usm\` version (\`npm ls @smithgray/usm\`), the command or MCP tool invoked, reproduction steps, and expected vs actual.`);
+    if (policy === "human-gate") {
+      lines.push(`For a USM tool bug: describe it to the human and **ask** whether to file it upstream (they may prefer to file it themselves).`);
+    } else if (policy === "direct-to-github") {
+      lines.push(`For a USM tool bug: file it with \`gh issue create -R ${upstreamRepo} --title "bug: ..." --body "<repro + version>"\`.`);
+    } else {
+      lines.push(`For a USM tool bug: surface it to the human with the upstream URL (<${upstream}>) — do not bury it in this project's feedback entries.`);
+    }
+    lines.push(`**Never** file USM tool bugs in this project's tracker${tracker ? ` (<${tracker}>)` : ""} or in \`${feedbackDir}/\` — they will not be seen by anyone who can fix them.`);
   }
-  lines.push(`**Never** file USM tool bugs in this project's tracker${tracker ? ` (<${tracker}>)` : ""} or in \`${feedbackDir}/\` — they will not be seen by anyone who can fix them.`);
   lines.push("");
 
   // ── Step 2: project-scope policy (unchanged behaviour) ─────────────────────
@@ -125,10 +139,14 @@ export function generateFeedbackProtocol(system: SystemUsm): string {
   lines.push("**Hard rules (all policies):**");
   lines.push("- **NEVER** create ad-hoc tracking files at the repo root (`bugs.md`, `ISSUES.md`, `TODO-agent.md`, etc.).");
   lines.push(`- The **only** canonical location for structured project feedback is \`${feedbackDir}/\`.`);
-  if (tracker) {
-    lines.push(`- Real bugs in this project live in the issue tracker: <${tracker}>.`);
+  if (selfReferential) {
+    lines.push(`- Real bugs — in this codebase or in the USM tool itself — live in the issue tracker: <${tracker}>.`);
+  } else {
+    if (tracker) {
+      lines.push(`- Real bugs in this project live in the issue tracker: <${tracker}>.`);
+    }
+    lines.push(`- Real bugs in the **USM tool itself** live upstream: <${upstream}> — never in this repo.`);
   }
-  lines.push(`- Real bugs in the **USM tool itself** live upstream: <${upstream}> — never in this repo.`);
   lines.push("- If ever unsure, default to asking the human.");
   lines.push("");
 

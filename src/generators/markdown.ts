@@ -2979,12 +2979,22 @@ export function generateFeedbackPage(system: SystemUsm, root: string): Generatio
   lines.push("### Step 0: Where does the bug live?");
   lines.push("");
   const upstream = system.feedback?.upstream_tracker ?? USM_UPSTREAM_TRACKER;
-  lines.push("| Scope | Covers | Where it goes |");
-  lines.push("|-------|--------|---------------|");
-  lines.push(`| **This project** | App code, infra, this repo's own \`.usm\` specs, these docs | Steps 1-3 below |`);
-  lines.push(`| **The USM tool itself** | \`@smithgray/usm\` CLI, MCP tools, generator output, schema validation | Upstream: [${upstream}](${upstream}) |`);
-  lines.push("");
-  lines.push(`Bugs in the USM tool itself are **not** this project's bugs — file them upstream (include the \`@smithgray/usm\` version, the command/tool invoked, repro, and expected vs actual). Never file tool bugs in this project's tracker; they won't reach anyone who can fix them.`);
+  const pageTracker = system.feedback?.tracker
+    ?? (system.identity?.repository ? `${system.identity.repository.replace(/\/$/, "")}/issues` : undefined);
+  const selfReferential = pageTracker !== undefined
+    && pageTracker.replace(/\/+$/, "").toLowerCase() === upstream.replace(/\/+$/, "").toLowerCase();
+
+  if (selfReferential) {
+    // This repo IS the USM project — both scopes file at the same tracker.
+    lines.push(`This project **is** the USM project: its tracker and the USM upstream tracker are the same place ([${pageTracker}](${pageTracker})). File bugs in this codebase **and** bugs in the USM tool itself (CLI, MCP tools, generators, schema) there — for tool bugs include the \`@smithgray/usm\` version, the command/tool invoked, repro, and expected vs actual.`);
+  } else {
+    lines.push("| Scope | Covers | Where it goes |");
+    lines.push("|-------|--------|---------------|");
+    lines.push(`| **This project** | App code, infra, this repo's own \`.usm\` specs, these docs | Steps 1-3 below |`);
+    lines.push(`| **The USM tool itself** | \`@smithgray/usm\` CLI, MCP tools, generator output, schema validation | Upstream: [${upstream}](${upstream}) |`);
+    lines.push("");
+    lines.push(`Bugs in the USM tool itself are **not** this project's bugs — file them upstream (include the \`@smithgray/usm\` version, the command/tool invoked, repro, and expected vs actual). Never file tool bugs in this project's tracker; they won't reach anyone who can fix them.`);
+  }
   lines.push("");
   lines.push("### Step 1: Check the feedback policy");
   lines.push("");

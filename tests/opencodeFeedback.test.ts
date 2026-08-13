@@ -189,6 +189,41 @@ describe("usm/feedback-upstream-routing", () => {
     expect(content).toMatch(/are \*\*not\*\* this project's bugs/);
   });
 
+  it("collapses the protocol coherently when the project tracker IS the upstream tracker (USM repo itself)", () => {
+    const usmRepoSystem: SystemUsm = {
+      ...SYSTEM,
+      identity: { name: "USM", domain: "usm.dev", repository: "https://github.com/Smith-Gray-Pty-Ltd/usm" },
+    };
+    const protocol = generateFeedbackProtocol(usmRepoSystem);
+    // Single-tracker statement present…
+    expect(protocol).toMatch(/is\*\* the USM project.*same place/s);
+    expect(protocol).toContain(USM_UPSTREAM_TRACKER);
+    // …and the contradictory never-file-here guidance is gone
+    expect(protocol).not.toMatch(/\*\*Never\*\* file USM tool bugs in this project's tracker/);
+    expect(protocol).not.toMatch(/live upstream:.*never in this repo/);
+    expect(protocol).toMatch(/in this codebase \*\*and\*\* bugs in the USM tool itself/);
+  });
+
+  it("collapses the docs feedback page the same way", () => {
+    const usmRepoSystem: SystemUsm = {
+      ...SYSTEM,
+      identity: { name: "USM", domain: "usm.dev", repository: "https://github.com/Smith-Gray-Pty-Ltd/usm" },
+    };
+    const page = generateFeedbackPage(usmRepoSystem, root);
+    const content = page.outputs[0].content;
+    expect(content).toMatch(/is\*\* the USM project.*same place/s);
+    expect(content).not.toMatch(/are \*\*not\*\* this project's bugs/);
+    expect(content).not.toMatch(/Never file tool bugs in this project's tracker/);
+  });
+
+  it("keeps the full two-scope table when trackers differ (downstream repos)", () => {
+    const protocol = generateFeedbackProtocol(SYSTEM); // repository: test-org/repo
+    expect(protocol).toMatch(/\| \*\*This project\*\*.*\|/);
+    expect(protocol).toMatch(/\| \*\*The USM tool itself\*\*.*\|/);
+    expect(protocol).toMatch(/\*\*Never\*\* file USM tool bugs in this project's tracker/);
+    expect(protocol).toMatch(/live upstream:.*never in this repo/);
+  });
+
   it("schema accepts the optional upstream_tracker field (and its absence)", () => {
     const withOverride = parseUsm(`$schema: https://usm.dev/schema/v1.json
 $id: test-org/system

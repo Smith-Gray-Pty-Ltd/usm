@@ -4,9 +4,11 @@ $type: feature
 $version: 1
 $last_updated: "2026-08-13"
 summary: >-
-  Scope-aware feedback routing — the generated feedback protocol, MCP tool, and docs page explicitly
+  Scope-aware feedback routing — the generated feedback protocol, MCP tool, and docs page
   distinguish bugs in the consuming project (route per project policy/tracker) from bugs in the USM
-  tool itself (route upstream to the USM repo), with the upstream URL literal and override.
+  tool itself (route upstream), with the upstream URL literal and override. When the project tracker
+  and upstream tracker are the same place (the USM repo itself), the protocol collapses to coherent
+  single-tracker text instead of contradicting itself.
 $system: usm/system
 $service: usm/cli
 intent: >-
