@@ -441,11 +441,23 @@ const STATUS_ORDER: Record<string, number> = {
  */
 function generateSidebar(root: string, docsRoot: string, audience: Audience = "developer"): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
+  const featuresRoot = path.join(docsRoot, "features");
   const sidebar: SidebarGroup[] = [];
 
+  // A doc "exists" as either `<relPath>.md` (flat file) or `<relPath>/index.md`
+  // (consolidated feature directory) — both are valid VitePress routes.
   function docExists(relPath: string): boolean {
-    return fs.existsSync(path.join(docsRoot, relPath + ".md"));
+    return (
+      fs.existsSync(path.join(docsRoot, relPath + ".md")) ||
+      fs.existsSync(path.join(docsRoot, relPath, "index.md"))
+    );
   }
+
+  // Normalised link (no trailing slash) → already covered by the sidebar
+  const coveredLinks = new Set<string>();
+  const coverLink = (link: string): void => {
+    coveredLinks.add(link.replace(/\/+$/, ""));
+  };
 
   function pushIfAny(text: string, items: SidebarItem[], collapsed = false): void {
     if (items.length === 0) return;
@@ -507,6 +519,7 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
 
   // ── Generated Outputs (features by area) ───────────────────────────────────
   const featuresByArea = new Map<string, SidebarItem[]>();
+  const flatFeatures: SidebarItem[] = [];
   if (system.index) {
     for (const feat of system.index) {
       const refMatch = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
@@ -528,11 +541,69 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
         text: `${feat.name}${statusBadge}`,
         link: `/${relPath}`,
       });
+      coverLink(`/${relPath}`);
     }
   }
 
-  if (featuresByArea.size > 0) {
-    const featureSubGroups: SidebarGroup[] = [];
+  // ── Feature docs on disk not covered by system.index ──────────────────────
+  // system.index only lists NESTED feature refs (.usm/features/<area>/<slug>.usm).
+  // Flat feature specs (.usm/features/<slug>.usm → docs/features/<slug>/index.md)
+  // and any index gaps would leave generated docs unreachable from the sidebar
+  // (issue #11). Enumerate the docs/features directory as a fallback so every
+  // generated feature doc is wired into navigation exactly once.
+  if (fs.existsSync(featuresRoot)) {
+    const diskFeaturesByArea = new Map<string, SidebarItem[]>();
+
+    const titleFromSlug = (slug: string): string =>
+      slug
+        .split(/[-_/]/)
+        .map((w) => AREA_ACRONYMS[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+
+    const addDiskFeature = (areaDisplay: string | null, slug: string, link: string): void => {
+      if (coveredLinks.has(link.replace(/\/+$/, ""))) return;
+      const item = { text: titleFromSlug(slug), link };
+      if (areaDisplay === null) {
+        flatFeatures.push(item);
+      } else {
+        if (!diskFeaturesByArea.has(areaDisplay)) diskFeaturesByArea.set(areaDisplay, []);
+        diskFeaturesByArea.get(areaDisplay)!.push(item);
+      }
+      coverLink(link);
+    };
+
+    const featureEntries = fs.readdirSync(featuresRoot, { withFileTypes: true });
+    for (const entry of featureEntries) {
+      if (entry.isDirectory()) {
+        const indexPath = path.join(featuresRoot, entry.name, "index.md");
+        if (fs.existsSync(indexPath)) {
+          // Flat feature: docs/features/<slug>/index.md
+          addDiskFeature(null, entry.name, `/features/${entry.name}/`);
+        } else {
+          // Nested features under an area dir: docs/features/<area>/<slug>.md
+          const areaDisplay = areaDisplayName(entry.name);
+          const areaDir = path.join(featuresRoot, entry.name);
+          for (const md of fs.readdirSync(areaDir)) {
+            if (md.endsWith(".md") && md !== "index.md") {
+              const slug = md.replace(/\.md$/, "");
+              addDiskFeature(areaDisplay, `${entry.name}/${slug}`, `/features/${entry.name}/${slug}`);
+            }
+          }
+        }
+      } else if (entry.name.endsWith(".md") && entry.name !== "index.md") {
+        // Flat feature written as a bare .md file
+        addDiskFeature(null, entry.name.replace(/\.md$/, ""), `/features/${entry.name.replace(/\.md$/, "")}`);
+      }
+    }
+
+    for (const [areaDisplay, items] of [...diskFeaturesByArea.entries()].sort()) {
+      items.sort((a, b) => a.text.localeCompare(b.text));
+      featuresByArea.set(areaDisplay, [...(featuresByArea.get(areaDisplay) || []), ...items]);
+    }
+  }
+
+  if (featuresByArea.size > 0 || flatFeatures.length > 0) {
+    const featureSubGroups: (SidebarItem | SidebarGroup)[] = [];
     for (const [area, items] of [...featuresByArea.entries()].sort()) {
       items.sort((a, b) => {
         const aStatus = a.text.includes("[planned]") ? STATUS_ORDER["planned"]
@@ -548,9 +619,15 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
       });
       featureSubGroups.push({ text: area, collapsed: true, items });
     }
+
+    // Flat feature docs (no area grouping) sit directly under the group —
+    // VitePress sidebars accept mixed link items and nested groups.
+    flatFeatures.sort((a, b) => a.text.localeCompare(b.text));
+    featureSubGroups.unshift(...flatFeatures);
+
     sidebar.push({
       text: audience === "help" ? "Generated Outputs" : "Features",
-      collapsed: true,
+      collapsed: false,
       items: featureSubGroups,
     });
   }
