@@ -1,0 +1,48 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-feedback
+$type: feature
+$version: 1
+$last_updated: "2026-08-14"
+summary: The usm feedback command configures the agent feedback policy in system.usm — interactive setup or non-interactive flags for human-gate, direct-to-feedback, or direct-to-github modes.
+$system: usm/system
+$service: usm/cli
+command: feedback
+intent: >-
+  The feedback policy governs how AI agents surface bugs and improvements. Teams need a way to
+  set it up without hand-editing system.usm: interactively at init/upgrade time, or explicitly in
+  CI and agent contexts via flags. This command writes the policy block and tracker settings,
+  which the rules-file generator renders into every agent-facing file.
+status: built
+prerequisites:
+  - An existing .usm/system.usm (create with 'usm init-file' or 'usm scan')
+usage:
+  - command: usm feedback
+    description: Interactive setup — prompts for GitHub auth and policy choice (TTY only)
+  - command: usm feedback --policy direct-to-feedback --github-auth
+    description: Non-interactive — agents write structured .usm/feedback entries directly
+  - command: usm feedback --policy human-gate
+    description: Non-interactive — agents ask the human before filing (the default)
+  - command: usm feedback --policy direct-to-github --github-auth --tracker https://github.com/org/repo/issues
+    description: Non-interactive — agents file GitHub issues via gh
+options:
+  - flag: -r, --root <root>
+    description: Repo root directory
+    default: .
+  - flag: -s, --system <path>
+    description: Path to system.usm (default <root>/.usm/system.usm)
+    default: —
+  - flag: -p, --policy <policy>
+    description: "Policy: human-gate | direct-to-feedback | direct-to-github (skips interactive prompts)"
+    default: —
+  - flag: -g, --github-auth
+    description: Declare that the dev agent has GitHub (gh CLI) auth
+    default: "false"
+  - flag: --no-github-auth
+    description: Declare that the dev agent lacks GitHub auth
+    default: "false"
+  - flag: -t, --tracker <url>
+    description: Override the issue tracker URL (default identity.repository/issues)
+    default: —
+see_also:
+  - usm/agent-feedback
+  - usm/feedback-upstream-routing

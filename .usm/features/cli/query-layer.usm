@@ -132,3 +132,30 @@ implementation:
 see_also:
   - usm/mcp-read
   - usm/cli-generate
+command: query
+options:
+  - default: required
+    description: "Query: <selector> [where <predicate>]"
+    flag: <expr>
+  - default: .
+    description: Repo root directory
+    flag: "-r, --root <root>"
+  - default: "false"
+    description: Output full parsed objects as JSON
+    flag: "--json"
+  - default: "100"
+    description: Cap number of results
+    flag: "--limit <n>"
+prerequisites:
+  - A .usm/ directory with specs
+usage:
+  - command: usm query "features where status = planned"
+    description: List planned features
+  - command: usm query "features where contracts = 0"
+    description: Drift check - features with no contracts
+  - command: usm query "all where summary ~ auth"
+    description: Find specs mentioning auth (case-insensitive)
+  - command: usm query "services where has decisions" --json
+    description: Full parsed objects as JSON
+  - command: usm query "features where status = built and contracts > 2" --limit 5
+    description: Cap results

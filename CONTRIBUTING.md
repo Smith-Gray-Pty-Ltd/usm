@@ -21,7 +21,7 @@ pnpm run test
 
 Verify everything works:
 ```bash
-node dist/cli/index.js --version    # Should print 0.1.0
+node dist/cli/index.js --version    # Should match package.json
 node dist/cli/index.js validate .usm  # Should validate all files
 ```
 

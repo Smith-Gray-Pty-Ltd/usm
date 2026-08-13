@@ -18,7 +18,7 @@ const siteUrl = "https://usm.dev";
 
 export const metadata: Metadata = {
   title: "USM — A Shared Focused Brain for Human + AI Development",
-  description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with Cursor, Claude Code, and Codex.",
+  description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with opencode, Cursor, Claude Code, Codex, and GitHub Copilot.",
   keywords: [
     "USM",
     "Universal System Map",
@@ -27,7 +27,9 @@ export const metadata: Metadata = {
     "agentic coding",
     "MCP",
     "Model Context Protocol",
+    "opencode",
     "Cursor",
+    "GitHub Copilot",
     "Claude Code",
     "Codex",
     "documentation generation",
@@ -49,7 +51,7 @@ export const metadata: Metadata = {
     type: "website",
     url: siteUrl,
     title: "USM — A Shared Focused Brain for Human + AI Development",
-    description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with Cursor, Claude Code, and Codex.",
+    description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with opencode, Cursor, Claude Code, Codex, and GitHub Copilot.",
     siteName: "USM",
     locale: "en_US",
   },
@@ -90,9 +92,11 @@ const jsonLd = {
       license: "https://github.com/Smith-Gray-Pty-Ltd/usm/blob/main/LICENSE",
       featureList: [
         "Spec-first workflow (discuss → spec → review → build → documented)",
-        "12 MCP tools (8 read + 4 write) for AI agents",
-        "Generates markdown, Mermaid, OpenAPI, AGENTS.md, Vitest specs, ArchiMate, TOGAF",
-        "Works with Cursor, Claude Code, Codex, GitHub Copilot",
+        "14 MCP tools (9 read + 5 write) for AI agents",
+        "Generates markdown, Mermaid, OpenAPI, AGENTS.md, Vitest specs, ArchiMate, TOGAF, Structurizr",
+        "Works with opencode, Cursor, Claude Code, Codex, GitHub Copilot",
+        "Per-message workflow enforcement via always-on iron rules",
+        "Predicate queries over your architecture (usm query / usm_query)",
         "10-20x fewer tokens than raw codebase context",
         "VitePress docs with help/developer audience split",
         "Configurable output paths via usmconfig.json",

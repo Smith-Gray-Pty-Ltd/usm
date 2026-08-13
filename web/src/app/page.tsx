@@ -7,6 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LanguageCarousel } from "@/components/language-carousel";
 import { ToolLogos } from "@/components/tool-logos";
+import usmPkg from "../../../package.json";
+
+const USM_VERSION = usmPkg.version;
+const MCP_TOOL_COUNT = 14;
 import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,
@@ -162,7 +166,7 @@ export default function Home() {
         <div className="relative mx-auto max-w-5xl px-6 py-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
-              <Badge variant="secondary" className="mb-5">Alpha v0.1.0 — Free &amp; open source</Badge>
+              <Badge variant="secondary" className="mb-5">v{USM_VERSION} — Free &amp; open source</Badge>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-5 leading-tight">
                 The shared focused brain for<br />human + AI development
               </h1>
@@ -172,7 +176,7 @@ export default function Home() {
               </p>
               <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground mb-8">
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Spec-first workflow</span>
-                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> 12 MCP tools</span>
+                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> {MCP_TOOL_COUNT} MCP tools</span>
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> 10-20x fewer tokens</span>
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> LLM enrichment</span>
               </div>
@@ -608,7 +612,7 @@ export default function Home() {
         <FadeIn>
           <h2 className="text-3xl font-semibold mb-4">Start building with a spec</h2>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-            Free, open source, MIT licensed. Works with Cursor, Claude Code, and Codex. Self-hosting — your .usm files stay in your repo.
+            Free, open source, MIT licensed. Works with opencode, Cursor, Claude Code, Codex, and GitHub Copilot. Self-hosting — your .usm files stay in your repo.
           </p>
           <div className="flex items-center justify-center gap-3">
             <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "lg" })}>Get Started Free</a>
@@ -620,7 +624,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t">
         <div className="mx-auto max-w-5xl px-6 py-8 flex items-center justify-between text-sm text-muted-foreground">
-          <div>MIT © 2026 Smith &amp; Gray Pty Ltd — Alpha v0.1.0</div>
+          <div>MIT © 2026 Smith &amp; Gray Pty Ltd — v{USM_VERSION}</div>
           <div className="flex items-center gap-5">
             <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Docs</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>

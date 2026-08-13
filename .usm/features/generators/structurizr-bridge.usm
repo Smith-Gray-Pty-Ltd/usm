@@ -127,3 +127,35 @@ see_also:
   - usm/gen-markdown
   - usm/cli-generate
   - usm/scan-codebase
+command: import
+options:
+  - default: required
+    description: Path to the export file (e.g. structurizr-workspace.json)
+    flag: <file>
+  - default: structurizr-json
+    description: Import format
+    flag: "-f, --format <format>"
+  - default: .
+    description: Repo root directory
+    flag: "-r, --root <root>"
+  - default: slugified system name
+    description: $id org prefix
+    flag: "--id <prefix>"
+  - default: example.com
+    description: identity.domain for the system file
+    flag: "--domain <domain>"
+  - default: "false"
+    description: Overwrite existing .usm files
+    flag: "--force"
+  - default: "false"
+    description: List planned writes without writing
+    flag: "--dry-run"
+prerequisites:
+  - A Structurizr workspace JSON export
+usage:
+  - command: usm import workspace.json
+    description: Import a Structurizr workspace into .usm specs
+  - command: usm import workspace.json --dry-run
+    description: List planned writes without writing
+  - command: usm import workspace.json --id acme --domain acme.com --force
+    description: Set id prefix and domain, overwrite existing

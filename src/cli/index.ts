@@ -11,6 +11,7 @@ import { runQuery, QueryParseError } from "../query/index.js";
 import type { UsmFile } from "../types.js";
 import { generateStructurizrDsl } from "../generators/structurizr.js";
 import { importStructurizrWorkspace, parseStructurizrWorkspace, planStructurizrImport } from "../import/structurizr.js";
+import { generateReadmeFacts } from "../generators/readmeFacts.js";
 import { initConfig, writeConfig } from "../scan/init.js";
 import { promptFeedbackPolicy, applyFeedbackToSystem, resolveFeedbackPolicy, DEFAULT_FEEDBACK_POLICY } from "../scan/feedback.js";
 import { detectUpgrade, applyUpgrade } from "../scan/upgrade.js";
@@ -809,7 +810,7 @@ program
     const runDocs = runAll || onlyTarget === "docs";
 
     // Validate --only target early (before any generation)
-    const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md", "structurizr"];
+    const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md", "structurizr", "readme-facts"];
     if (onlyTarget && !validTargets.includes(onlyTarget)) {
       console.error(`Invalid --only target: ${onlyTarget}. Valid targets: ${validTargets.join(", ")}`);
       process.exit(1);
@@ -841,6 +842,17 @@ program
       const result = generateArchiMateModel(system, root);
       if (result.outputs.length > 0) {
         console.log(`Generated ArchiMate model: ${path.relative(root, result.outputs[0].path)}`);
+      }
+      return;
+    }
+
+    // Handle readme-facts target (anti-drift: version/commands/tools into README)
+    if (onlyTarget === "readme-facts") {
+      const result = generateReadmeFacts(root);
+      for (const output of result.outputs) {
+        fs.mkdirSync(path.dirname(output.path), { recursive: true });
+        fs.writeFileSync(output.path, output.content, "utf-8");
+        console.log(`Updated README facts: ${path.relative(root, output.path)}`);
       }
       return;
     }

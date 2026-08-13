@@ -1,0 +1,56 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-query
+$type: feature
+$version: 1
+$last_updated: "2026-08-13"
+summary: >-
+  usm_query MCP tool — predicate query over all .usm files. Selectors (features/services/.../all),
+  comparisons (= != > < >= <=), contains (~), has, and/or/not with parens. Read-only, capped at 50
+  by default, hits include paths for direct usm_read.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Agents answering questions like "which planned features have no contracts?" or "what does this
+  service own?" currently list everything (usm_list) or grep raw YAML (usm_search). A typed
+  predicate query over parsed .usm data gives drift checks, impact analysis, and triage in one call
+  — for agents via MCP, mirroring the usm query CLI. Read-only, results capped for context safety.
+status: built
+flows:
+  - id: run-query
+    name: Run a predicate query
+    steps:
+      - action: accept
+        id: s1
+        target: query string plus optional limit
+      - action: evaluate
+        id: s2
+        target: same parser and evaluator as the usm query CLI (src/query/index.ts)
+      - action: return
+        id: s3
+        target: id, type, status, summary, path per hit, plus total and truncated flag
+contracts:
+  - description: Query grammar shared with the CLI
+    id: shared-evaluator
+    must_have:
+      - Selector maps to $type filtering
+      - Absent fields make predicates false, never errors
+      - Friendly parse errors naming token and position
+  - description: Read-only with context-safe capping
+    id: read-only-capped
+    must_have:
+      - No file writes on any query path
+      - Default limit 50 with total and truncated in the response
+tests:
+  - expect:
+      - assertion: usm_query returns results with id and path
+      - assertion: limit caps results and sets truncated true
+    id: query-via-mcp
+    setup:
+      fixture_project: true
+implementation:
+  primary: src/mcp/query.ts
+  test_code: tests/query.test.ts
+  test_code_status: generated
+see_also:
+  - usm/query-layer
+command: usm_query

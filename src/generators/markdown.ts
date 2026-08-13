@@ -2117,6 +2117,9 @@ export function generateCliReference(root: string): GenerationResult {
       if (parsed.$type !== "feature") continue;
       const feature = parsed as FeatureUsm;
       if (!feature.usage && !feature.options) continue;
+      // usm_-prefixed command names are MCP tools — they belong to the
+      // MCP reference, not the CLI reference.
+      if (feature.command && feature.command.startsWith("usm_")) continue;
       commands.push({
         id: feature.$id,
         name: feature.command || feature.$id.split("/").pop() || feature.$id,
@@ -2126,7 +2129,7 @@ export function generateCliReference(root: string): GenerationResult {
         prerequisites: feature.prerequisites,
       });
     } catch {
-      // Skip unparseable
+      // Skip
     }
   }
 
@@ -2594,7 +2597,8 @@ export function generateMcpReference(root: string): GenerationResult {
   lines.push("Tools available in the USM MCP server for AI agents.");
   lines.push("");
 
-  // Read all .usm files in features/mcp/
+  // Read all .usm files in features/mcp/ — a spec's `command` field may
+  // bundle several tool names ("a, b, c"); split into one row per tool.
   const tools: Array<{ id: string; name: string; summary: string; intent: string }> = [];
   for (const entry of fs.readdirSync(mcpDir)) {
     if (!entry.endsWith(".usm")) continue;
@@ -2603,12 +2607,16 @@ export function generateMcpReference(root: string): GenerationResult {
       const parsed = parseUsmFile(filePath);
       if (parsed.$type !== "feature") continue;
       const feature = parsed as FeatureUsm;
-      tools.push({
-        id: feature.$id,
-        name: feature.command || feature.$id.split("/").pop() || feature.$id,
-        summary: feature.summary,
-        intent: feature.intent,
-      });
+      if (!feature.command) continue;
+      const names = feature.command.split(",").map((s) => s.trim()).filter((n) => n.startsWith("usm_"));
+      for (const name of names) {
+        tools.push({
+          id: feature.$id,
+          name,
+          summary: feature.summary,
+          intent: feature.intent,
+        });
+      }
     } catch {
       // Skip
     }
@@ -2841,8 +2849,17 @@ export function generateAgentSetupGuide(root: string): GenerationResult {
   lines.push("usm generate --only rules");
   lines.push("```");
   lines.push("");
-  lines.push("Creates `.cursor/rules/usm.mdc`, `CLAUDE.md`, and `.github/copilot-instructions.md` —");
-  lines.push("teaching your agent the spec-first workflow automatically.");
+  lines.push("Creates per-tool rules files — teaching your agent the spec-first workflow automatically:");
+  lines.push("");
+  lines.push("| Tool | Detail file | Always-on file (every request) |");
+  lines.push("|------|-------------|--------------------------------|");
+  lines.push("| opencode | `.opencode/skills/usm-workflow/SKILL.md` | `.opencode/usm-instructions.md` (wired into `opencode.json`) |");
+  lines.push("| Claude Code | `CLAUDE.md` | `.claude/skills/usm-workflow/SKILL.md` |");
+  lines.push("| Cursor | `.cursor/rules/usm.mdc` | `.cursor/rules/usm-always.mdc` (`alwaysApply`) |");
+  lines.push("| Copilot | `.github/copilot-instructions.md` | `.github/instructions/usm-iron-rules.md` |");
+  lines.push("| Codex | `AGENTS.md` | — (no per-message mechanism) |");
+  lines.push("");
+  lines.push("The always-on files carry short iron rules that re-anchor the workflow on every request — countering drift in long agent sessions.");
   lines.push("");
   lines.push("## Step 6: (Optional) Enrich with LLM");
   lines.push("");
