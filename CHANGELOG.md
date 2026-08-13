@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- 3bb24a2: Scope-aware feedback routing — the Agent Feedback Protocol, the docs feedback page, and the `usm_report_feedback` MCP tool now explicitly distinguish bugs in the consuming project from bugs in the USM tool itself (CLI/MCP/generators/schema). Tool bugs route upstream to https://github.com/Smith-Gray-Pty-Ltd/usm/issues (overridable via the new optional `feedback.upstream_tracker` field in system.usm) and are never filed against the consuming project's tracker.
+- 271f896: Internal DSL builder — fluent TypeScript that compiles to validated .usm specs: `defineFeature("org/slug", { system, service }).summary(...).flow(id, f => f.step(...)).contract(id, c => c.mustHave(...)).build()` returns `{ yaml, object, valid, errors }`, with `defineService` and `writeFeature` (refuses invalid specs) exported from the package entry. Extends existing parsed specs via `FeatureBuilder.adopt` — flows/contracts/tests upsert by id. Per Fowler: an expression builder over the semantic model — the .usm format stays canonical.
+- 3bb24a2: Per-message workflow enforcement across AI coding tools — counters mid-session drift in long agent sessions. Two tiers per tool wherever a mechanism exists:
+
+  - **opencode**: `.opencode/skills/usm-workflow/SKILL.md` (description visible in the system prompt every message) + `.opencode/usm-instructions.md` iron rules wired into `opencode.json` `instructions` (injected into every request). Existing opencode.json config is preserved — only the USM entry is appended; JSONC configs are never touched.
+  - **Claude Code**: `.claude/skills/usm-workflow/SKILL.md` (same file — Claude Code uses the SKILL.md convention, description visible every message) alongside CLAUDE.md.
+  - **Cursor**: `.cursor/rules/usm-always.mdc` with `alwaysApply: true` (injected every request) alongside the glob-scoped detail rule.
+  - **Copilot**: `.github/instructions/usm-iron-rules.md` with broad `applyTo` alongside copilot-instructions.md.
+  - **Codex**: AGENTS.md only — the AGENTS.md standard has no per-message mechanism; documented limitation.
+
+  Iron-rules content is generated from one shared function so all tiers stay identical.
+
+- 271f896: Query layer over .usm data — `usm query "features where status = planned and contracts = 0"` in the CLI and a new `usm_query` MCP tool (read-only, results capped). A tiny predicate grammar (selectors, = != > < >= <=, ~ contains, has, and/or/not with parens) evaluated against parsed .usm files — typed impact analysis and drift checks instead of grepping raw YAML. Absent fields are false, never errors.
+- 271f896: Structurizr bridge — `usm import <workspace.json>` converts a Structurizr workspace export into .usm system + service specs (guards existing files, `--force`/`--dry-run`/`--id`/`--domain` flags, service type inferred from technology), and `usm generate --only structurizr` exports the reverse: a Structurizr DSL workspace with softwareSystem → containers (services) → components (features, status-badged). Import JSON now; DSL-grammar parsing deferred until demand is demonstrated.
+
+### Patch Changes
+
+- cd32928: Fix contradictory feedback guidance in self-referential projects — when the consuming repo's tracker IS the USM upstream tracker (i.e. the USM repo itself), the generated protocol named the same URL as both "file tool bugs here" and "never file them here". The generator now detects the collision and collapses to coherent single-tracker text; downstream repos (different trackers) keep the full two-scope table unchanged.
+
 ## 0.3.1
 
 ### Patch Changes
