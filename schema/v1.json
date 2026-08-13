@@ -493,6 +493,11 @@
               "type": "string",
               "default": ".usm/feedback",
               "description": "Directory for structured feedback entries written by agents."
+            },
+            "upstream_tracker": {
+              "type": "string",
+              "default": "https://github.com/Smith-Gray-Pty-Ltd/usm/issues",
+              "description": "Tracker for bugs in the USM tool itself (CLI, MCP tools, generators, schema) — distinct from this project's tracker. Agents route tool bugs here instead of filing them against the consuming project."
             }
           },
           "additionalProperties": false

@@ -121,7 +121,7 @@ server.tool(
 // Tool 13: usm_report_feedback (write)
 server.tool(
   "usm_report_feedback",
-  "Report a bug, improvement, or question as a structured $type: feedback entry in .usm/feedback/. Respects the configured feedback policy: human-gate returns a draft (no write), direct-to-feedback writes to disk, direct-to-github records locally and suggests a gh issue. Pass write=true to override human-gate after human approval. Validates against the v1 schema.",
+  "Report a bug, improvement, or question ABOUT THIS PROJECT as a structured $type: feedback entry in .usm/feedback/. Scope matters: bugs in this project's code/specs belong here; bugs in the USM tool itself (CLI commands, MCP tool behaviour, generator output, schema validation) belong UPSTREAM at https://github.com/Smith-Gray-Pty-Ltd/usm/issues — not in this repo. Respects the configured feedback policy: human-gate returns a draft (no write), direct-to-feedback writes to disk, direct-to-github records locally and suggests a gh issue. Pass write=true to override human-gate after human approval. Validates against the v1 schema.",
   reportFeedbackSchema,
   reportFeedbackTool,
 );

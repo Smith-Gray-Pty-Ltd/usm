@@ -14,6 +14,7 @@ import yaml from "js-yaml";
 import { validateUsm } from "../validate.js";
 import { allUsmFilesInMonorepo } from "../mcp-utils.js";
 import { parseUsmFile, isSystemFile } from "../parse.js";
+import { USM_UPSTREAM_TRACKER } from "../generators/rulesFiles.js";
 import type { FeedbackUsm, SystemUsm } from "../types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -80,6 +81,33 @@ function resolveTracker(system: SystemUsm | null): string | undefined {
   if (system?.feedback?.tracker) return system.feedback.tracker;
   const repo = system?.identity?.repository?.replace(/\/$/, "");
   return repo ? `${repo}/issues` : undefined;
+}
+
+/**
+ * Resolve the upstream tracker for USM tool bugs: system.feedback.upstream_tracker
+ * or the canonical USM repo.
+ */
+function resolveUpstream(system: SystemUsm | null): string {
+  return system?.feedback?.upstream_tracker ?? USM_UPSTREAM_TRACKER;
+}
+
+/**
+ * Heuristic: does this report describe a bug in the USM tool itself (CLI,
+ * MCP tools, generators, schema) rather than in the consuming project?
+ * Used only to NUDGE routing — never blocks or rewrites the report.
+ */
+function looksLikeUsmToolBug(args: { summary: string; reproduction?: string; feature?: string }): boolean {
+  const haystack = `${args.summary} ${args.reproduction ?? ""} ${args.feature ?? ""}`.toLowerCase();
+  const signals = [
+    /@smithgray\/usm/,
+    /\busm_(list|read|search|validate|summary|references|get_contracts|get_flows|draft_feature|write_feature|update_feature|update_feature_status|report_feedback)\b/,
+    /\busm (generate|scan|validate|docs|init|enrich|scaffold|info|roundtrip|feedback)\b/,
+    /\bmcp (server|tool)s?\b.*\busm\b/,
+    /usm (mcp|cli|generator|schema)/,
+    /\.usm-workspace.*generat/,
+    /generator (output|produces|drops|truncates|omits|wipes)/,
+  ];
+  return signals.some((re) => re.test(haystack));
 }
 
 /**
@@ -150,6 +178,9 @@ export async function reportFeedbackTool(args: {
     const policy = resolvePolicy(system);
     const feedbackDir = resolveFeedbackDir(system);
     const tracker = resolveTracker(system);
+    const upstream = resolveUpstream(system);
+    const upstreamRepo = upstream.replace(/\/issues\/?$/, "");
+    const toolBug = looksLikeUsmToolBug(args);
 
     // Construct the feedback object
     const today = new Date().toISOString().split("T")[0];
@@ -210,21 +241,26 @@ export async function reportFeedbackTool(args: {
     }
 
     if (policy === "direct-to-github") {
-      // Record a local entry AND surface the gh command
+      // Record a local entry AND surface the gh command.
+      // USM tool bugs file UPSTREAM, not against the consuming project.
+      const fileTo = toolBug ? upstream : tracker;
+      const ghCommand = buildGhCommand(feedback, fileTo);
       atomicWrite(targetPath, yamlContent);
-      const ghCommand = buildGhCommand(feedback, tracker);
       return {
         content: [{
           type: "text" as const,
           text: JSON.stringify({
-            action: "recorded-and-suggest-github",
+            action: toolBug ? "recorded-and-suggest-upstream-github" : "recorded-and-suggest-github",
             path: targetPath,
             policy,
-            tracker,
+            scope: toolBug ? "usm-tool" : "project",
+            tracker: fileTo,
             gh_command: ghCommand,
-            note: tracker
-              ? `Policy is direct-to-github. A record was written and a GitHub issue is suggested at ${tracker}. Run the gh_command to file it.`
-              : "Policy is direct-to-github but no tracker is configured (set identity.repository or feedback.tracker). A local record was written.",
+            note: toolBug
+              ? `This looks like a bug in the USM TOOL ITSELF (CLI/MCP/generators/schema) — filing upstream at ${upstream} instead of the project tracker. Include the @smithgray/usm version and the command/tool invoked.`
+              : fileTo
+                ? `Policy is direct-to-github. A record was written and a GitHub issue is suggested at ${fileTo}. Run the gh_command to file it.`
+                : "Policy is direct-to-github but no tracker is configured (set identity.repository or feedback.tracker). A local record was written.",
           }, null, 2),
         }],
       };
@@ -237,8 +273,14 @@ export async function reportFeedbackTool(args: {
         text: JSON.stringify({
           action: "drafted",
           policy,
+          scope: toolBug ? "usm-tool" : "project",
           yaml: yamlContent,
           note: "Active policy is human-gate: this feedback was NOT written to disk. Show it to the human and ask whether to record it. Re-call with write=true after approval to persist.",
+          ...(toolBug
+            ? {
+                scope_hint: `This looks like a bug in the USM TOOL ITSELF, not this project — consider reporting it upstream to ${upstream} (gh issue create -R ${upstreamRepo}) instead of recording it as project feedback. Include the @smithgray/usm version, the command/tool invoked, repro, and expected vs actual. Ask the human which they prefer.`,
+              }
+            : {}),
         }, null, 2),
       }],
     };

@@ -36,3 +36,6 @@ AGENTS.md
 CLAUDE.md
 .cursor/rules/usm.mdc
 .github/copilot-instructions.md
+.opencode/skills/usm-workflow/SKILL.md
+.opencode/usm-instructions.md
+opencode.json

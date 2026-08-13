@@ -1,0 +1,174 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/opencode-integration
+$type: feature
+$version: 1
+$last_updated: "2026-08-13"
+summary: >-
+  First-class opencode support in the rules-files generator — emits a usm-workflow skill
+  (description visible every message) plus an always-on instructions entry (injected into every
+  system prompt), so the spec-first workflow is reinforced per-message instead of being read once at
+  session start and forgotten.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Agents drift off the spec-first workflow in long sessions: AGENTS.md is loaded once and diluted by
+  accumulated context, and models stop consulting .usm before code changes. opencode offers two
+  mechanisms that persist on every message — instructions files (injected into every request's
+  system prompt) and skills (whose descriptions are visible every message). The rules generator has
+  no opencode target, so the fastest-growing agent runtime gets no per-message reinforcement.
+status: built
+flows:
+  - id: generate-opencode-skill
+    name: Generate the usm-workflow skill
+    description: >-
+      During usm generate, emit .opencode/skills/usm-workflow/SKILL.md — a skill whose frontmatter
+      description is the enforcement nudge (visible in the system prompt every message) and whose
+      body is the full spec-first checklist.
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm and service files
+      - id: s2
+        action: generate
+        target: >-
+          SKILL.md frontmatter: name usm-workflow, description front-loaded with trigger keywords
+          (feature, bug, spec, .usm) and when to invoke
+      - id: s3
+        action: generate
+        target: >-
+          SKILL.md body: pre-flight check (read spec before code), draft-before-build loop,
+          update-status-after-build, feedback protocol pointer
+      - id: s4
+        action: write
+        target: .opencode/skills/usm-workflow/SKILL.md (USM-owned file, fully regenerated)
+  - id: wire-always-on-instructions
+    name: Wire the iron-rules file into every-message instructions
+    description: >-
+      Generate a short iron-rules markdown file and register it in opencode.json instructions so its
+      content is appended to the system prompt on every request — the mechanism that actually
+      counters mid-session drift.
+    steps:
+      - id: s1
+        action: generate
+        target: ".opencode/usm-instructions.md — max ~30 lines: the 5 iron rules only"
+      - id: s2
+        action: read
+        target: existing opencode.json (project root or .opencode/) if present
+      - id: s3
+        action: merge
+        target: >-
+          instructions array — append .opencode/usm-instructions.md if absent; never remove or
+          reorder existing entries; never touch any other config field
+      - id: s4
+        action: validate
+        target: resulting opencode.json parses as JSON with $schema preserved
+  - id: regenerate-idempotent
+    name: Regenerate without breaking user config
+    description: >-
+      Repeated usm generate runs replace the USM-owned skill and instructions files wholesale but
+      leave all other opencode.json content untouched.
+    steps:
+      - id: s1
+        action: rerun
+        target: usm generate
+      - id: s2
+        action: verify
+        target: skill + instructions files regenerated with current workflow text
+      - id: s3
+        action: verify
+        target: >-
+          opencode.json: only the instructions entry is owned; user fields (mcp, permission, model,
+          plugin) byte-identical
+contracts:
+  - id: skill-description-is-the-nudge
+    description: >-
+      The skill's frontmatter description must carry the workflow trigger by itself, since it is the
+      only part visible before invocation
+    must_have:
+      - Description front-loads trigger keywords and filenames (.usm, feature, spec)
+      - >-
+        Description states when to invoke: before starting feature work, when unsure a change needs
+        a spec, when the session has drifted
+      - >-
+        Body contains the full checklist including read-before-code, draft-before-build,
+        show-human-review, update-status-after
+  - id: instructions-injected-every-request
+    description: >-
+      The iron-rules file must be registered in opencode.json instructions so opencode appends it to
+      every system prompt
+    must_have:
+      - opencode.json instructions array contains .opencode/usm-instructions.md
+      - The file is short (≤ ~30 lines) — iron rules only, no system description
+      - Content is the same workflow taught by all other rules files
+  - id: user-config-preserved
+    description: The generator must never damage user-authored opencode config
+    must_have:
+      - Existing instructions entries preserved in order
+      - No other top-level field added, removed, or modified
+      - >-
+        $schema field preserved; valid JSON output; works when opencode.json does not yet exist
+        (creates minimal file) and when it exists at root or .opencode/
+  - id: drift-countermeasure
+    description: >-
+      The per-message reinforcement must explicitly address mid-session drift, not just initial
+      onboarding
+    must_have:
+      - >-
+        Iron rules phrased as per-message self-checks (e.g. 'Before ANY code change: does a .usm
+        spec exist for this?')
+      - Skill description mentions re-anchoring a drifted session
+tests:
+  - id: skill-file-generated
+    setup:
+      system_usm: true
+      run_generate: true
+    expect:
+      - assertion: .opencode/skills/usm-workflow/SKILL.md exists
+      - assertion: frontmatter has name and description
+      - assertion: body includes the spec-first checklist
+  - id: instructions-wired
+    setup:
+      run_generate: true
+    expect:
+      - assertion: .opencode/usm-instructions.md exists and is ≤ 40 lines
+      - assertion: opencode.json instructions contains .opencode/usm-instructions.md
+  - id: existing-config-preserved
+    setup:
+      opencode_json_with_mcp_and_custom_instructions: true
+    expect:
+      - assertion: custom instructions entries still present, order unchanged
+      - assertion: mcp block untouched
+      - assertion: output is valid JSON
+  - id: workflow-consistent
+    setup:
+      all_rules_outputs_generated: true
+    expect:
+      - assertion: skill body and instructions file mention draft_feature workflow and human review step
+      - assertion: feedback routing matches the scope-aware protocol
+decisions:
+  - id: instructions-plus-skill-not-plugin
+    decision: Use opencode instructions array + skill, not a plugin with experimental.chat.system.transform
+    rationale: >-
+      Plugin system-transform hooks are experimental and require TypeScript runtime code in the
+      consumer repo — fragile distribution. instructions injection is stable config, and the skill
+      description is visible every message anyway. Together they cover the every-message requirement
+      without shipping code.
+  - id: short-dedicated-file-not-agents-md
+    decision: Generate a dedicated short instructions file rather than reusing AGENTS.md
+    rationale: >-
+      opencode already injects AGENTS.md every message — the drift problem is dilution by length. A
+      ≤30-line iron-rules file stays salient where the full AGENTS.md does not.
+  - id: skill-file-usm-owned
+    decision: >-
+      The skill and instructions files are fully USM-owned (wholesale regeneration); opencode.json
+      is merge-touched only in instructions
+    rationale: >-
+      Skills are single-purpose; unlike CLAUDE.md there is no human content to preserve inside them.
+      opencode.json is user-authored config and must be treated as hand-written.
+implementation:
+  primary: src/generators/rulesFiles.ts
+  test_code: tests/opencodeFeedback.test.ts
+  test_code_status: manual
+see_also:
+  - usm/gen-rules-files
+  - usm/feedback-upstream-routing

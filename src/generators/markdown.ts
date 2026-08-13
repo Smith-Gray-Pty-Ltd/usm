@@ -22,6 +22,7 @@ import type {
 } from "../types.js";
 import { findUsmFiles, findAllUsmFiles, parseUsmFile, isServiceFile, isFeatureFile, findAllUsmDirs } from "../index.js";
 import { generateSequenceDiagrams } from "./mermaid.js";
+import { USM_UPSTREAM_TRACKER } from "./rulesFiles.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -2974,6 +2975,16 @@ export function generateFeedbackPage(system: SystemUsm, root: string): Generatio
   lines.push("## For AI agents");
   lines.push("");
   lines.push("If you're an AI agent and you've found a bug, inconsistency, or improvement opportunity:");
+  lines.push("");
+  lines.push("### Step 0: Where does the bug live?");
+  lines.push("");
+  const upstream = system.feedback?.upstream_tracker ?? USM_UPSTREAM_TRACKER;
+  lines.push("| Scope | Covers | Where it goes |");
+  lines.push("|-------|--------|---------------|");
+  lines.push(`| **This project** | App code, infra, this repo's own \`.usm\` specs, these docs | Steps 1-3 below |`);
+  lines.push(`| **The USM tool itself** | \`@smithgray/usm\` CLI, MCP tools, generator output, schema validation | Upstream: [${upstream}](${upstream}) |`);
+  lines.push("");
+  lines.push(`Bugs in the USM tool itself are **not** this project's bugs — file them upstream (include the \`@smithgray/usm\` version, the command/tool invoked, repro, and expected vs actual). Never file tool bugs in this project's tracker; they won't reach anyone who can fix them.`);
   lines.push("");
   lines.push("### Step 1: Check the feedback policy");
   lines.push("");

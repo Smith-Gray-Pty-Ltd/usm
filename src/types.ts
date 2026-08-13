@@ -113,6 +113,12 @@ export interface FeedbackPolicy {
   github_auth?: boolean;
   tracker?: string;
   feedback_dir?: string;
+  /**
+   * Tracker for bugs in the USM tool itself (CLI, MCP tools, generators,
+   * schema) — distinct from this project's tracker. Defaults to the
+   * canonical USM repo's issue tracker.
+   */
+  upstream_tracker?: string;
 }
 
 export interface Principle {

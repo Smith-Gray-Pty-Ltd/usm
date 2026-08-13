@@ -2,11 +2,14 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-rules-files
 $type: feature
 $version: 1
-$last_updated: "2026-06-22"
+$last_updated: "2026-08-13"
 status: built
-summary: |
-  Tool-specific rules file generator — produces instruction files for AI coding tools (Cursor, Claude Code, Codex, GitHub Copilot) that teach agents the USM spec-first workflow. Each file tells the agent when to read .usm, when to write specs, and how to update them after implementation.
-
+summary: >-
+  Tool-specific rules file generator — produces instruction files for AI coding tools (Cursor,
+  Claude Code, Codex, GitHub Copilot, opencode) that teach agents the USM spec-first workflow. Each
+  file tells the agent when to read .usm, when to write specs, and how to update them after
+  implementation. opencode additionally gets per-message reinforcement: a usm-workflow skill plus
+  iron-rules instructions injected into every system prompt.
 $system: usm/system
 $service: usm/cli
 intent: |
@@ -18,7 +21,6 @@ intent: |
   with structural context but no workflow instructions. This generator produces
   tool-specific files that instruct agents to follow the spec-first loop:
   discuss → draft .usm → human reviews → build → update .usm.
-
 decisions:
   - id: one-generator-multiple-outputs
     decision: Single generator produces all tool-specific files in one pass
@@ -51,7 +53,6 @@ decisions:
       that control when the rule is injected. Generating in .mdc format means
       the rule auto-activates when agents work in .usm/ directories.
     status: accepted
-
 flows:
   - id: generate-all-rules-files
     name: Generate rules files for all supported tools
@@ -81,7 +82,6 @@ flows:
       - id: s7
         action: smart-merge
         target: each file preserving human content outside USM markers
-
   - id: generate-cursor-rule
     name: Generate Cursor .mdc rule file
     description: |
@@ -100,7 +100,6 @@ flows:
       - id: s4
         action: write
         target: .cursor/rules/usm.mdc
-
   - id: generate-claude-md
     name: Generate CLAUDE.md for Claude Code
     description: |
@@ -119,7 +118,6 @@ flows:
       - id: s4
         action: smart-merge
         target: preserve existing CLAUDE.md content outside markers
-
   - id: enhance-agents-md
     name: Enhance AGENTS.md with workflow instructions
     description: |
@@ -138,35 +136,20 @@ flows:
       - id: s4
         action: smart-merge
         target: replace between USM markers, preserve rest
-
 contracts:
-  - id: all-tools-covered
-    description: Generator produces files for all supported tools
+  - description: Generator produces files for all supported tools
+    id: all-tools-covered
     must_have:
-      - ".cursor/rules/usm.mdc generated for Cursor"
-      - "CLAUDE.md generated for Claude Code"
-      - "AGENTS.md enhanced with workflow instructions"
-      - ".github/copilot-instructions.md generated for Copilot"
-  - id: workflow-instructions-consistent
-    description: All files teach the same spec-first workflow
-    must_have:
-      - "Each file instructs: read .usm before starting work"
-      - "Each file instructs: draft feature .usm before implementing"
-      - "Each file instructs: show human the review markdown"
-      - "Each file instructs: update feature status after implementation"
-  - id: smart-merge-preserves-human-content
-    description: Regeneration does not destroy human-added instructions
-    must_have:
-      - "Content outside USM:START/USM:END markers preserved"
-      - "Content inside markers replaced with generated output"
-      - "If no markers, insert after first H1"
-  - id: cursor-mdc-has-valid-frontmatter
-    description: Cursor .mdc file has valid frontmatter for auto-activation
-    must_have:
-      - "YAML frontmatter with description field"
-      - "globs field includes .usm/** and *.usm patterns"
-      - "alwaysApply or appropriate trigger setting"
-
+      - .cursor/rules/usm.mdc generated for Cursor
+      - CLAUDE.md generated for Claude Code
+      - AGENTS.md enhanced with workflow instructions
+      - .github/copilot-instructions.md generated for Copilot
+      - >-
+        .opencode/skills/usm-workflow/SKILL.md generated for opencode (description visible every
+        message)
+      - >-
+        .opencode/usm-instructions.md generated + opencode.json instructions entry wired (injected
+        every request)
 tests:
   - id: generate-all-files
     setup:
@@ -197,13 +180,11 @@ tests:
       - assertion: all files mention draft_feature workflow
       - assertion: all files mention human review step
       - assertion: all files mention update_feature_status after implementation
-
 implementation:
   primary: src/generators/rulesFiles.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/gen-agentsmd"
-  - "usm/mcp-write"
-  - "usm/gen-feature-review"
+  - usm/gen-agentsmd
+  - usm/mcp-write
+  - usm/gen-feature-review

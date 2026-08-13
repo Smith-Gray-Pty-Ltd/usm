@@ -43,12 +43,23 @@ Follow this workflow when implementing features:
 `;
 
 /**
+ * Canonical upstream tracker for bugs in the USM tool itself. Shared by the
+ * rules-file protocol, the docs feedback page, and the MCP tool text so all
+ * surfaces stay consistent (one-source contract).
+ */
+export const USM_UPSTREAM_TRACKER = "https://github.com/Smith-Gray-Pty-Ltd/usm/issues";
+
+/**
  * Generate the Agent Feedback Protocol block.
  *
  * Renders policy-specific instructions driven by `system.feedback`, plus a hard
  * rule against ad-hoc tracking files. Emitted into every rules file so all
- * agents (Cursor, Claude, Codex, Copilot) behave consistently instead of
+ * agents (Cursor, Claude, Codex, Copilot, opencode) behave consistently instead of
  * improvising (e.g. creating their own bugs.md).
+ *
+ * Scope-aware: agents must first classify WHERE the bug lives — in this project,
+ * or in the USM tool itself. Tool bugs route upstream to the USM repo, never to
+ * the consuming project's tracker.
  *
  * Always emitted — even with no `feedback` block the default policy is
  * `human-gate` and the no-ad-hoc-files rule is universally valuable.
@@ -59,11 +70,36 @@ export function generateFeedbackProtocol(system: SystemUsm): string {
   const feedbackDir = fb?.feedback_dir ?? ".usm/feedback";
   const repo = system.identity?.repository?.replace(/\/$/, "");
   const tracker = fb?.tracker ?? (repo ? `${repo}/issues` : undefined);
+  const upstream = fb?.upstream_tracker ?? USM_UPSTREAM_TRACKER;
+  const upstreamRepo = upstream.replace(/\/issues\/?$/, "");
 
   const lines: string[] = [];
   lines.push("## Agent Feedback Protocol");
   lines.push("");
-  lines.push("> **If you are an AI agent, read this.** When you discover a bug, inconsistency, or improvement, follow this project's configured policy — do NOT improvise or invent your own tracking files.");
+  lines.push("> **If you are an AI agent, read this.** When you discover a bug, inconsistency, or improvement, first classify WHERE it lives (below), then follow this project's configured policy — do NOT improvise or invent your own tracking files.");
+  lines.push("");
+
+  // ── Scope classification: project vs USM tool itself ──────────────────────
+  lines.push("### Step 1 — Where does the bug live?");
+  lines.push("");
+  lines.push("| Scope | Covers | Where it goes |");
+  lines.push("|-------|--------|---------------|");
+  lines.push(`| **This project** | App code, infra, this repo's own \`.usm\` specs | Step 2 below — this project's policy |`);
+  lines.push(`| **The USM tool itself** | \`@smithgray/usm\` CLI commands, MCP tool behaviour, generator output, schema validation | Upstream: <${upstream}> |`);
+  lines.push("");
+  lines.push(`USM tool bugs are NOT this project's bugs. Include the \`@smithgray/usm\` version (\`npm ls @smithgray/usm\`), the command or MCP tool invoked, reproduction steps, and expected vs actual.`);
+  if (policy === "human-gate") {
+    lines.push(`For a USM tool bug: describe it to the human and **ask** whether to file it upstream (they may prefer to file it themselves).`);
+  } else if (policy === "direct-to-github") {
+    lines.push(`For a USM tool bug: file it with \`gh issue create -R ${upstreamRepo} --title "bug: ..." --body "<repro + version>"\`.`);
+  } else {
+    lines.push(`For a USM tool bug: surface it to the human with the upstream URL (<${upstream}>) — do not bury it in this project's feedback entries.`);
+  }
+  lines.push(`**Never** file USM tool bugs in this project's tracker${tracker ? ` (<${tracker}>)` : ""} or in \`${feedbackDir}/\` — they will not be seen by anyone who can fix them.`);
+  lines.push("");
+
+  // ── Step 2: project-scope policy (unchanged behaviour) ─────────────────────
+  lines.push("### Step 2 — This project's policy (for project-scope issues)");
   lines.push("");
   lines.push(`**Active policy:** \`${policy}\``);
   lines.push("");
@@ -88,10 +124,11 @@ export function generateFeedbackProtocol(system: SystemUsm): string {
   lines.push("");
   lines.push("**Hard rules (all policies):**");
   lines.push("- **NEVER** create ad-hoc tracking files at the repo root (`bugs.md`, `ISSUES.md`, `TODO-agent.md`, etc.).");
-  lines.push(`- The **only** canonical location for structured feedback is \`${feedbackDir}/\`.`);
+  lines.push(`- The **only** canonical location for structured project feedback is \`${feedbackDir}/\`.`);
   if (tracker) {
-    lines.push(`- Real bugs live in the issue tracker: <${tracker}>.`);
+    lines.push(`- Real bugs in this project live in the issue tracker: <${tracker}>.`);
   }
+  lines.push(`- Real bugs in the **USM tool itself** live upstream: <${upstream}> — never in this repo.`);
   lines.push("- If ever unsure, default to asking the human.");
   lines.push("");
 
@@ -243,6 +280,165 @@ ${usmSection}
 }
 
 /**
+ * Generate .opencode/skills/usm-workflow/SKILL.md — the drift countermeasure.
+ *
+ * opencode lists every skill's frontmatter description in the system prompt on
+ * EVERY message. The description therefore IS the nudge — it must carry the
+ * workflow trigger by itself. The body (full checklist) loads on invoke.
+ *
+ * USM-owned file: fully regenerated on each `usm generate`.
+ */
+function generateOpencodeSkill(): string {
+  return `---
+name: usm-workflow
+description: Enforces the USM spec-first workflow — read .usm specs before code changes, draft a spec before building any new feature, update feature status after implementation, and route feedback by scope (this project vs the USM tool itself). Invoke before starting any feature, refactor, or bug fix; when unsure whether a change needs a .usm spec; when touching files listed in a feature's implementation paths; and to re-anchor a long session that has drifted off the workflow.
+---
+
+# USM Workflow Enforcement
+
+You are working in a USM-managed project. The .usm/ directory is the source of
+truth — code and specs must not drift. Work through this checklist.
+
+## Pre-flight (before ANY code change)
+
+1. Identify the feature/module the change belongs to.
+2. Find its spec:
+   - \`usm_search "<feature keywords>"\` or \`usm_list\` to locate the .usm file
+   - \`usm_read\` the spec — read its contracts and flows before editing
+3. If touching a file listed in a spec's \`implementation:\` paths, the spec
+   governs the behaviour you are about to change. Check its contracts first.
+
+## New feature work — draft BEFORE building
+
+1. Discuss the feature with the human.
+2. \`usm_draft_feature\` with structured fields (summary, intent, flows,
+   contracts, tests).
+3. Show the human the generated markdown preview — ALWAYS the markdown, not
+   the YAML. Do not write to disk without approval.
+4. On approval: \`usm_write_feature\`, then implement.
+5. After implementing: \`usm_update_feature_status\` → built, with the
+   implementation paths.
+
+## Updating existing behaviour
+
+1. Read the spec first (\`usm_read\`) — its contracts are acceptance criteria.
+2. Make the code change.
+3. \`usm_update_feature\` if behaviour changed (id-bearing arrays merge by id —
+   pass only new/changed items).
+4. \`usm_update_feature_status\` if the status changed.
+
+## Hard rules
+
+- NEVER hand-write .usm files — use the MCP write tools (they validate).
+- NEVER write a spec to disk without showing the human the markdown preview.
+- NEVER let code and spec drift — if you changed behaviour, update the spec in
+  the same session.
+- The .usm file IS the documentation — if it's wrong, the docs are wrong.
+
+## Feedback — classify scope FIRST
+
+- Bug in THIS project (app code, infra, this repo's .usm specs) → follow the
+  Agent Feedback Protocol in AGENTS.md.
+- Bug in the USM tool itself (CLI, MCP tools, generators, schema) → upstream:
+  ${USM_UPSTREAM_TRACKER} — never this repo's tracker.
+- NEVER create ad-hoc tracking files (bugs.md, ISSUES.md, TODO-agent.md).
+
+## Re-anchoring a drifted session
+
+If you notice you have been editing code without consulting specs, or the
+conversation has wandered from the agreed feature: STOP. List what has changed
+so far, \`usm_read\` the governing spec(s), reconcile any drift (code or spec),
+then continue. Drift compounds — correcting early is cheap.
+`;
+}
+
+/**
+ * Generate .opencode/usm-instructions.md — the iron rules injected into every
+ * request's system prompt via opencode.json `instructions`.
+ *
+ * Deliberately short: opencode already injects AGENTS.md every message — the
+ * drift problem is dilution by length. These per-message self-checks stay
+ * salient where the full AGENTS.md does not. USM-owned file, fully regenerated.
+ */
+function generateIronRules(): string {
+  return `<!-- Generated by \`usm generate\` — injected into every opencode request via opencode.json "instructions". Edits will be overwritten. -->
+
+# USM Iron Rules (self-check every message)
+
+1. Before ANY code change: does a .usm spec govern this? Find it (\`usm_search\`/\`usm_read\`) and read its contracts BEFORE editing. No spec for new work → draft one (\`usm_draft_feature\`), show the human the markdown, get approval (\`usm_write_feature\`) — BEFORE writing code.
+2. NEVER hand-write .usm files — use the MCP write tools (they validate). NEVER write a spec without showing the human the markdown preview first.
+3. After implementing: update the spec (\`usm_update_feature\` / \`usm_update_feature_status\`) in the same session. Code and spec must not drift.
+4. Found a bug? Classify scope first: this project → feedback policy in AGENTS.md; the USM tool itself (CLI/MCP/generators/schema) → ${USM_UPSTREAM_TRACKER} — never this repo's tracker. NEVER create ad-hoc tracking files (bugs.md, ISSUES.md).
+5. Drifted? If you've been editing code without consulting specs: STOP, read the governing spec, reconcile, continue.
+
+Full checklist: invoke the \`usm-workflow\` skill.
+`;
+}
+
+/**
+ * The instructions entry USM owns inside opencode.json.
+ */
+const USM_INSTRUCTIONS_PATH = ".opencode/usm-instructions.md";
+
+/**
+ * Merge the USM instructions entry into the project's opencode.json.
+ *
+ * opencode.json is user-authored config: the ONLY field we touch is the
+ * \`instructions\` array (append our entry if absent). Everything else is
+ * preserved byte-for-byte in intent — we re-serialize the parsed JSON, which
+ * keeps existing key order (JSON.stringify preserves insertion order).
+ *
+ * Resolution order (matching opencode's own config discovery):
+ *   1. <root>/opencode.json          — read, merge, return
+ *   2. <root>/.opencode/opencode.json — read, merge, return
+ *   3. <root>/opencode.jsonc exists   — JSONC cannot be safely re-serialized;
+ *                                       return null (skill + instructions
+ *                                       files still generated; the human adds
+ *                                       the instructions entry manually)
+ *   4. nothing exists                 — create minimal <root>/opencode.json
+ */
+function mergeOpencodeConfig(root: string): { path: string; content: string } | null {
+  const rootConfig = path.join(root, "opencode.json");
+  const dirConfig = path.join(root, ".opencode", "opencode.json");
+  const jsoncConfig = path.join(root, "opencode.jsonc");
+
+  let configPath: string;
+  let config: Record<string, unknown>;
+
+  if (fs.existsSync(rootConfig)) {
+    configPath = rootConfig;
+  } else if (fs.existsSync(dirConfig)) {
+    configPath = dirConfig;
+  } else if (fs.existsSync(jsoncConfig)) {
+    // JSONC may contain comments — merging programmatically is unsafe.
+    return null;
+  } else {
+    configPath = rootConfig;
+    config = {
+      $schema: "https://opencode.ai/config.json",
+    };
+    config.instructions = [USM_INSTRUCTIONS_PATH];
+    return { path: configPath, content: JSON.stringify(config, null, 2) + "\n" };
+  }
+
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+  } catch {
+    // Unparseable config — never destroy it; leave wiring to the human.
+    return null;
+  }
+
+  if (!Array.isArray(config.instructions)) {
+    config.instructions = [USM_INSTRUCTIONS_PATH];
+  } else if (!config.instructions.includes(USM_INSTRUCTIONS_PATH)) {
+    // Append at the end — never remove or reorder existing entries.
+    config.instructions = [...(config.instructions as unknown[]), USM_INSTRUCTIONS_PATH];
+  }
+
+  return { path: configPath, content: JSON.stringify(config, null, 2) + "\n" };
+}
+
+/**
  * Generate all rules files for supported AI coding tools.
  *
  * Produces:
@@ -250,6 +446,8 @@ ${usmSection}
  * - CLAUDE.md (Claude Code, smart-merged)
  * - AGENTS.md (enhanced with workflow, smart-merged)
  * - .github/copilot-instructions.md (GitHub Copilot)
+ * - .opencode/skills/usm-workflow/SKILL.md (opencode — description visible every message)
+ * - .opencode/usm-instructions.md + opencode.json wiring (opencode — injected every request)
  */
 export function generateRulesFiles(
   system: SystemUsm,
@@ -282,6 +480,24 @@ export function generateRulesFiles(
     path: path.join(root, ".github", "copilot-instructions.md"),
     content: copilotContent,
   });
+
+  // 4. .opencode/skills/usm-workflow/SKILL.md — description visible every message
+  outputs.push({
+    path: path.join(root, ".opencode", "skills", "usm-workflow", "SKILL.md"),
+    content: generateOpencodeSkill(),
+  });
+
+  // 5. .opencode/usm-instructions.md — injected into every request via opencode.json
+  outputs.push({
+    path: path.join(root, USM_INSTRUCTIONS_PATH),
+    content: generateIronRules(),
+  });
+
+  // 6. opencode.json — append our instructions entry (only field we own)
+  const opencodeConfig = mergeOpencodeConfig(root);
+  if (opencodeConfig) {
+    outputs.push(opencodeConfig);
+  }
 
   return { outputs };
 }

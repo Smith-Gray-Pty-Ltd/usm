@@ -1,0 +1,162 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/feedback-upstream-routing
+$type: feature
+$version: 1
+$last_updated: "2026-08-13"
+summary: >-
+  Scope-aware feedback routing — the generated feedback protocol, MCP tool, and docs page explicitly
+  distinguish bugs in the consuming project (route per project policy/tracker) from bugs in the USM
+  tool itself (route upstream to the USM repo), with the upstream URL literal and override.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Agents in downstream projects misattribute USM tool bugs to the project they are working in. The
+  generated feedback protocol says 'Real bugs live in the issue tracker: <this repo>' with no scope
+  distinction, so an agent hitting an update_feature data-loss bug files (or gates) it against
+  daingerdainger-com instead of the USM repo. Tool bugs need explicit upstream routing with the
+  exact target.
+status: built
+flows:
+  - id: agent-classifies-scope
+    name: Agent classifies a bug by blast radius
+    description: >-
+      When an agent discovers a bug, it first determines whether the fault is in the project or in
+      the USM tool itself.
+    steps:
+      - id: s1
+        action: detect
+        target: bug, inconsistency, or wrong generator/MCP output
+      - id: s2
+        action: classify
+        target: >-
+          USM tool itself (CLI commands, MCP tool behaviour, generator output, schema validation) vs
+          this project (app code, infra, this repo's .usm specs)
+      - id: s3
+        action: branch
+        target: project scope → existing feedback policy; USM-tool scope → upstream routing
+  - id: route-upstream
+    name: Route a USM tool bug upstream
+    description: >-
+      USM tool bugs are drafted and filed against the upstream tracker with version and environment
+      context.
+    steps:
+      - id: s1
+        action: read
+        target: >-
+          upstream tracker URL — feedback.upstream_tracker, default
+          https://github.com/Smith-Gray-Pty-Ltd/usm/issues
+      - id: s2
+        action: draft
+        target: "issue with: @smithgray/usm version, command/tool invoked, repro, expected vs actual"
+      - id: s3
+        action: respect-policy
+        target: >-
+          human-gate: ask the human before filing; direct-to-github: gh issue create -R
+          Smith-Gray-Pty-Ltd/usm
+      - id: s4
+        action: forbidden
+        target: never file USM tool bugs in the consuming project's tracker or .usm/feedback
+  - id: render-scope-aware-protocol
+    name: Render the scope-aware protocol everywhere
+    description: >-
+      The Where does the bug live? guidance is emitted into every agent-facing surface from one code
+      path.
+    steps:
+      - id: s1
+        action: generate
+        target: >-
+          generateFeedbackProtocol gains a scope table: project scope vs USM tool scope with
+          respective destinations
+      - id: s2
+        action: render
+        target: >-
+          all rules files (AGENTS.md, CLAUDE.md, .cursor/rules/usm.mdc, copilot, opencode skill) via
+          the shared block
+      - id: s3
+        action: render
+        target: docs feedback page (generateFeedbackPage) gains the same scope table
+  - id: mcp-tool-explicit
+    name: MCP tool carries the distinction
+    description: usm_report_feedback surfaces the scope question at the tool boundary.
+    steps:
+      - id: s1
+        action: update
+        target: >-
+          tool description: distinguishes project feedback from USM tool bugs; names the upstream
+          repo
+      - id: s2
+        action: update
+        target: >-
+          human-gate draft response: if the entry looks like a USM tool bug, suggests routing
+          upstream instead
+contracts:
+  - id: scope-branch-explicit
+    description: >-
+      Every generated feedback protocol explicitly branches on bug scope before stating where it
+      goes
+    must_have:
+      - A 'Where does the bug live?' distinction rendered in every rules file
+      - "Project scope: existing policy behaviour unchanged"
+      - "USM-tool scope: upstream URL named literally with the gh -R command"
+  - id: upstream-default-and-override
+    description: The upstream tracker has a default and a system.feedback override
+    must_have:
+      - "Default upstream: https://github.com/Smith-Gray-Pty-Ltd/usm/issues"
+      - Optional feedback.upstream_tracker field in system.usm overrides it
+      - Schema update is optional-field-only (no breaking change)
+  - id: no-misfiling
+    description: The protocol must forbid filing USM tool bugs against the consuming project
+    must_have:
+      - Explicit 'never file USM tool bugs in this repo's tracker' rule
+      - usm_report_feedback human-gate draft mentions upstream routing for tool bugs
+  - id: one-source-many-surfaces
+    description: Scope routing text is generated from a single code path into all surfaces
+    must_have:
+      - rulesFiles.ts generateFeedbackProtocol is the single source
+      - Docs feedback page and MCP tool text stay consistent with it
+tests:
+  - id: protocol-renders-both-scopes
+    setup:
+      system_usm_with_feedback_block: true
+      run_generate: true
+    expect:
+      - assertion: generated AGENTS.md contains the scope distinction
+      - assertion: upstream URL literal present
+      - assertion: project-scope behaviour unchanged from prior policy text
+  - id: upstream-override-honoured
+    setup:
+      feedback_upstream_tracker: https://github.com/fork/usm/issues
+    expect:
+      - assertion: generated protocol uses the override URL
+  - id: mcp-description-explicit
+    setup:
+      read_mcp_tool_registration: true
+    expect:
+      - assertion: usm_report_feedback description distinguishes project vs USM tool bugs
+      - assertion: upstream repo named in the description
+  - id: schema-accepts-override
+    setup:
+      system_usm_with_upstream_tracker: true
+    expect:
+      - assertion: usm validate passes
+      - assertion: absent field still validates (optional)
+decisions:
+  - id: default-upstream-hardcoded
+    decision: Default upstream tracker is the canonical USM repo, overridable via feedback.upstream_tracker
+    rationale: >-
+      Consumers should not need configuration to get correct routing; forks/rebrands can override.
+      Optional schema field only — no breaking change.
+  - id: classification-instructions-not-detection
+    decision: Teach scope classification via instructions rather than automatic detection in the MCP tool
+    rationale: >-
+      Classification requires judgment about blast radius; the agent (or human at the gate) is
+      better placed than a heuristic on the summary string. The tool only nudges when a USM tool bug
+      seems likely.
+implementation:
+  primary: src/generators/rulesFiles.ts
+  test_code: tests/opencodeFeedback.test.ts
+  test_code_status: manual
+see_also:
+  - usm/agent-feedback
+  - usm/gen-rules-files
+  - usm/opencode-integration
