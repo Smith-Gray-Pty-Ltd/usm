@@ -1,0 +1,129 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/structurizr-bridge
+$type: feature
+$version: 1
+$last_updated: "2026-08-13"
+summary: >-
+  Structurizr bridge — import a Structurizr workspace JSON into .usm system and service specs via
+  usm import, and export a Structurizr DSL workspace from .usm via a new generate target (usm
+  generate --only structurizr). USM as the hub: one model, many notations.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Teams already modelling in diagram-as-code (Structurizr/C4) face manual re-entry to adopt USM, and
+  USM users embedded in those shops need round-trip coexistence. Import gives a one-command
+  migration path in; export lets USM become the hub with Structurizr as one more projection
+  alongside Mermaid, OpenAPI, ArchiMate and TOGAF. Both treat .usm as canonical — adapters are
+  bridges, never the store.
+status: built
+flows:
+  - id: import-workspace
+    name: Import a Structurizr workspace JSON
+    steps:
+      - id: s1
+        action: read
+        target: workspace JSON model.softwareSystems
+      - id: s2
+        action: map
+        target: first softwareSystem becomes .usm/system.usm with identity.name and summary
+      - id: s3
+        action: map
+        target: containers become .usm/services/<slug>.usm with inferred type and runtime
+      - id: s4
+        action: guard
+        target: refuse to overwrite existing files unless --force; --dry-run lists planned writes
+  - id: export-target
+    name: Export Structurizr DSL as a generate target
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm plus services and features
+      - id: s2
+        action: generate
+        target: softwareSystem with a container per service and a component per feature
+      - id: s3
+        action: write
+        target: .usm-workspace/structurizr/workspace.dsl with landscape and container views
+  - id: roundtrip
+    name: Import then export stays coherent
+    steps:
+      - id: s1
+        action: import
+        target: a workspace JSON
+      - id: s2
+        action: export
+        target: the structurizr target from the imported specs
+      - id: s3
+        action: verify
+        target: names and container set survive the round trip
+contracts:
+  - id: import-never-destroys
+    description: Import guards existing work
+    must_have:
+      - Existing system.usm or service files are never overwritten without --force
+      - "--dry-run lists planned writes without writing"
+      - Invalid or non-workspace JSON fails with a clear message
+  - id: export-valid-dsl
+    description: Exported workspace.dsl is well-formed Structurizr DSL
+    must_have:
+      - workspace, model and views structure with balanced braces
+      - Quotes in names and descriptions escaped
+      - >-
+        System name from identity.name, containers from services, components from features with
+        $service set
+  - id: target-registered
+    description: Export participates in the standard generate target system
+    must_have:
+      - structurizr accepted by --only
+      - Output written under .usm-workspace/structurizr/
+  - id: conservative-mapping
+    description: Mapping choices are documented and reversible
+    must_have:
+      - >-
+        Container becomes service with type api by default, or database, cache, queue when
+        technology suggests it
+      - Unmappable detail preserved in summary text, never dropped silently
+tests:
+  - id: import-maps-workspace
+    setup:
+      fixture: one softwareSystem with two containers
+    expect:
+      - assertion: system.usm written with identity.name from softwareSystem name
+      - assertion: two service files written with $system set
+      - assertion: validate passes on all written files
+  - id: import-guards
+    setup:
+      existing: system.usm already present
+    expect:
+      - assertion: import refuses without --force and prints which files block
+      - assertion: "--dry-run writes nothing"
+  - id: export-well-formed
+    setup:
+      fixture: system with services and features
+    expect:
+      - assertion: workspace.dsl contains softwareSystem, one container per service, components for features
+      - assertion: braces balanced and quoted names escaped
+  - id: target-wired
+    setup:
+      run: usm generate --only structurizr
+    expect:
+      - assertion: target accepted and file written under .usm-workspace/structurizr/
+decisions:
+  - id: json-import-first
+    decision: Import the Structurizr workspace JSON format, not the DSL grammar
+    rationale: >-
+      Structurizr serialises workspaces to JSON; parsing that is tractable, while the DSL grammar
+      would need a real parser — deferred until demand is demonstrated (Fowler threshold).
+  - id: features-as-components
+    decision: Export features as components inside their service container
+    rationale: >-
+      Preserves the C4 hierarchy (system, container, component) and gives Structurizr users
+      feature-level detail.
+implementation:
+  primary: src/generators/structurizr.ts
+  test_code: tests/structurizr.test.ts
+  test_code_status: manual
+see_also:
+  - usm/gen-markdown
+  - usm/cli-generate
+  - usm/scan-codebase
