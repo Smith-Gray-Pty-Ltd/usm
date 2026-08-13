@@ -35,7 +35,10 @@ packages/
 AGENTS.md
 CLAUDE.md
 .cursor/rules/usm.mdc
+.cursor/rules/usm-always.mdc
+.claude/skills/usm-workflow/SKILL.md
 .github/copilot-instructions.md
+.github/instructions/usm-iron-rules.md
 .opencode/skills/usm-workflow/SKILL.md
 .opencode/usm-instructions.md
 opencode.json

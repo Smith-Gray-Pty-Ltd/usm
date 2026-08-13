@@ -126,6 +126,34 @@ describe("usm/opencode-integration", () => {
     const config = JSON.parse(read(".opencode/opencode.json")) as { instructions: string[] };
     expect(config.instructions).toEqual(["CUSTOM.md", ".opencode/usm-instructions.md"]);
   });
+
+  it("emits the same skill for Claude Code (shared SKILL.md convention)", () => {
+    runGenerate();
+    const claudeSkill = read(".claude/skills/usm-workflow/SKILL.md");
+    expect(claudeSkill).toMatch(/^name:\s*usm-workflow$/m);
+    expect(claudeSkill).toMatch(/^description:\s*Enforces the USM spec-first workflow/m);
+    expect(claudeSkill).toMatch(/usm_draft_feature/);
+    // Identical content to the opencode skill — one source, two runtimes
+    expect(claudeSkill).toBe(read(".opencode/skills/usm-workflow/SKILL.md"));
+  });
+
+  it("emits a Cursor alwaysApply iron-rules rule (every request)", () => {
+    runGenerate();
+    const rule = read(".cursor/rules/usm-always.mdc");
+    expect(rule).toMatch(/^alwaysApply:\s*true$/m);
+    expect(rule).toMatch(/Before ANY code change/);
+    expect(rule).toContain(USM_UPSTREAM_TRACKER);
+    // Detailed glob-scoped rule still generated alongside
+    expect(fs.existsSync(path.join(root, ".cursor/rules/usm.mdc"))).toBe(true);
+  });
+
+  it("emits a Copilot instructions file with broad applyTo", () => {
+    runGenerate();
+    const instructions = read(".github/instructions/usm-iron-rules.md");
+    expect(instructions).toMatch(/^applyTo:\s*"\*\*"$/m);
+    expect(instructions).toMatch(/Before ANY code change/);
+    expect(instructions).toContain(USM_UPSTREAM_TRACKER);
+  });
 });
 
 describe("usm/feedback-upstream-routing", () => {

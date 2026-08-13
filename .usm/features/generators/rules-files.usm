@@ -5,11 +5,11 @@ $version: 1
 $last_updated: "2026-08-13"
 status: built
 summary: >-
-  Tool-specific rules file generator — produces instruction files for AI coding tools (Cursor,
-  Claude Code, Codex, GitHub Copilot, opencode) that teach agents the USM spec-first workflow. Each
-  file tells the agent when to read .usm, when to write specs, and how to update them after
-  implementation. opencode additionally gets per-message reinforcement: a usm-workflow skill plus
-  iron-rules instructions injected into every system prompt.
+  Tool-specific rules file generator with two-tier enforcement — detailed workflow per tool (Cursor
+  .mdc, CLAUDE.md, AGENTS.md, copilot-instructions, opencode skill) plus always-on iron rules
+  injected every request wherever the tool provides a mechanism (opencode instructions, Cursor
+  alwaysApply, Copilot applyTo, Claude Code skill description). Codex/AGENTS.md has no per-message
+  mechanism and gets the detailed tier only.
 $system: usm/system
 $service: usm/cli
 intent: |
@@ -137,19 +137,19 @@ flows:
         action: smart-merge
         target: replace between USM markers, preserve rest
 contracts:
-  - description: Generator produces files for all supported tools
+  - description: All tools covered with always-on iron rules where a per-message mechanism exists
     id: all-tools-covered
     must_have:
-      - .cursor/rules/usm.mdc generated for Cursor
-      - CLAUDE.md generated for Claude Code
-      - AGENTS.md enhanced with workflow instructions
-      - .github/copilot-instructions.md generated for Copilot
-      - >-
-        .opencode/skills/usm-workflow/SKILL.md generated for opencode (description visible every
-        message)
-      - >-
-        .opencode/usm-instructions.md generated + opencode.json instructions entry wired (injected
-        every request)
+      - Cursor usm.mdc plus usm-always.mdc
+      - Claude CLAUDE.md plus skills SKILL.md
+      - Codex AGENTS.md detail only
+      - Copilot instructions plus usm-iron-rules.md
+      - opencode SKILL.md plus wired instructions
+  - description: Iron rules from one shared function; SKILL.md identical for opencode and Claude Code
+    id: two-tier-enforcement-parity
+    must_have:
+      - Shared iron-rules body in all tiers
+      - Identical SKILL.md across runtimes
 tests:
   - id: generate-all-files
     setup:
