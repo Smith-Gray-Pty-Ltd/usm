@@ -42,6 +42,50 @@ function atomicWrite(filePath: string, content: string): void {
 }
 
 /**
+ * Feature fields whose values are arrays of objects keyed by `id`.
+ * These merge by id on update (upsert) instead of being replaced wholesale —
+ * a partial array passed with add-intent must never silently drop the
+ * entries that weren't mentioned (issue #14).
+ */
+const ID_BEARING_ARRAY_FIELDS = ["contracts", "flows", "tests", "decisions"];
+
+interface MergeStats {
+  mode: "upsert-by-id" | "replaced" | "set";
+  added: number;
+  updated: number;
+  preserved: number;
+}
+
+/**
+ * Merge an incoming array into an existing one by `id`.
+ * - Items whose `id` matches an existing entry replace that entry (update).
+ * - Items without a matching `id` (or without an `id`) are appended.
+ * - Existing entries not mentioned in the incoming array are preserved.
+ */
+function upsertById(existing: unknown[], incoming: unknown[]): { merged: unknown[]; stats: MergeStats } {
+  const merged = [...existing];
+  let added = 0;
+  let updated = 0;
+  for (const item of incoming) {
+    const itemId = item && typeof item === "object" && "id" in item ? (item as { id: unknown }).id : undefined;
+    const idx =
+      itemId !== undefined
+        ? merged.findIndex(
+            (e) => e && typeof e === "object" && "id" in e && (e as { id: unknown }).id === itemId,
+          )
+        : -1;
+    if (idx >= 0) {
+      merged[idx] = item;
+      updated++;
+    } else {
+      merged.push(item);
+      added++;
+    }
+  }
+  return { merged, stats: { mode: "upsert-by-id", added, updated, preserved: existing.length - updated } };
+}
+
+/**
  * Validate status transitions.
  */
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -229,10 +273,11 @@ export async function writeFeatureTool(args: { yaml: string; path: string }) {
 export const updateFeatureSchema = {
   id: z.string().optional().describe("Feature $id to find (e.g. 'usm/mcp-write')"),
   path: z.string().optional().describe("Direct file path (alternative to id)"),
-  fields: z.string().describe("JSON object of fields to update (e.g. {\"summary\": \"new summary\", \"status\": \"built\"})"),
+  fields: z.string().describe('JSON object of fields to update (e.g. {"summary": "new summary", "status": "built"}). Id-bearing arrays (contracts, flows, tests, decisions) are MERGED by id — pass just the new/changed items and existing ones are preserved. Use the replace param to remove items.'),
+  replace: z.string().optional().describe('Optional JSON array of field names whose arrays should be REPLACED wholesale instead of merged by id (e.g. ["contracts"]). Required to remove array items — replacement is destructive and drops unmentioned entries.'),
 };
 
-export async function updateFeatureTool(args: { id?: string; path?: string; fields: string }) {
+export async function updateFeatureTool(args: { id?: string; path?: string; fields: string; replace?: string }) {
   try {
     // Find the feature file
     let filePath: string | null = null;
@@ -271,6 +316,29 @@ export async function updateFeatureTool(args: { id?: string; path?: string; fiel
     // Parse the update fields
     const updates = JSON.parse(args.fields) as Record<string, unknown>;
 
+    // Parse the optional replace list (fields whose arrays are replaced
+    // wholesale instead of merged by id — required to remove array items)
+    let replaceFields: string[] = [];
+    if (args.replace !== undefined && args.replace !== "") {
+      const parsed = JSON.parse(args.replace) as unknown;
+      if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === "string")) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ error: "'replace' must be a JSON array of field names, e.g. [\"contracts\"]" }, null, 2) }],
+          isError: true,
+        };
+      }
+      replaceFields = parsed;
+      // Only id-bearing fields are eligible for merge, so only they need replace
+      const unknown = replaceFields.filter((f) => !ID_BEARING_ARRAY_FIELDS.includes(f));
+      if (unknown.length > 0) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ error: `'replace' only applies to id-bearing array fields (${ID_BEARING_ARRAY_FIELDS.join(", ")}) — unknown: ${unknown.join(", ")}` }, null, 2) }],
+          isError: true,
+        };
+      }
+    }
+    const replaceSet = new Set(replaceFields);
+
     // Immutable fields — cannot be changed via update
     const IMMUTABLE = ["$id", "$type", "$schema"];
     for (const key of IMMUTABLE) {
@@ -282,10 +350,27 @@ export async function updateFeatureTool(args: { id?: string; path?: string; fiel
       }
     }
 
-    // Apply updates (arrays are replaced, scalars are updated)
+    // Apply updates.
+    // Scalars (and non-id-bearing arrays like see_also) are set directly.
+    // Id-bearing arrays (contracts, flows, tests, decisions) are MERGED by id
+    // by default — items with a matching id update, new items append, and
+    // unmentioned entries are preserved. Wholesale replacement (which drops
+    // unmentioned entries) requires the explicit `replace` param.
     const fieldsUpdated: string[] = [];
+    const mergeDetails: Record<string, MergeStats> = {};
+    const target = feature as unknown as Record<string, unknown>;
     for (const [key, value] of Object.entries(updates)) {
-      (feature as unknown as Record<string, unknown>)[key] = value;
+      if (ID_BEARING_ARRAY_FIELDS.includes(key) && Array.isArray(value) && !replaceSet.has(key)) {
+        const existing = Array.isArray(target[key]) ? (target[key] as unknown[]) : [];
+        const { merged, stats } = upsertById(existing, value);
+        target[key] = merged;
+        mergeDetails[key] = stats;
+      } else {
+        if (ID_BEARING_ARRAY_FIELDS.includes(key)) {
+          mergeDetails[key] = { mode: "replaced", added: Array.isArray(value) ? value.length : 0, updated: 0, preserved: 0 };
+        }
+        target[key] = value;
+      }
       fieldsUpdated.push(key);
     }
 
@@ -318,6 +403,7 @@ export async function updateFeatureTool(args: { id?: string; path?: string; fiel
           updated: true,
           path: filePath,
           fields_updated: fieldsUpdated,
+          ...(Object.keys(mergeDetails).length > 0 ? { merge_details: mergeDetails } : {}),
         }, null, 2),
       }],
     };

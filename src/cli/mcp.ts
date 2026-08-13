@@ -105,7 +105,7 @@ server.tool(
 // Tool 11: usm_update_feature (write)
 server.tool(
   "usm_update_feature",
-  "Update fields on an existing feature .usm file. Provide 'id' (feature $id) or 'path', and 'fields' (JSON object of fields to update). Arrays are replaced, scalars updated. $id, $type, $schema are immutable. Validates before writing.",
+  "Update fields on an existing feature .usm file. Provide 'id' (feature $id) or 'path', and 'fields' (JSON object of fields to update). Id-bearing arrays (contracts, flows, tests, decisions) are MERGED by id — pass just the new/changed items and existing ones are preserved; to remove items pass the 'replace' param with the field names to replace wholesale. $id, $type, $schema are immutable. Validates before writing.",
   updateFeatureSchema,
   updateFeatureTool,
 );
