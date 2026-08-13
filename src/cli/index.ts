@@ -3,7 +3,7 @@
 import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
-import { parseUsmFile, isSystemFile, isServiceFile, isFeatureFile } from "../parse.js";
+import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile } from "../parse.js";
 import { validateUsm, validateUsmFile } from "../validate.js";
 import { generate } from "../generate.js";
 import { findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "../parse.js";
@@ -768,6 +768,16 @@ program
         for (const warn of result.warnings || []) {
           console.log(`  ⚠ ${warn.path}: ${warn.message}`);
         }
+        // Parse-integrity check: list ids in raw YAML missing from parsed data
+        // would validate fine but silently vanish from generated docs (issue #13)
+        try {
+          const { warnings } = parseUsmFileWithWarnings(filePath);
+          for (const warn of warnings) {
+            console.log(`  ⚠ ${filePath}: ${warn}`);
+          }
+        } catch {
+          // Parse errors are reported by validateUsmFile above
+        }
       } else {
         console.log(`✗ ${filePath}`);
         for (const err of result.errors || []) {
@@ -884,7 +894,10 @@ program
     // ─── Pass 1: Per-file generation (system, service, feature) ────────────
     for (const filePath of files) {
       try {
-        const parsed = parseUsmFile(filePath);
+        const { parsed, warnings: parseIntegrityWarnings } = parseUsmFileWithWarnings(filePath);
+        for (const warn of parseIntegrityWarnings) {
+          console.warn(`⚠ ${filePath}: ${warn}`);
+        }
         const validation = validateUsm(parsed);
         if (!validation.valid) {
           console.log(`✗ ${filePath} — validation failed, skipping`);
