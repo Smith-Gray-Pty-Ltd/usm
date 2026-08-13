@@ -185,6 +185,7 @@ function generateUsmSection(system: SystemUsm, services: ServiceUsm[]): string {
   lines.push("- `usm_list` — list all .usm files");
   lines.push("- `usm_read` — read a specific .usm file");
   lines.push("- `usm_search` — search .usm files by keyword");
+  lines.push("- `usm_query` — predicate query over all .usm files (e.g. \"features where status = planned and contracts = 0\")");
   lines.push("- `usm_validate` — validate a .usm file against schema");
   lines.push("- `usm_summary` — quick summary of a .usm file");
   lines.push("- `usm_references` — find references to a feature $id");

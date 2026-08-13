@@ -163,3 +163,17 @@ export type {
   EnrichOptions,
 } from "./enrich/types.js";
 export type { LlmClient, LlmResponse } from "./enrich/llm.js";
+
+// Internal DSL builder (fluent TypeScript that compiles to validated .usm)
+export {
+  defineFeature,
+  defineService,
+  writeFeature,
+  parseSpec,
+  FeatureBuilder,
+  ServiceBuilder,
+  FlowBuilder,
+  ContractBuilder,
+  TestBuilder,
+} from "./dsl/index.js";
+export type { BuildResult, FeatureStatus as DslFeatureStatus, ServiceType as DslServiceType, FlowStepInput } from "./dsl/index.js";

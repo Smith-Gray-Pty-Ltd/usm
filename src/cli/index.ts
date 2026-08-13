@@ -7,6 +7,10 @@ import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, is
 import { validateUsm, validateUsmFile } from "../validate.js";
 import { generate } from "../generate.js";
 import { findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "../parse.js";
+import { runQuery, QueryParseError } from "../query/index.js";
+import type { UsmFile } from "../types.js";
+import { generateStructurizrDsl } from "../generators/structurizr.js";
+import { importStructurizrWorkspace, parseStructurizrWorkspace, planStructurizrImport } from "../import/structurizr.js";
 import { initConfig, writeConfig } from "../scan/init.js";
 import { promptFeedbackPolicy, applyFeedbackToSystem, resolveFeedbackPolicy, DEFAULT_FEEDBACK_POLICY } from "../scan/feedback.js";
 import { detectUpgrade, applyUpgrade } from "../scan/upgrade.js";
@@ -805,7 +809,7 @@ program
     const runDocs = runAll || onlyTarget === "docs";
 
     // Validate --only target early (before any generation)
-    const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md"];
+    const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md", "structurizr"];
     if (onlyTarget && !validTargets.includes(onlyTarget)) {
       console.error(`Invalid --only target: ${onlyTarget}. Valid targets: ${validTargets.join(", ")}`);
       process.exit(1);
@@ -837,6 +841,27 @@ program
       const result = generateArchiMateModel(system, root);
       if (result.outputs.length > 0) {
         console.log(`Generated ArchiMate model: ${path.relative(root, result.outputs[0].path)}`);
+      }
+      return;
+    }
+
+    // Handle structurizr target (export .usm → Structurizr DSL workspace)
+    if (onlyTarget === "structurizr") {
+      const systemPath = path.join(root, ".usm", "system.usm");
+      if (!fs.existsSync(systemPath)) {
+        console.error("No .usm/system.usm found.");
+        process.exit(1);
+      }
+      const system = parseUsmFile(systemPath) as SystemUsm;
+      const serviceFiles = findAllUsmFiles(root).filter((f) => f.includes(`${path.sep}services${path.sep}`));
+      const featureFiles = findAllUsmFiles(root).filter((f) => f.includes(`${path.sep}features${path.sep}`));
+      const services = serviceFiles.map((f) => parseUsmFile(f) as unknown as import("../types.js").ServiceUsm).filter((s) => s.$type === "service");
+      const features = featureFiles.map((f) => parseUsmFile(f) as unknown as import("../types.js").FeatureUsm).filter((s) => s.$type === "feature");
+      const result = generateStructurizrDsl(system, services, features, root);
+      for (const output of result.outputs) {
+        fs.mkdirSync(path.dirname(output.path), { recursive: true });
+        fs.writeFileSync(output.path, output.content, "utf-8");
+        console.log(`Generated Structurizr workspace: ${path.relative(root, output.path)}`);
       }
       return;
     }
@@ -1144,6 +1169,143 @@ program
       console.log("5. Roundtrip: ✗ (key fields mismatch)");
       process.exit(1);
     }
+  });
+
+// ─── query ─────────────────────────────────────────────────────────────────────
+
+program
+  .command("query")
+  .description([
+    "Query .usm files with a predicate expression (read-only).",
+    "",
+    "Examples:",
+    "  usm query \"features where status = planned\"",
+    "  usm query \"features where contracts > 0 and not (status = deprecated)\"",
+    "  usm query \"all where summary ~ auth\"",
+    "  usm query \"services where has decisions\" --json",
+  ].join("\n"))
+  .argument("<expr>", "Query: <selector> [where <predicate>]")
+  .option("-r, --root <root>", "Repo root directory", ".")
+  .option("--json", "Output full parsed objects as JSON")
+  .option("--limit <n>", "Cap number of results", "100")
+  .action((expr: string, opts: { root: string; json: boolean; limit: string }) => {
+    const root = path.resolve(opts.root);
+
+    // Collect .usm files (same discovery as validate/generate)
+    const files = findAllUsmFiles(root);
+    if (files.length === 0) {
+      const usmDir = path.join(root, ".usm");
+      if (fs.existsSync(usmDir)) files.push(...findUsmFiles(usmDir));
+    }
+    if (files.length === 0) {
+      console.log("No .usm files found.");
+      return;
+    }
+
+    const hitsWithPaths = files
+      .map((filePath) => {
+        try {
+          return { file: parseUsmFile(filePath) as unknown as Record<string, unknown>, path: filePath };
+        } catch {
+          return null; // unparseable files simply aren't queryable
+        }
+      })
+      .filter((x): x is { file: Record<string, unknown>; path: string } => x !== null);
+
+    let hits;
+    try {
+      hits = runQuery(expr, hitsWithPaths);
+    } catch (err) {
+      if (err instanceof QueryParseError) {
+        console.error(`Query error: ${err.message}`);
+        process.exit(1);
+      }
+      throw err;
+    }
+
+    const limit = Number(opts.limit) || 100;
+    const truncated = hits.length > limit;
+    const shown = truncated ? hits.slice(0, limit) : hits;
+
+    if (opts.json) {
+      console.log(JSON.stringify(shown.map((h) => h.file), null, 2));
+    } else {
+      for (const hit of shown) {
+        const file = hit.file;
+        const id = String(file.$id ?? path.basename(hit.path));
+        const status = file.status ? String(file.status) : String(file.$type ?? "");
+        const summary = String(file.summary ?? "").split("\n")[0].slice(0, 80);
+        console.log(`${id}  [${status}]  ${summary}`);
+      }
+    }
+    console.error(`\n${hits.length} match(es)${truncated ? ` (showing ${shown.length})` : ""} across ${hitsWithPaths.length} file(s)`);
+  });
+
+// ─── import ─────────────────────────────────────────────────────────────────────
+
+program
+  .command("import")
+  .description("Import an external model into .usm specs (currently: Structurizr workspace JSON)")
+  .argument("<file>", "Path to the export file (e.g. structurizr-workspace.json)")
+  .option("-f, --format <format>", "Import format", "structurizr-json")
+  .option("-r, --root <root>", "Repo root directory", ".")
+  .option("--id <prefix>", "$id org prefix (defaults to slugified system name)")
+  .option("--domain <domain>", "identity.domain for the system file", "example.com")
+  .option("--force", "Overwrite existing .usm files", false)
+  .option("--dry-run", "List planned writes without writing", false)
+  .action((file: string, opts: { format: string; root: string; id?: string; domain: string; force: boolean; dryRun: boolean }) => {
+    if (opts.format !== "structurizr-json") {
+      console.error(`Unknown import format '${opts.format}'. Supported: structurizr-json`);
+      process.exit(1);
+    }
+    const resolved = path.resolve(file);
+    if (!fs.existsSync(resolved)) {
+      console.error(`File not found: ${resolved}`);
+      process.exit(1);
+    }
+    const root = path.resolve(opts.root);
+    const raw = fs.readFileSync(resolved, "utf-8");
+
+    try {
+      parseStructurizrWorkspace(raw);
+    } catch (err) {
+      console.error(`Error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+
+    const result = importStructurizrWorkspace(raw, {
+      root,
+      idPrefix: opts.id,
+      domain: opts.domain,
+      force: opts.force,
+      dryRun: opts.dryRun,
+    });
+
+    if (opts.dryRun) {
+      console.log("Planned writes (--dry-run, nothing written):");
+      for (const entry of result.planned) {
+        console.log(`  ${entry.wouldOverwrite ? "OVERWRITE" : "create  "} ${path.relative(root, entry.path)}  (${entry.name})`);
+      }
+      return;
+    }
+
+    if (result.skipped.length > 0) {
+      console.error("Refusing to overwrite existing files (use --force to override):");
+      for (const entry of result.skipped) {
+        console.error(`  ${path.relative(root, entry.path)}`);
+      }
+      process.exit(1);
+    }
+
+    for (const entry of result.written) {
+      console.log(`✓ wrote ${path.relative(root, entry.path)}  (${entry.name})`);
+    }
+    if (result.errors.length > 0) {
+      console.error("Errors:");
+      for (const err of result.errors) console.error(`  ⚠ ${err}`);
+      process.exit(1);
+    }
+    console.log(`\nImported ${result.written.length} file(s). Review them, set a real identity.domain, then run 'usm generate'.`);
   });
 
 // ─── info ──────────────────────────────────────────────────────────────────────

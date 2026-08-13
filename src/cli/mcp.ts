@@ -11,6 +11,7 @@ import { referencesSchema, referencesTool } from "../mcp/references.js";
 import { searchSchema, searchTool } from "../mcp/search.js";
 import { contractsSchema, contractsTool } from "../mcp/contracts.js";
 import { flowsSchema, flowsTool } from "../mcp/flows.js";
+import { querySchema, queryTool } from "../mcp/query.js";
 import { draftFeatureSchema, draftFeatureTool } from "../mcp/write.js";
 import { writeFeatureSchema, writeFeatureTool } from "../mcp/write.js";
 import { updateFeatureSchema, updateFeatureTool } from "../mcp/write.js";
@@ -86,7 +87,15 @@ server.tool(
   flowsTool,
 );
 
-// Tool 9: usm_draft_feature (write)
+// Tool 9: usm_query (read)
+server.tool(
+  "usm_query",
+  "Query all .usm files with a predicate expression — typed impact analysis instead of grepping raw YAML. Selectors: features services systems apis data policies operations feedback all. Example: \"features where status = planned and contracts = 0\" (drift check), \"all where summary ~ auth\" (find by text), \"services where has decisions\". Operators: = != > < >= <=, ~ (contains), has <field>, and/or/not with parentheses. Read-only; results capped at 50 by default. Each hit includes its path so you can usm_read it directly.",
+  querySchema,
+  queryTool,
+);
+
+// Tool 10: usm_draft_feature (write)
 server.tool(
   "usm_draft_feature",
   "Draft a feature .usm spec from structured fields. Validates against the v1 schema and returns YAML + markdown preview. Does NOT write to disk — show the markdown to the human for review, then call usm_write_feature to persist.",
@@ -94,7 +103,7 @@ server.tool(
   draftFeatureTool,
 );
 
-// Tool 10: usm_write_feature (write)
+// Tool 11: usm_write_feature (write)
 server.tool(
   "usm_write_feature",
   "Write a feature .usm file to disk. Validates the YAML against the v1 schema before writing atomically. Returns { written, path } or { errors }.",
@@ -102,7 +111,7 @@ server.tool(
   writeFeatureTool,
 );
 
-// Tool 11: usm_update_feature (write)
+// Tool 12: usm_update_feature (write)
 server.tool(
   "usm_update_feature",
   "Update fields on an existing feature .usm file. Provide 'id' (feature $id) or 'path', and 'fields' (JSON object of fields to update). Id-bearing arrays (contracts, flows, tests, decisions) are MERGED by id — pass just the new/changed items and existing ones are preserved; to remove items pass the 'replace' param with the field names to replace wholesale. $id, $type, $schema are immutable. Validates before writing.",
@@ -110,7 +119,7 @@ server.tool(
   updateFeatureTool,
 );
 
-// Tool 12: usm_update_feature_status (write)
+// Tool 13: usm_update_feature_status (write)
 server.tool(
   "usm_update_feature_status",
   "Update the status of a feature (planned → in-progress → built → deprecated). Enforces valid transitions. Optionally update implementation paths. Validates before writing atomically.",
@@ -118,7 +127,7 @@ server.tool(
   updateFeatureStatusTool,
 );
 
-// Tool 13: usm_report_feedback (write)
+// Tool 14: usm_report_feedback (write)
 server.tool(
   "usm_report_feedback",
   "Report a bug, improvement, or question ABOUT THIS PROJECT as a structured $type: feedback entry in .usm/feedback/. Scope matters: bugs in this project's code/specs belong here; bugs in the USM tool itself (CLI commands, MCP tool behaviour, generator output, schema validation) belong UPSTREAM at https://github.com/Smith-Gray-Pty-Ltd/usm/issues — not in this repo. Respects the configured feedback policy: human-gate returns a draft (no write), direct-to-feedback writes to disk, direct-to-github records locally and suggests a gh issue. Pass write=true to override human-gate after human approval. Validates against the v1 schema.",

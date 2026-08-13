@@ -1,0 +1,134 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/query-layer
+$type: feature
+$version: 1
+$last_updated: "2026-08-13"
+summary: >-
+  Predicate query language over .usm data — a tiny expression grammar (selectors, comparisons,
+  and/or/not, has, contains) evaluated against parsed .usm files, exposed as `usm query` CLI and
+  `usm_query` MCP tool. Turns grep-and-guess into typed impact analysis.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Agents currently list everything or grep raw YAML to answer questions like "which planned features
+  have no contracts?" or "what does this service own?". The semantic model is where computation
+  should live (Fowler): a typed query surface over parsed .usm data serves drift checks, impact
+  analysis, and triage — for agents via MCP and humans via CLI. Read-only; touches nothing about
+  storage or format.
+status: built
+flows:
+  - id: run-query-cli
+    name: Run a query from the CLI
+    steps:
+      - id: s1
+        action: parse
+        target: query string into selector + predicate AST
+      - id: s2
+        action: collect
+        target: all .usm files in the monorepo (same discovery as validate/generate)
+      - id: s3
+        action: evaluate
+        target: filter files by selector and predicate
+      - id: s4
+        action: output
+        target: table lines by default, --json for full objects, --limit cap
+  - id: query-via-mcp
+    name: Run a query via the usm_query MCP tool
+    steps:
+      - id: s1
+        action: accept
+        target: query string + optional limit
+      - id: s2
+        action: evaluate
+        target: same parser and evaluator as CLI
+      - id: s3
+        action: return
+        target: id/type/status/summary/path per hit, total count, truncated flag (capped at 50 default)
+  - id: compose-predicates
+    name: Compose predicates
+    steps:
+      - id: s1
+        action: support
+        target: "selectors: features services systems apis data policies operations feedback all"
+      - id: s2
+        action: support
+        target: "comparisons: = != > < >= <= ~ (contains) and has <field>"
+      - id: s3
+        action: support
+        target: >-
+          boolean: and or not with parentheses; fields: type id status summary intent system service
+          kind severity contracts flows tests decisions interfaces version
+contracts:
+  - id: selector-and-predicates
+    description: >-
+      The grammar covers type selection, field comparison, existence, contains, and boolean
+      composition
+    must_have:
+      - Selector maps to $type filtering (features→feature etc, all→any)
+      - "= != on strings; > < >= <= on numeric fields (array lengths, version)"
+      - ~ substring contains case-insensitive; has field for existence/non-empty
+      - and or not with parentheses, standard precedence (not > and > or)
+  - id: friendly-errors
+    description: Parse failures produce actionable messages, never raw stack traces
+    must_have:
+      - Message names the token and position and what was expected
+      - Unknown fields resolve to missing (has is false, comparisons false) rather than erroring
+  - id: read-only-and-capped
+    description: Query never writes; MCP results are capped for context safety
+    must_have:
+      - No file writes on any query path
+      - MCP default limit 50 with total + truncated in the response
+  - id: one-evaluator-two-surfaces
+    description: CLI and MCP share a single parser/evaluator module
+    must_have:
+      - src/query module is the only implementation
+      - MCP response includes path so agents can usm_read hits directly
+tests:
+  - id: parser-cases
+    setup:
+      query_strings:
+        - features where status = planned
+        - features where contracts > 0 and not (status = deprecated)
+        - all where summary ~ auth
+        - services where has decisions
+    expect:
+      - assertion: each parses to expected AST without error
+      - assertion: malformed string yields friendly parse error with position
+  - id: evaluator-cases
+    setup:
+      fixture_usm_files: feature planned w/o contracts, feature built w/ 2 contracts, service, feedback high
+    expect:
+      - assertion: status = planned returns only the planned feature
+      - assertion: contracts > 0 returns the built feature
+      - assertion: all where summary ~ AUTH matches case-insensitively
+      - assertion: feedback where severity = high returns the feedback file
+  - id: cli-smoke
+    setup:
+      fixture_project: true
+    expect:
+      - assertion: usm query 'features where status = planned' prints matching ids
+      - assertion: "--json emits parseable JSON array"
+  - id: mcp-tool
+    setup:
+      fixture_project: true
+    expect:
+      - assertion: usm_query returns results with id and path
+      - assertion: limit caps results and sets truncated true
+decisions:
+  - id: tiny-grammar-not-sql
+    decision: A ~200-line recursive-descent grammar, not SQL/jq subset
+    rationale: >-
+      Covers selector+predicate use cases agents actually have; keeps error messages precise and the
+      surface teachable in one rules-file line.
+  - id: missing-field-is-false
+    decision: Unknown/absent fields make predicates false instead of erroring
+    rationale: >-
+      Queries like 'feedback where severity = high' must not explode on feature files that lack
+      severity; absence is simply not a match.
+implementation:
+  primary: src/query/index.ts
+  test_code: tests/query.test.ts
+  test_code_status: manual
+see_also:
+  - usm/mcp-read
+  - usm/cli-generate

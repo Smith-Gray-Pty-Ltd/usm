@@ -1,0 +1,118 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/internal-dsl-builder
+$type: feature
+$version: 1
+$last_updated: "2026-08-13"
+summary: >-
+  Fluent typed TypeScript builder (internal DSL, per Fowler) that compiles to validated .usm YAML —
+  defineFeature/defineService chains populate the semantic model and build() enforces the schema,
+  exported from the package's public API.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Authoring flows/contracts/tests in raw YAML is verbose and error-prone for humans and agents
+  alike. Fowler's answer for this exact pain is an internal DSL: a fluent host-language builder that
+  populates the semantic model and inherits the host's tooling (types, autocomplete, refactoring).
+  LLMs write TypeScript far better than any bespoke grammar, so the builder aligns human ergonomics
+  with agent capability. Constraints stay enforced by schema validation at build() — the YAML/JSON
+  path remains first-class.
+status: built
+flows:
+  - id: build-feature
+    name: Compose a feature spec with the builder
+    steps:
+      - id: s1
+        action: call
+        target: defineFeature('org/slug', { system, service })
+      - id: s2
+        action: chain
+        target: >-
+          .summary().intent().status().flow(id, fn).contract(id, fn).test(id, fn).decision(id,
+          fn).seeAlso([])
+      - id: s3
+        action: build
+        target: returns { yaml, object, valid, errors } — schema-validated before hand-back
+  - id: emit-and-write
+    name: Write a built spec to disk
+    steps:
+      - id: s1
+        action: build
+        target: the spec via builder
+      - id: s2
+        action: write
+        target: writeFeature(result, path) — refuses invalid specs, atomic write
+  - id: extend-existing
+    name: Extend an existing spec
+    steps:
+      - id: s1
+        action: load
+        target: defineFeature from a parsed existing .usm file
+      - id: s2
+        action: mutate
+        target: chain additions (flows append by id)
+      - id: s3
+        action: rebuild
+        target: revalidate
+contracts:
+  - id: builder-emits-valid-usm
+    description: Every build() result passes schema validation or reports errors explicitly
+    must_have:
+      - build() runs validateUsm and includes errors in the result
+      - writeFeature refuses to write when valid is false
+      - Generated YAML matches MCP write-tool serialization conventions
+  - id: required-fields-enforced
+    description: The builder surface mirrors the schema's required fields
+    must_have:
+      - summary and intent required before a valid build
+      - $system and $service required at construction
+      - flows get steps; contracts get must_have; tests get expect
+  - id: exported-public-api
+    description: The DSL ships as part of the package's public entry
+    must_have:
+      - import { defineFeature, defineService, writeFeature } from '@smithgray/usm' works
+      - Types exported for IDE autocomplete
+  - id: roundtrip-fidelity
+    description: Builder output parses back to the same object
+    must_have:
+      - yaml → parseUsm → deep-equals object
+tests:
+  - id: builds-valid-feature
+    setup: {}
+    expect:
+      - assertion: "chained builder builds with valid: true"
+      - assertion: yaml parses back deep-equal to object
+  - id: invalid-build-reported
+    setup:
+      missing_intent: true
+    expect:
+      - assertion: "valid: false with schema errors listed"
+      - assertion: writeFeature refuses and writes nothing
+  - id: extend-existing
+    setup:
+      existing_parsed_feature: true
+    expect:
+      - assertion: loaded builder appends flows by id without dropping existing
+      - assertion: rebuild validates
+  - id: service-builder
+    setup: {}
+    expect:
+      - assertion: defineService builds a schema-valid service with type and runtime
+decisions:
+  - id: internal-over-external
+    decision: Internal (host-language) DSL, not a custom grammar
+    rationale: >-
+      Fowler's cost test: inherit TS tooling and LLM fluency, skip parser maintenance forever. The
+      semantic model (.usm) remains the asset.
+  - id: runtime-schema-validation
+    decision: Enforce constraints by validating at build() rather than type-level branding
+    rationale: >-
+      Keeps the fluent API simple and the JSON Schema the single source of truth; builders cannot
+      silently bypass the same validation MCP tools enforce.
+implementation:
+  primary: src/dsl/index.ts
+  test_code: tests/dsl.test.ts
+  test_code_status: manual
+see_also:
+  - usm/mcp-write
+  - usm/schema-v1
+  - usm/query-layer
