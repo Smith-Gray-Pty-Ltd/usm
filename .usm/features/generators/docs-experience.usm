@@ -1,0 +1,172 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/docs-experience
+$type: feature
+$version: 1
+$last_updated: "2026-08-14"
+summary: >-
+  Overhaul the generated docs site from a spec-dump into a real reading experience — suppress
+  empty templated stubs, surface the real TOGAF deliverables in the nav, widen the layout to use
+  the viewport, rebuild the homepage as navigation, and give the help and technical audiences
+  distinct voices.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Strategic review found the docs generators faithfully dump .usm content into VitePress defaults
+  but do not author a reading experience. Around 30 of 127 pages are empty placeholder stubs
+  (including a UI map for a CLI); the real TOGAF detailed-design output exists but is orphaned
+  from the nav; content is squeezed into VitePress's 688px default; the homepage is a layout:home
+  hero with no sidebar plus a README-style metrics dump; and the help/technical audiences differ
+  only by filtering, never by voice. Because usm generate produces this for every consumer
+  (daingerdainger-com and others), every flaw ships to every downstream docs site.
+status: in-progress
+flows:
+  - id: suppress-stubs
+    name: Suppress templated stubs a service has no data for
+    description: >-
+      A service only emits the architecture/ui/deployment/operations/decisions pages its .usm
+      actually populates. A CLI gets no UI map or production-deployment page.
+    steps:
+      - action: inspect
+        id: s1
+        target: each templated page generator checks whether the source service carries that section data
+      - action: omit
+        id: s2
+        target: skip emitting the page when the section is empty rather than writing a placeholder
+      - action: prune
+        id: s3
+        target: the matching sidebar entry is also omitted so nav has no dead links
+  - id: surface-togaf
+    name: Surface the real TOGAF deliverables as the Architecture section
+    description: >-
+      The togaf generator already produces Phase A-H deliverables; wire them into the dev-docs
+      sidebar as a real Architecture section instead of empty per-service architecture stubs.
+    steps:
+      - action: generate
+        id: s1
+        target: togaf output into the docs tree (not a parallel orphaned directory)
+      - action: wire
+        id: s2
+        target: sidebar Architecture group with Vision, Business, Data, Application, Technology, Governance links
+      - action: scope
+        id: s3
+        target: help audience omits the Architecture section (internal detail)
+  - id: widen-layout
+    name: Widen the layout to use the viewport
+    description: Override VitePress defaults so reference content, tables, code, and diagrams breathe.
+    steps:
+      - action: set
+        id: s1
+        target: --vp-layout-max-width and content-container max-width via generated theme CSS
+      - action: enable
+        id: s2
+        target: full-width code blocks and tables that break out of the prose column
+  - id: rebuild-homepage
+    name: Rebuild the homepage as navigation
+    description: >-
+      Drop the README-style metrics/identity dump; keep the hero and add a features grid whose cards
+      ARE the navigation into the docs.
+    steps:
+      - action: drop
+        id: s1
+        target: the At-a-glance, Identity, Who-its-for, Next-steps body markdown from index.md
+      - action: add
+        id: s2
+        target: a features grid of cards linking to Getting Started, Schema, CLI, MCP, Architecture (dev only)
+      - action: keep
+        id: s3
+        target: the hero actions (Get Started, Schema Reference)
+  - id: audience-voice
+    name: Give help and technical audiences distinct voices
+    description: >-
+      The same feature spec renders differently per audience — task-oriented for help,
+      reference-faithful for technical.
+    steps:
+      - action: render
+        id: s1
+        target: help voice leads with when-to-run, example output, troubleshooting, derived from flows and contracts
+      - action: render
+        id: s2
+        target: technical voice is the full spec-faithful reference (intent, flows, contracts, tests, decisions)
+      - action: share
+        id: s3
+        target: one source .usm file, two render paths
+  - id: anti-drift
+    name: Anti-drift and discoverability
+    description: Pin the getting-started version from package.json and enable VitePress sitemap on both sites.
+    steps:
+      - action: derive
+        id: s1
+        target: getting-started install version from package.json, not a hardcoded string
+      - action: enable
+        id: s2
+        target: sitemap.hostname in both VitePress configs
+contracts:
+  - id: no-empty-stubs
+    description: No empty placeholder pages are emitted
+    must_have:
+      - A templated section page is emitted only when the source service carries data for it
+      - Sidebar entries match emitted pages one-to-one (no dead links)
+      - A CLI never gets ui, production-deployment, or observability pages
+  - id: togaf-in-nav
+    description: The real TOGAF deliverables are reachable from the technical docs nav
+    must_have:
+      - dev-docs sidebar has an Architecture group linking the Phase A-H deliverables
+      - help audience omits the Architecture section
+      - No parallel orphaned togaf directory
+  - id: content-width
+    description: Reference content uses the viewport, not VitePress's 688px default
+    must_have:
+      - "--vp-layout-max-width overridden to ~1280 or wider"
+      - Code blocks and tables render full-width
+      - Applies to every consumer site on their next generate
+  - id: homepage-is-navigation
+    description: The homepage is a navigation surface, not a metrics dump
+    must_have:
+      - No At-a-glance, Identity, or Who-its-for body markdown on index.md
+      - A features grid of cards links into the primary doc sections
+      - Hero actions retained
+  - id: audience-voice-distinct
+    description: Help and technical audiences read differently for the same feature
+    must_have:
+      - Help feature page leads with when-to-run and example output
+      - Technical feature page is spec-faithful (full flows, contracts, tests)
+      - Same source .usm, two render paths
+  - id: no-handwritten-drift
+    description: No hand-written drift in generated docs
+    must_have:
+      - getting-started install version derived from package.json
+      - VitePress sitemap enabled on both audiences
+decisions:
+  - id: emit-only-when-populated
+    decision: Emit a templated page only when its source section is populated; never write a placeholder
+    rationale: >-
+      A placeholder promises depth and delivers nothing — worse than the page not existing.
+      Omission is honest.
+  - id: togaf-as-architecture-section
+    decision: Surface togaf output as the Architecture section of the docs site, not a separate target
+    rationale: >-
+      The detailed design already exists; the failure was discoverability. Wiring it into the nav
+      fixes both the empty stubs and the orphaned output in one move.
+  - id: css-not-config-for-width
+    decision: Widen via generated theme CSS custom properties, not VitePress config knobs
+    rationale: >-
+      CSS custom properties are the documented override path and survive VitePress minor bumps;
+      config knobs for layout do not exist.
+  - id: feature-cards-as-nav
+    decision: Use the VitePress features grid as homepage navigation rather than forcing a sidebar onto layout home
+    rationale: >-
+      Cards are the canonical landing-page nav pattern and keep the hero; forcing a sidebar means
+      abandoning the home layout entirely.
+  - id: voice-is-render-mode
+    decision: Audience is a render mode (voice), not just a filter
+    rationale: >-
+      Filtering alone produced two identical sites; the brief needs two different documents from
+      one source.
+implementation:
+  primary: ""
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/gen-markdown
+  - usm/gen-togaf
+  - usm/cli-docs

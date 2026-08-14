@@ -1134,6 +1134,14 @@ program
           }
           fs.writeFileSync(output.path, output.content, "utf-8");
           console.log(`→ ${output.path} (togaf)`);
+
+          // Also surface in the developer docs tree as the Architecture section
+          // (help audience omits it). Only during full generate, not standalone togaf.
+          if (runAll) {
+            const docsArchDir = path.join(root, ".usm-workspace", "docs", "architecture");
+            fs.mkdirSync(docsArchDir, { recursive: true });
+            fs.writeFileSync(path.join(docsArchDir, path.basename(output.path)), output.content, "utf-8");
+          }
         }
       } catch (err) {
         console.error(`✗ togaf — ${(err as Error).message}`);

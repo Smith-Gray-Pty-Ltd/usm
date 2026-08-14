@@ -632,12 +632,30 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     });
   }
 
-  // ── Developer-only: Architecture + Deployment ──────────────────────────────
+  // ── Developer-only: Architecture (TOGAF detailed design) + Deployment ──────
   if (audience === "developer") {
     const archItems: SidebarItem[] = [];
     if (docExists("architecture/architecture")) {
       archItems.push({ text: "System Architecture", link: "/architecture/architecture" });
     }
+
+    // TOGAF ADM Phase deliverables — the real detailed design content
+    const togafPages: Array<{ file: string; label: string }> = [
+      { file: "architecture/A-architecture-vision", label: "Architecture Vision" },
+      { file: "architecture/B-business-architecture", label: "Business Architecture" },
+      { file: "architecture/C1-data-architecture", label: "Data Architecture" },
+      { file: "architecture/C2-application-architecture", label: "Application Architecture" },
+      { file: "architecture/D-technology-architecture", label: "Technology Architecture" },
+      { file: "architecture/E-opportunities-and-solutions", label: "Opportunities & Solutions" },
+      { file: "architecture/G-implementation-governance", label: "Implementation Governance" },
+      { file: "architecture/H-architecture-change-management", label: "Change Management" },
+    ];
+    for (const page of togafPages) {
+      if (docExists(page.file)) {
+        archItems.push({ text: page.label, link: `/${page.file}` });
+      }
+    }
+
     if (docExists("data/models")) {
       archItems.push({ text: "Data Models", link: "/data/models" });
     }
@@ -740,6 +758,13 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
   // VitePress renders ```mermaid as <div class="language-mermaid"><pre><code>...</code></pre></div>.
   // We extract raw text from <pre><code>, set as div.textContent, then mermaid.run() renders SVG.
   // MutationObserver handles SPA nav. Dark mode clears data-processed and re-renders.
+
+  // Layout: widen from VitePress's cramped 688px default to a readable
+  // reference-doc width. Applies to every consumer site on their next generate.
+  const layoutCss =
+    ":root{--vp-layout-max-width:1280px}" +
+    ".VPDoc.has-sidebar .content-container,.VPDoc.has-aside .content-container{max-width:960px!important}";
+
   const mermaidBoot =
     "(function(){" +
     "var s=document.createElement('script');" +
@@ -783,6 +808,8 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
     "document.head.appendChild(s);" +
     "})();";
 
+  const sitemapHost = audience === "help" ? "https://docs.usm.dev" : "https://dev-docs.usm.dev";
+
   return `import { defineConfig } from 'vitepress'
 
 export default defineConfig({
@@ -792,8 +819,10 @@ export default defineConfig({
   ignoreDeadLinks: true,
   outDir: '.vitepress/dist',
   lastUpdated: true,
+  sitemap: { hostname: ${JSON.stringify(sitemapHost)} },
   head: [
-    ['script', {}, ${JSON.stringify(mermaidBoot)}]
+    ['script', {}, ${JSON.stringify(mermaidBoot)}],
+    ['style', {}, ${JSON.stringify(layoutCss)}]
   ],
   themeConfig: {
     ${navJson}

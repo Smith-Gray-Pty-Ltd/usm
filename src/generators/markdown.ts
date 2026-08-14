@@ -133,188 +133,38 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
     lines.push('      text: GitHub');
     lines.push(`      link: ${JSON.stringify(repo)}`);
   }
+
+  // Feature cards = the homepage's navigation. Each card links to a primary
+  // doc section so visitors land on the hero and immediately see where to go.
+  lines.push("");
+  lines.push("features:");
+  const features: Array<{ title: string; details: string; link: string }> = [
+    { title: "Getting Started", details: "Install, init, scan, generate — first-run walkthrough", link: "/getting-started" },
+    { title: "Schema Reference", details: "Every field in a .usm file", link: "/schema-reference" },
+    { title: "CLI Reference", details: "Every usm command and flag", link: "/cli-reference" },
+    { title: "MCP Tools", details: "Agent tools for the spec-first workflow", link: "/mcp-reference" },
+    { title: "Agent Setup", details: "Wire USM into Cursor, Claude, opencode, Copilot", link: "/agent-setup-guide" },
+    { title: "Language Support", details: "Route detection across 12 languages, 30+ frameworks", link: "/language-support" },
+  ];
+  // Architecture (TOGAF) card — only when the detailed-design content exists
+  const archVisionPath = path.join(root, ".usm-workspace", "docs", "architecture", "A-architecture-vision.md");
+  if (fs.existsSync(archVisionPath)) {
+    features.push({ title: "Architecture", details: "TOGAF detailed design — vision, business, data, application, technology", link: "/architecture/A-architecture-vision" });
+  }
+  for (const f of features) {
+    lines.push(`  - title: ${JSON.stringify(f.title)}`);
+    lines.push(`    details: ${JSON.stringify(f.details)}`);
+    lines.push(`    link: ${JSON.stringify(f.link)}`);
+  }
+
   lines.push("---");
   lines.push("");
 
-  // Short intro
-  lines.push(file.summary);
-  lines.push("");
-
-  // Version + generation info
+  // Minimal body — just the proof point, no metrics/identity dump
   lines.push(`::: info Version \`${version}\` · Generated ${generatedAt}`);
   lines.push("This site is **fully generated** from `.usm` files. Edit the source of truth, not the markdown.");
   lines.push(":::");
   lines.push("");
-
-  // Quick Start commands
-  lines.push("## Quick Start");
-  lines.push("");
-  lines.push("```bash");
-  lines.push(`npm install -g @smithgray/usm@${version}`);
-  lines.push("cd your-project");
-  lines.push("usm init          # Creates usmconfig.json");
-  lines.push("usm scan          # Detects services, routes, data models");
-  lines.push("usm generate      # Produces docs, Mermaid, OpenAPI, AGENTS.md");
-  lines.push("usm docs serve    # Preview at http://localhost:5173");
-  lines.push("```");
-  lines.push("");
-
-  // Quick stats
-  const allServiceRefs = file.services || [];
-  const appServiceIds = new Set<string>();
-  const sharedServiceIds = new Set<string>();
-  const packageIds = new Set<string>();
-  for (const svc of allServiceRefs) {
-    const classification = classifyServiceById(svc);
-    if (classification === "app") appServiceIds.add(svc.id);
-    else if (classification === "shared-service") sharedServiceIds.add(svc.id);
-    else packageIds.add(svc.id);
-  }
-  const featureCount = (file.index || []).length;
-  const builtCount = (file.index || []).filter((f) => f.status === "built" || f.status === "active").length;
-
-  lines.push("## At a glance");
-  lines.push("");
-  lines.push("| Metric | Value |");
-  lines.push("|--------|-------|");
-  lines.push(`| Features | ${featureCount} (${builtCount} built) |`);
-  if (appServiceIds.size > 0) lines.push(`| App services | ${appServiceIds.size} |`);
-  if (sharedServiceIds.size > 0) lines.push(`| Shared services | ${sharedServiceIds.size} |`);
-  if (packageIds.size > 0) lines.push(`| Packages | ${packageIds.size} |`);
-  lines.push("");
-
-  // Prominent link cards to key sections
-  lines.push("## Explore");
-  lines.push("");
-  lines.push("| Section | Description |");
-  lines.push("|---------|-------------|");
-  lines.push("| [Getting Started](/getting-started) | Install, init, scan, generate — first-run walkthrough |");
-  lines.push("| [Schema Reference](/schema-reference) | Field-by-field reference for every `.usm` type |");
-  lines.push("| [CLI Reference](/cli-reference) | Every `usm` command and flag |");
-  lines.push("| [MCP Tools](/mcp-reference) | Agent tools for the spec-first workflow |");
-  lines.push("| [Agent Setup Guide](/agent-setup-guide) | Wire USM into Cursor, Claude, Copilot |");
-  lines.push("| [Roadmap](/roadmap) | What's shipping next |");
-  lines.push("");
-
-  // Spec-first workflow diagram
-  lines.push("## Spec-first workflow");
-  lines.push("");
-  lines.push("```mermaid");
-  lines.push("flowchart LR");
-  lines.push("  A[Discuss feature] --> B[Draft .usm via MCP]");
-  lines.push("  B --> C[Human reviews markdown]");
-  lines.push("  C --> D[Write + validate .usm]");
-  lines.push("  D --> E[Implement in code]");
-  lines.push("  E --> F[usm generate]");
-  lines.push("  F --> G[Docs · Mermaid · OpenAPI · AGENTS.md]");
-  lines.push("  G --> H[Mark feature built]");
-  lines.push("```");
-  lines.push("");
-
-  // Featured example (tabs: YAML vs what it produces)
-  if (file.index && file.index.length > 0) {
-    const exampleFeature = file.index.find(
-      (f) => f.status === "built" || f.status === "active" || !f.status,
-    );
-    if (exampleFeature) {
-      const usmPath = path.resolve(root, exampleFeature.ref);
-      if (fs.existsSync(usmPath)) {
-        const usmContent = fs.readFileSync(usmPath, "utf-8");
-        const exampleLines = usmContent.split("\n").slice(0, 28);
-        const truncated = usmContent.split("\n").length > 28;
-        lines.push("## Featured example");
-        lines.push("");
-        lines.push(`A real feature from this project: **${exampleFeature.name || exampleFeature.id}** (\`${exampleFeature.ref}\`).`);
-        lines.push("");
-        lines.push("::: code-group");
-        lines.push("");
-        lines.push("```yaml [feature.usm]");
-        lines.push(exampleLines.join("\n"));
-        if (truncated) lines.push("# … truncated");
-        lines.push("```");
-        lines.push("");
-        lines.push("```bash [what it generates]");
-        lines.push("usm generate");
-        lines.push("# → markdown docs (this site)");
-        lines.push("# → Mermaid diagrams");
-        lines.push("# → OpenAPI / ArchiMate / TOGAF (when present)");
-        lines.push("# → AGENTS.md + rules files for Cursor / Claude / Copilot");
-        lines.push("# → Vitest specs from contracts + tests");
-        lines.push("```");
-        lines.push("");
-        lines.push(":::");
-        lines.push("");
-      }
-    }
-  }
-
-  // CTA: link to marketing site
-  lines.push("::: tip Using USM in production?");
-  lines.push("Visit [usm.dev](https://usm.dev) for the full story, language support, and community links.");
-  lines.push(":::");
-  lines.push("");
-
-  // Identity
-  lines.push("## Identity");
-  lines.push("");
-  lines.push("| Field | Value |");
-  lines.push("|-------|-------|");
-  lines.push(`| Name | ${file.identity.name} |`);
-  lines.push(`| Domain | ${file.identity.domain} |`);
-  if (file.identity.contact) lines.push(`| Contact | ${file.identity.contact} |`);
-  if (repo) lines.push(`| Repository | <${repo}> |`);
-  lines.push("");
-
-  // Services lists (kept for navigation)
-  const appServicesFromSystem = allServiceRefs.filter((s) => appServiceIds.has(s.id));
-  if (appServicesFromSystem.length > 0) {
-    lines.push("## App services");
-    lines.push("");
-    for (const svc of appServicesFromSystem) {
-      const port = svc.port ? ` (port ${svc.port})` : "";
-      lines.push(`- **${svc.name || slugToTitle(svc.id)}**${port}`);
-    }
-    lines.push("");
-  }
-
-  const sharedServicesFromSystem = allServiceRefs.filter((s) => sharedServiceIds.has(s.id));
-  if (sharedServicesFromSystem.length > 0) {
-    lines.push("## Shared services");
-    lines.push("");
-    for (const svc of sharedServicesFromSystem) {
-      lines.push(`- [${svc.name || slugToTitle(svc.id)}](/shared-services/${svc.id}/overview)`);
-    }
-    lines.push("");
-  }
-
-  // Roles
-  if (file.roles && file.roles.length > 0) {
-    lines.push("## Who it's for");
-    lines.push("");
-    for (const role of file.roles) {
-      lines.push(`- **${role.name}** — ${role.description.split("\n")[0].trim()}`);
-    }
-    lines.push("");
-  }
-
-  // Next steps
-  lines.push("## Next steps");
-  lines.push("");
-  lines.push("| Go here | If you want to… |");
-  lines.push("|--------|------------------|");
-  lines.push("| [Getting Started](/getting-started) | Install USM and run your first `init` → `scan` → `generate` |");
-  lines.push("| [Schema Reference](/schema-reference) | Understand every field in a `.usm` file |");
-  lines.push("| [CLI Reference](/cli-reference) | See every `usm` command and flag |");
-  lines.push("| [MCP Tools](/mcp-reference) | Wire agents into the spec-first loop |");
-  lines.push("| [Agent Setup Guide](/agent-setup-guide) | Connect Cursor / Claude / Copilot |");
-  lines.push("");
-
-  if (repo) {
-    lines.push("::: tip Contribute");
-    lines.push(`Source of truth: [\`.usm/\` on GitHub](${repo}/tree/main/.usm). Edit the specs, not the generated markdown.`);
-    lines.push(":::");
-    lines.push("");
-  }
 
   return {
     outputs: [
@@ -717,24 +567,10 @@ function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): G
   // Features section (populated by feature generator)
   outputs.push({ path: `${appRoot}/features/README.md`, content: sectionReadme("Features", "Feature documentation") });
 
-  // API section
-  outputs.push({ path: `${appRoot}/api/README.md`, content: sectionReadme("API", "API endpoints and contracts") });
-  outputs.push({ path: `${appRoot}/api/reference.md`, content: placeholder("API reference", file) });
-  outputs.push({ path: `${appRoot}/api/contracts.md`, content: placeholder("API contracts", file) });
-
-  // UI section
-  outputs.push({ path: `${appRoot}/ui/README.md`, content: sectionReadme("UI", "Pages and elements") });
-  outputs.push({ path: `${appRoot}/ui/ui-map.md`, content: placeholder("UI map", file) });
-  outputs.push({ path: `${appRoot}/ui/elements.md`, content: placeholder("Elements index", file) });
-
   // Deployment section
   outputs.push({ path: `${appRoot}/deployment/README.md`, content: sectionReadme("Deployment", "Deployment docs and runbooks") });
   outputs.push({ path: `${appRoot}/deployment/local-dev.md`, content: buildDeployLocalDev(file, slug) });
   outputs.push({ path: `${appRoot}/deployment/production.md`, content: buildDeployProduction(file, slug) });
-
-  // Testing section
-  outputs.push({ path: `${appRoot}/testing/README.md`, content: sectionReadme("Testing", "Test specs and strategy") });
-  outputs.push({ path: `${appRoot}/testing/specs.md`, content: placeholder("Test specifications", file) });
 
   // Operations section
   outputs.push({ path: `${appRoot}/operations/README.md`, content: sectionReadme("Operations", "Observability, incidents, backups") });
@@ -836,48 +672,12 @@ function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string)
     content: buildServiceOverview(file, slug),
   });
 
-  // Architecture section
-  outputs.push({ path: `${svcRoot}/architecture/README.md`, content: sectionReadme("Architecture", "System design") });
-  outputs.push({ path: `${svcRoot}/architecture/overview.md`, content: placeholder("Architecture overview", file) });
-  outputs.push({ path: `${svcRoot}/architecture/system-architecture.md`, content: placeholder("System architecture", file) });
-  outputs.push({ path: `${svcRoot}/architecture/modules.md`, content: buildModulesDoc(file) });
-  outputs.push({ path: `${svcRoot}/architecture/data-model.md`, content: placeholder("Data model", file) });
-  outputs.push({ path: `${svcRoot}/architecture/security.md`, content: placeholder("Security model", file) });
-
-  // Features section (for infrastructure services that may have their own features)
-  outputs.push({ path: `${svcRoot}/features/README.md`, content: sectionReadme("Features", "Feature documentation") });
-
-  // API section
-  outputs.push({ path: `${svcRoot}/api/README.md`, content: sectionReadme("API", "Service endpoints") });
-  outputs.push({ path: `${svcRoot}/api/reference.md`, content: placeholder("API reference", file) });
-  outputs.push({ path: `${svcRoot}/api/contracts.md`, content: placeholder("API contracts", file) });
-
-  // UI section
-  outputs.push({ path: `${svcRoot}/ui/README.md`, content: sectionReadme("UI", "Service pages") });
-  outputs.push({ path: `${svcRoot}/ui/ui-map.md`, content: placeholder("UI map", file) });
-  outputs.push({ path: `${svcRoot}/ui/elements.md`, content: placeholder("Elements index", file) });
-
-  // Deployment section
-  outputs.push({ path: `${svcRoot}/deployment/README.md`, content: sectionReadme("Deployment", "Deployment docs and runbooks") });
-  outputs.push({ path: `${svcRoot}/deployment/local-dev.md`, content: placeholder("Local development", file) });
-  outputs.push({ path: `${svcRoot}/deployment/production.md`, content: placeholder("Production deployment", file) });
-
-  // Testing section
-  outputs.push({ path: `${svcRoot}/testing/README.md`, content: sectionReadme("Testing", "Test specs") });
-  outputs.push({ path: `${svcRoot}/testing/specs.md`, content: placeholder("Test specifications", file) });
-
-  // Operations section
-  outputs.push({ path: `${svcRoot}/operations/README.md`, content: sectionReadme("Operations", "Observability, incidents, backups") });
-  outputs.push({ path: `${svcRoot}/operations/observability.md`, content: placeholder("Observability", file) });
-  outputs.push({ path: `${svcRoot}/operations/incident-response.md`, content: placeholder("Incident response", file) });
-
-  // Decisions section
-  outputs.push({ path: `${svcRoot}/decisions/README.md`, content: sectionReadme("Decisions", "Architecture Decision Records") });
-  outputs.push({ path: `${svcRoot}/decisions/0001-template.md`, content: adrTemplate() });
-
-  // Risks + Roadmap
-  outputs.push({ path: `${svcRoot}/risks.md`, content: buildRisksMd(file) });
-  outputs.push({ path: `${svcRoot}/roadmap.md`, content: buildRoadmapMd(file) });
+  // Architecture — only the modules sub-page has a real generator; the rest
+  // (overview/system-architecture/data-model/security) were always placeholders
+  // promising depth and delivering nothing. Emit only what has real content.
+  if (file.modules && Array.isArray(file.modules) && file.modules.length > 0) {
+    outputs.push({ path: `${svcRoot}/architecture/modules.md`, content: buildModulesDoc(file) });
+  }
 
   // Infrastructure (from service .usm infrastructure: field)
   if (file.infrastructure) {
@@ -886,6 +686,11 @@ function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string)
       content: buildInfrastructureDoc(file),
     });
   }
+
+  // Risks + Roadmap (real generators — show "none defined" when empty, which
+  // is informative, not a placeholder promising future content)
+  outputs.push({ path: `${svcRoot}/risks.md`, content: buildRisksMd(file) });
+  outputs.push({ path: `${svcRoot}/roadmap.md`, content: buildRoadmapMd(file) });
 
   return { outputs };
 }
