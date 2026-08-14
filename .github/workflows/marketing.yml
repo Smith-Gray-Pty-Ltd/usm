@@ -37,6 +37,12 @@ jobs:
         working-directory: web
         run: npm run build
 
+      # Cache fix: HTML must always revalidate (edge caches were serving stale
+      # sites after back-to-back deploys); hashed assets stay immutable.
+      - name: Write cache headers
+        run: |
+          printf '/*\n  Cache-Control: public, max-age=0, must-revalidate\n/_next/static/*\n  Cache-Control: public, max-age=31536000, immutable\n' > web/out/_headers
+
       - name: Install wrangler
         run: npm install -g wrangler@3
 
