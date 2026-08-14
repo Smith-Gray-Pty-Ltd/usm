@@ -444,7 +444,7 @@ function generateFeatureMarkdown(
   const statusBadge = file.status ? ` [${file.status}]` : "";
   lines.push(`# ${file.$id}${statusBadge}`);
   lines.push("");
-  lines.push(file.summary);
+  lines.push(escapeProse(file.summary));
   lines.push("");
 
   if (file.status) {
@@ -455,7 +455,7 @@ function generateFeatureMarkdown(
   // Intent
   lines.push("## Intent");
   lines.push("");
-  lines.push(file.intent);
+  lines.push(escapeProse(file.intent));
   lines.push("");
 
   // Decisions
@@ -2098,6 +2098,28 @@ function escapeTableCell(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\|/g, "\\|");
+}
+
+// HTML tags the generators intentionally emit inline in prose (allow-list).
+const SAFE_INLINE_TAGS = /<\/?(a|b|br|code|em|i|kbd|s|small|span|strong|sub|sup|u)\b[^<>]*>/g;
+
+/**
+ * Escape angle brackets in spec-authored prose so VitePress's Vue template
+ * compiler never sees a fake tag like `<this repo>` or `<repro + version>`
+ * ("Element is missing end tag" build failure). Real inline HTML from the
+ * allow-list passes through untouched.
+ */
+export function escapeProse(text: string): string {
+  // Placeholder-protect real tags, escape everything else, restore.
+  const keep: string[] = [];
+  const masked = text.replace(SAFE_INLINE_TAGS, (m) => {
+    keep.push(m);
+    return `%%USMTAG${keep.length - 1}%%`;
+  });
+  return masked
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/%%USMTAG(\d+)%%/g, (_, i) => keep[Number(i)]);
 }
 
 export function generateCliReference(root: string): GenerationResult {

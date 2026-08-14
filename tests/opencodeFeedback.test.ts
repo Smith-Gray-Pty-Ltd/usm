@@ -7,7 +7,7 @@ import {
   generateFeedbackProtocol,
   USM_UPSTREAM_TRACKER,
 } from "../src/generators/rulesFiles.js";
-import { generateFeedbackPage } from "../src/generators/markdown.js";
+import { generateFeedbackPage, escapeProse } from "../src/generators/markdown.js";
 import { validateUsm } from "../src/validate.js";
 import { parseUsm } from "../src/parse.js";
 import type { SystemUsm } from "../src/types.js";
@@ -153,6 +153,19 @@ describe("usm/opencode-integration", () => {
     expect(instructions).toMatch(/^applyTo:\s*"\*\*"$/m);
     expect(instructions).toMatch(/Before ANY code change/);
     expect(instructions).toContain(USM_UPSTREAM_TRACKER);
+  });
+});
+
+describe("escapeProse (VitePress Vue-template safety)", () => {
+  it("escapes fake tags so Vue never sees an unclosed element", () => {
+    expect(escapeProse("tracker: <this repo> with no scope")).toBe("tracker: &lt;this repo&gt; with no scope");
+    expect(escapeProse("--body \"<repro + version>\"")).toContain("&lt;repro + version&gt;");
+  });
+
+  it("keeps allow-listed inline HTML and normal text intact", () => {
+    expect(escapeProse("line<br>break")).toBe("line<br>break");
+    expect(escapeProse("<strong>x</strong> and <code>y</code>")).toBe("<strong>x</strong> and <code>y</code>");
+    expect(escapeProse("no brackets here")).toBe("no brackets here");
   });
 });
 
