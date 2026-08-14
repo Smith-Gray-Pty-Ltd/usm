@@ -729,18 +729,19 @@ function buildServiceReadme(file: ServiceUsm, slug: string, kind: "app" | "share
     lines.push("");
   }
 
-  // Sections
+  // Sections — only link to pages that are actually generated for this kind.
+  // Shared services get a lean set (overview/risks/roadmap); app services
+  // get the full architecture/deployment/operations/decisions tree.
   lines.push("## Sections");
   lines.push("");
   lines.push("- [Overview](overview.md)");
-  lines.push("- [Architecture](architecture/README.md)");
-  lines.push("- [Features](features/README.md)");
-  lines.push("- [API](api/README.md)");
-  lines.push("- [UI](ui/README.md)");
-  lines.push("- [Deployment](deployment/README.md)");
-  lines.push("- [Testing](testing/README.md)");
-  lines.push("- [Operations](operations/README.md)");
-  lines.push("- [Decisions](decisions/README.md)");
+  if (kind === "app") {
+    lines.push("- [Architecture](architecture/README.md)");
+    lines.push("- [Features](features/README.md)");
+    lines.push("- [Deployment](deployment/README.md)");
+    lines.push("- [Operations](operations/README.md)");
+    lines.push("- [Decisions](decisions/README.md)");
+  }
   lines.push("- [Risks](risks.md)");
   lines.push("- [Roadmap](roadmap.md)");
   lines.push("");
@@ -1138,7 +1139,7 @@ function buildRisksMd(file: ServiceUsm): string {
   } else {
     lines.push("No risks defined in this service's .usm file.");
     lines.push("");
-    lines.push("For platform-wide risks, see [Platform Risks](../../.usm-workspace/docs/risks.md).");
+    lines.push("For platform-wide risks, see [Platform Risks](/risks).");
     lines.push("");
   }
 
@@ -1160,7 +1161,7 @@ function buildRoadmapMd(file: ServiceUsm): string {
   } else {
     lines.push("No roadmap items defined in this service's .usm file.");
     lines.push("");
-    lines.push("For the platform roadmap, see [Platform Roadmap](../../.usm-workspace/docs/roadmap.md).");
+    lines.push("For the platform roadmap, see [Platform Roadmap](/roadmap).");
     lines.push("");
   }
 

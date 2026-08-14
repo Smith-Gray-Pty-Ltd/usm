@@ -274,6 +274,16 @@ const HELP_EXCLUDE_PATHS = [
   "risks.md",
   "architecture",
   "data",
+  // Internal/meta areas — USM describing its own generators, MCP tool build
+  // specs, schema-development specs, and internal module docs. Consumers want
+  // the reference pages (cli-reference, mcp-reference, schema-reference), not
+  // the per-feature build specs behind them.
+  "features/generators",
+  "features/mcp",
+  "features/schema",
+  "features/docs-and-schema-improvements",
+  "shared-services",
+  "packages",
 ];
 
 /**
@@ -343,6 +353,40 @@ function simplifyFeatureDoc(content: string): string {
  * - Excludes features that aren't built (unless visibility: public)
  * - Simplifies feature docs (removes contracts, tests, implementation, decisions)
  */
+/**
+ * Remove markdown table rows and list items whose link target doesn't exist
+ * in the help-docs tree. Fixes dead links in index/roadmap pages after
+ * feature filtering removes the target pages.
+ */
+function stripDeadLinks(content: string, dirPath: string): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let skipTableHeader = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Markdown table row: | text | [link](path) | ... — skip if link target missing
+    const linkMatch = line.match(/\[([^\]]*)\]\(([^)]+)\)/);
+    if (linkMatch) {
+      const target = linkMatch[2];
+      // Only check relative .md links (not http URLs or anchors)
+      if (!target.startsWith("http") && !target.startsWith("#") && target.endsWith(".md")) {
+        const targetPath = path.resolve(dirPath, target);
+        if (!fs.existsSync(targetPath)) {
+          // Skip this line (table row or list item with a dead link)
+          continue;
+        }
+      }
+    }
+
+    result.push(line);
+  }
+
+  // Clean up: remove empty tables (header + separator with no rows)
+  return result.join("\n").replace(/\|.*\|\n\|[-| :]+\|\n\n/g, "");
+}
+
 export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: string): number {
   let copied = 0;
 
@@ -387,6 +431,10 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
         if (relPath.startsWith("features/") && entry.name !== "index.md") {
           content = simplifyFeatureDoc(content);
         }
+
+        // Strip links to pages that don't exist in the help-docs tree
+        // (area-overview indexes and roadmap reference filtered-out features)
+        content = stripDeadLinks(content, path.dirname(dstPath));
 
         fs.writeFileSync(dstPath, content, "utf-8");
         copied++;

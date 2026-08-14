@@ -194,7 +194,7 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
     lines.push("\n");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "A-architecture-vision.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -283,7 +283,7 @@ function generatePhaseBBusiness(system: SystemUsm, features: FeatureUsm[], root:
     lines.push("\n");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "B-business-architecture.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -356,7 +356,7 @@ function generatePhaseC1Data(system: SystemUsm, dataFiles: DataUsm[], root: stri
     lines.push("> For the full ER diagram, see `.usm-workspace/docs/data/models.md`.\n\n");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "C1-data-architecture.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -438,7 +438,7 @@ function generatePhaseC2Application(system: SystemUsm, services: ServiceUsm[], f
     lines.push("");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "C2-application-architecture.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -554,7 +554,7 @@ function generatePhaseDTechnology(system: SystemUsm, services: ServiceUsm[], roo
   lines.push("```");
   lines.push("\n");
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "D-technology-architecture.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -607,7 +607,7 @@ function generatePhaseESolutions(system: SystemUsm, root: string): GenerationRes
     lines.push("\n");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "E-opportunities-and-solutions.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -673,7 +673,7 @@ function generatePhaseGGovernance(system: SystemUsm, features: FeatureUsm[], roo
     lines.push("\n");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "G-implementation-governance.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
@@ -757,7 +757,7 @@ function generatePhaseHChange(system: SystemUsm, services: ServiceUsm[], feature
     lines.push("\n");
   }
 
-  const content = lines.join("");
+  const content = lines.join("\n") + "\n";
   const filePath = writeDoc(root, "H-architecture-change-management.md", content);
   return { outputs: [{ path: filePath, content }] };
 }
