@@ -361,7 +361,6 @@ function simplifyFeatureDoc(content: string): string {
 function stripDeadLinks(content: string, dirPath: string): string {
   const lines = content.split("\n");
   const result: string[] = [];
-  let skipTableHeader = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

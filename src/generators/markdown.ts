@@ -262,22 +262,38 @@ function generateFeatureMarkdown(
     lines.push("");
   }
 
+  // Usage examples (from the spec's usage array — what appears in cli-reference
+  // but now also on the feature page itself for self-containment)
+  if (file.usage && Array.isArray(file.usage) && file.usage.length > 0) {
+    lines.push("## Usage");
+    lines.push("");
+    lines.push("```bash");
+    for (const u of file.usage) {
+      const usage = u as { command: string; description: string };
+      lines.push(`# ${usage.description}`);
+      lines.push(usage.command);
+      lines.push("");
+    }
+    lines.push("```");
+    lines.push("");
+  }
+
   // Intent
-  lines.push("## Intent");
+  lines.push("## Why this exists");
   lines.push("");
   lines.push(escapeProse(file.intent));
   lines.push("");
 
   // Decisions
   if (file.decisions && file.decisions.length > 0) {
-    lines.push("## Decisions");
+    lines.push("## Design decisions");
     lines.push("");
     renderDecisions(lines, file.decisions);
   }
 
   // Flows
   if (file.flows && file.flows.length > 0) {
-    lines.push("## Flows");
+    lines.push("## How it works");
     lines.push("");
     for (const flow of file.flows) {
       renderFlow(lines, flow);
@@ -304,7 +320,7 @@ function generateFeatureMarkdown(
 
   // Contracts
   if (file.contracts && file.contracts.length > 0) {
-    lines.push("## Contracts");
+    lines.push("## Guarantees");
     lines.push("");
     for (const contract of file.contracts) {
       renderContract(lines, contract);
@@ -313,7 +329,7 @@ function generateFeatureMarkdown(
 
   // Tests
   if (file.tests && file.tests.length > 0) {
-    lines.push("## Tests");
+    lines.push("## Test specifications");
     lines.push("");
     for (const test of file.tests) {
       renderTest(lines, test);
@@ -3983,8 +3999,11 @@ function renderFlow(lines: string[], flow: Flow): void {
     lines.push("");
   }
   flow.steps.forEach((step, i) => {
-    const target = step.target ? ` → ${step.target}` : "";
-    lines.push(`${i + 1}. **${step.action}**${target}`);
+    const action = step.action
+      ? step.action.charAt(0).toUpperCase() + step.action.slice(1)
+      : `Step ${i + 1}`;
+    const target = step.target ? ` — ${step.target}` : "";
+    lines.push(`${i + 1}. **${action}**${target}`);
     if (step.expect && step.expect.length > 0) {
       for (const exp of step.expect) {
         const entries = Object.entries(exp);

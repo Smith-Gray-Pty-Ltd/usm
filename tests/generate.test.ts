@@ -29,10 +29,10 @@ describe("generate markdown", () => {
     const parsed = parseUsmFile(path.join(FIXTURES, "feature.usm"));
     const result = generate(parsed, ["markdown"], "/tmp/test-root");
     expect(result.outputs.length).toBe(1);
-    expect(result.outputs[0].content).toContain("## Intent");
-    expect(result.outputs[0].content).toContain("## Flows");
-    expect(result.outputs[0].content).toContain("## Contracts");
-    expect(result.outputs[0].content).toContain("## Tests");
+    expect(result.outputs[0].content).toContain("## Why this exists");
+    expect(result.outputs[0].content).toContain("## How it works");
+    expect(result.outputs[0].content).toContain("## Guarantees");
+    expect(result.outputs[0].content).toContain("## Test specifications");
   });
 
   it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real system.usm", () => {
@@ -61,12 +61,12 @@ describe("generate markdown", () => {
     const result = generate(parsed, ["markdown"], "/tmp/test-root");
     expect(result.outputs.length).toBe(1);
     const content = result.outputs[0].content;
-    expect(content).toContain("## Intent");
-    expect(content).toContain("## Flows");
+    expect(content).toContain("## Why this exists");
+    expect(content).toContain("## How it works");
     expect(content).toContain("run-init");
-    expect(content).toContain("## Contracts");
+    expect(content).toContain("## Guarantees");
     expect(content).toContain("init-creates-config");
-    expect(content).toContain("## Tests");
+    expect(content).toContain("## Test specifications");
   });
 
   it("throws on unknown generator", () => {
