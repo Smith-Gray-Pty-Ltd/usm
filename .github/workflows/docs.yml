@@ -1,4 +1,4 @@
-name: Deploy help docs to docs.usm.dev
+name: Deploy docs to docs.usm.dev + dev-docs.usm.dev
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
 
 jobs:
   deploy:
-    name: Build and deploy help docs
+    name: Build and deploy both docs audiences
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -41,19 +41,44 @@ jobs:
       - name: Generate help docs
         run: node dist/cli/index.js generate --only help-docs
 
-      - name: Build help docs site
+      - name: Build technical docs site (developer audience)
+        run: node dist/cli/index.js docs build
+
+      - name: Build help docs site (help audience)
         run: node dist/cli/index.js docs build --audience help
+
+      # Cache fix: HTML must always revalidate (back-to-back deploys had edge
+      # caches serving stale sites for hours); hashed assets stay immutable.
+      # Written after builds — VitePress empties dist on each build.
+      - name: Write cache headers (both sites)
+        run: |
+          for dist in .usm-workspace/docs/.vitepress/dist .usm-workspace/help-docs/.vitepress/dist; do
+            if [ -d "$dist" ]; then
+              printf '/*\n  Cache-Control: public, max-age=0, must-revalidate\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n' > "$dist/_headers"
+            fi
+          done
 
       - name: Install wrangler
         run: npm install -g wrangler@3
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy help docs → docs.usm.dev
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           wrangler pages deploy .usm-workspace/help-docs/.vitepress/dist \
             --project-name=usm-docs \
+            --branch=main \
+            --commit-dirty=true \
+            --commit-message="${{ github.event.head_commit.message }}"
+
+      - name: Deploy technical docs → dev-docs.usm.dev
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          wrangler pages deploy .usm-workspace/docs/.vitepress/dist \
+            --project-name=usm-dev-docs \
             --branch=main \
             --commit-dirty=true \
             --commit-message="${{ github.event.head_commit.message }}"

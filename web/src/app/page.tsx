@@ -150,7 +150,8 @@ export default function Home() {
             USM
           </a>
           <div className="flex items-center gap-5 text-sm">
-            <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Docs</a>
+            <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Help Docs</a>
+            <a href="https://dev-docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Technical Docs</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <Star className="w-4 h-4" />
               GitHub
@@ -185,6 +186,12 @@ export default function Home() {
                   Install Now <ArrowRight className="w-4 h-4 ml-1" />
                 </a>
                 <a href="#see-it" className={buttonVariants({ size: "lg", variant: "outline" })}>Try in 60 seconds</a>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Docs:{" "}
+                <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground transition-colors">Help Docs</a>
+                {" · "}
+                <a href="https://dev-docs.usm.dev" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground transition-colors">Technical Docs</a>
               </div>
             </div>
             <FadeIn delay={200}>
@@ -538,6 +545,21 @@ export default function Home() {
               </FadeIn>
             ))}
           </div>
+          <FadeIn delay={200}>
+            <div className="mt-8 border border-border rounded-lg p-5 text-center">
+              <p className="text-sm text-muted-foreground mb-3">
+                Both documentation sites below are generated from the same <code className="text-xs">.usm/</code> directory — different audiences, zero separate maintenance:
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "outline" })}>
+                  Help Docs — docs.usm.dev
+                </a>
+                <a href="https://dev-docs.usm.dev" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm", variant: "outline" })}>
+                  Technical Docs — dev-docs.usm.dev
+                </a>
+              </div>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
@@ -626,7 +648,8 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-8 flex items-center justify-between text-sm text-muted-foreground">
           <div>MIT © 2026 Smith &amp; Gray Pty Ltd — v{USM_VERSION}</div>
           <div className="flex items-center gap-5">
-            <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Docs</a>
+            <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Help Docs</a>
+            <a href="https://dev-docs.usm.dev" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Technical Docs</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
           </div>
         </div>
