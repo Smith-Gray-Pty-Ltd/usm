@@ -14,7 +14,7 @@ describe("generate markdown", () => {
     const result = generate(parsed, ["markdown"], "/tmp/test-root");
     expect(result.outputs.length).toBeGreaterThanOrEqual(1);
     expect(result.outputs[0].content).toContain("Example System");
-    expect(result.outputs[0].content).toContain("features:");
+    expect(result.outputs[0].content).toContain("fully generated");
     expect(result.outputs[0].path).toMatch(/\.md$/);
   });
 
@@ -41,8 +41,8 @@ describe("generate markdown", () => {
     expect(result.outputs.length).toBe(1);
     const content = result.outputs[0].content;
     expect(content).toContain("Universal System Map");
-    expect(content).toContain("features:");
     expect(content).toContain("fully generated");
+    expect(content).toContain("Getting Started");
   });
 
   it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real cli.usm", () => {

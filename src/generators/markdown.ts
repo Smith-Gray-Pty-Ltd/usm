@@ -113,58 +113,18 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   const version = readPackageVersion();
   const generatedAt = new Date().toISOString().slice(0, 10);
 
-  // VitePress home frontmatter — hero only, no principle cards
-  lines.push("---");
-  lines.push("layout: home");
+  // No layout: home — that hides the sidebar. A normal doc page shows the
+  // sidebar immediately, which IS the navigation. The marketing hero lives
+  // on usm.dev; the docs site's job is to get people into the docs fast.
+  lines.push(`# ${name}`);
   lines.push("");
-  lines.push("hero:");
-  lines.push(`  name: ${JSON.stringify(name)}`);
-  lines.push(`  text: ${JSON.stringify("Structured source of truth for agentic systems")}`);
-  lines.push(`  tagline: ${JSON.stringify(tagline.slice(0, 160))}`);
-  lines.push("  actions:");
-  lines.push("    - theme: brand");
-  lines.push('      text: Get Started');
-  lines.push("      link: /getting-started");
-  lines.push("    - theme: alt");
-  lines.push('      text: Schema Reference');
-  lines.push("      link: /schema-reference");
-  if (repo) {
-    lines.push("    - theme: alt");
-    lines.push('      text: GitHub');
-    lines.push(`      link: ${JSON.stringify(repo)}`);
-  }
-
-  // Feature cards = the homepage's navigation. Each card links to a primary
-  // doc section so visitors land on the hero and immediately see where to go.
+  lines.push(tagline);
   lines.push("");
-  lines.push("features:");
-  const features: Array<{ title: string; details: string; link: string }> = [
-    { title: "Getting Started", details: "Install, init, scan, generate — first-run walkthrough", link: "/getting-started" },
-    { title: "Schema Reference", details: "Every field in a .usm file", link: "/schema-reference" },
-    { title: "CLI Reference", details: "Every usm command and flag", link: "/cli-reference" },
-    { title: "MCP Tools", details: "Agent tools for the spec-first workflow", link: "/mcp-reference" },
-    { title: "Agent Setup", details: "Wire USM into Cursor, Claude, opencode, Copilot", link: "/agent-setup-guide" },
-    { title: "Language Support", details: "Route detection across 12 languages, 30+ frameworks", link: "/language-support" },
-  ];
-  // Architecture (TOGAF) card — only when the detailed-design content exists
-  const archVisionPath = path.join(root, ".usm-workspace", "docs", "architecture", "A-architecture-vision.md");
-  if (fs.existsSync(archVisionPath)) {
-    features.push({ title: "Architecture", details: "TOGAF detailed design — vision, business, data, application, technology", link: "/architecture/A-architecture-vision" });
-  }
-  for (const f of features) {
-    lines.push(`  - title: ${JSON.stringify(f.title)}`);
-    lines.push(`    details: ${JSON.stringify(f.details)}`);
-    lines.push(`    link: ${JSON.stringify(f.link)}`);
-  }
-
-  lines.push("---");
-  lines.push("");
-
-  // Minimal body — just the proof point, no metrics/identity dump
   lines.push(`::: info Version \`${version}\` · Generated ${generatedAt}`);
   lines.push("This site is **fully generated** from `.usm` files. Edit the source of truth, not the markdown.");
   lines.push(":::");
   lines.push("");
+  lines.push(`Start with **[Getting Started](/getting-started)** or browse the sidebar →`);
 
   return {
     outputs: [

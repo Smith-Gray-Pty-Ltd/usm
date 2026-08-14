@@ -759,11 +759,14 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
   // We extract raw text from <pre><code>, set as div.textContent, then mermaid.run() renders SVG.
   // MutationObserver handles SPA nav. Dark mode clears data-processed and re-renders.
 
-  // Layout: widen from VitePress's cramped 688px default to a readable
-  // reference-doc width. Applies to every consumer site on their next generate.
+  // Layout: full-screen flex — content fills the viewport beside the sidebar.
+  // No centered max-width cap; the sidebar takes its natural width and the
+  // doc area takes the rest. Paragraph line-length stays readable via a
+  // max-width on prose elements only (not the container).
   const layoutCss =
-    ":root{--vp-layout-max-width:1280px}" +
-    ".VPDoc.has-sidebar .content-container,.VPDoc.has-aside .content-container{max-width:960px!important}";
+    ":root{--vp-layout-max-width:100%}" +
+    ".VPDoc.has-sidebar .content-container{max-width:100%!important}" +
+    ".vp-doc :not(pre) > p{max-width:80ch}";
 
   const mermaidBoot =
     "(function(){" +
