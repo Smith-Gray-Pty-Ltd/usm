@@ -19,6 +19,7 @@ Follow this workflow when implementing features:
    - \`usm_list\` to see all .usm files
    - \`usm_read\` to read a specific feature or service
    - \`usm_search\` to find features by keyword
+   - \`usm_query\` to run predicate queries ("features where status = planned and contracts = 0")
    - \`usm_summary\` for a quick overview
 
 ### When Implementing a New Feature
@@ -30,16 +31,23 @@ Follow this workflow when implementing features:
 6. Call \`usm_update_feature_status\` to mark as built (with implementation path)
 
 ### When Updating an Existing Feature
-1. Read the existing .usm spec first
+1. Read the existing .usm spec first (\`usm_read\`)
 2. Make code changes
-3. Call \`usm_update_feature\` if the spec needs updating
+3. Call \`usm_update_feature\` if the spec needs updating (id-bearing arrays merge by id)
 4. Call \`usm_update_feature_status\` if status changed
+
+### When Bootstrapping or Updating System/Service Specs
+1. Use \`usm_write_system\` to create or replace system.usm
+2. Use \`usm_update_system\` to add services, roles, or auth_schemes (merges by id)
+3. Use \`usm_write_service\` to create a service file (e.g. .usm/apps/my-app/service.usm)
+4. Use \`usm_update_service\` to update service fields (data_models, routes merge by id)
 
 ### Key Rules
 - NEVER create .usm files by hand — use the MCP write tools (they validate)
 - ALWAYS show the human the markdown before writing to disk
 - ALWAYS update feature status after implementation
 - The .usm file IS the documentation — if it's wrong, the docs are wrong
+- Use \`usm_query\` for impact analysis ("what depends on this service?")
 `;
 
 /**
@@ -194,10 +202,14 @@ function generateUsmSection(system: SystemUsm, services: ServiceUsm[]): string {
   lines.push("");
   lines.push("**Write tools** (author and update .usm files):");
   lines.push("- `usm_draft_feature` — draft a feature spec (returns YAML + markdown preview)");
-  lines.push("- `usm_write_feature` — write a .usm file to disk (validates first)");
-  lines.push("- `usm_update_feature` — update fields on an existing feature");
+  lines.push("- `usm_write_feature` — write a feature .usm file to disk (validates first)");
+  lines.push("- `usm_update_feature` — update fields on an existing feature (id-bearing arrays merge by id)");
   lines.push("- `usm_update_feature_status` — update feature status (planned→built)");
-  lines.push("- `usm_report_feedback` — report a bug/improvement as a structured $type: feedback entry (respects feedback policy)");
+  lines.push("- `usm_write_system` — create or replace system.usm (validates $type: system)");
+  lines.push("- `usm_write_service` — create or replace a service .usm file");
+  lines.push("- `usm_update_system` — update fields on system.usm (services/index/roles merge by id)");
+  lines.push("- `usm_update_service` — update fields on a service file (data_models/routes merge by id)");
+  lines.push("- `usm_report_feedback` — report a bug/improvement (scope-aware: project vs USM tool upstream)");
   lines.push("");
 
   // Workflow
@@ -380,8 +392,8 @@ then continue. Drift compounds — correcting early is cheap.
  * self-checks stay salient where the full file does not.
  */
 function ironRulesBody(): string {
-  return `1. Before ANY code change: does a .usm spec govern this? Find it (\`usm_search\`/\`usm_read\`) and read its contracts BEFORE editing. No spec for new work → draft one (\`usm_draft_feature\`), show the human the markdown, get approval (\`usm_write_feature\`) — BEFORE writing code.
-2. NEVER hand-write .usm files — use the MCP write tools (they validate). NEVER write a spec without showing the human the markdown preview first.
+  return `1. Before ANY code change: does a .usm spec govern this? Find it (\`usm_search\`/\`usm_read\`/\`usm_query\`) and read its contracts BEFORE editing. No spec for new work → draft one (\`usm_draft_feature\`), show the human the markdown, get approval (\`usm_write_feature\`) — BEFORE writing code.
+2. NEVER hand-write .usm files — use the MCP write tools (they validate). Use \`usm_write_system\`/\`usm_write_service\` for system and service files, not just feature tools. NEVER write a spec without showing the human the markdown preview first.
 3. After implementing: update the spec (\`usm_update_feature\` / \`usm_update_feature_status\`) in the same session. Code and spec must not drift.
 4. Found a bug? Classify scope first: this project → feedback policy in AGENTS.md; the USM tool itself (CLI/MCP/generators/schema) → ${USM_UPSTREAM_TRACKER} — never this repo's tracker. NEVER create ad-hoc tracking files (bugs.md, ISSUES.md).
 5. Drifted? If you've been editing code without consulting specs: STOP, read the governing spec, reconcile, continue.`;
