@@ -170,10 +170,16 @@
                 "type": "string"
               },
               "ref": {
-                "type": "string"
+                "type": "string",
+                "description": "Local path (apps/my-app) or URL for external services (https://api.example.com)"
               },
               "port": {
                 "type": "integer"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["web-app", "api", "worker", "idp", "llm-gateway", "agent-flows", "database", "cache", "queue", "shared", "external"],
+                "description": "Service type. 'external' for SaaS/third-party dependencies not in the repo."
               },
               "depends_on": {
                 "type": "array",
@@ -187,6 +193,21 @@
               "name",
               "ref"
             ],
+            "additionalProperties": false
+          }
+        },
+        "auth_schemes": {
+          "type": "array",
+          "description": "Named authentication schemes referenced by routes and services.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "Scheme identifier (e.g. 'zitadel-oidc', 'embed-key')" },
+              "type": { "type": "string", "enum": ["oidc", "api-key", "session", "basic", "embed-key", "oauth2", "none"], "description": "Authentication type" },
+              "description": { "type": "string" },
+              "config_ref": { "type": "string", "description": "Reference to config/env documentation" }
+            },
+            "required": ["id", "type"],
             "additionalProperties": false
           }
         },
@@ -1263,11 +1284,29 @@
                   "api"
                 ]
               },
+              "protocol": {
+                "type": "string",
+                "enum": ["rest", "graphql", "sse", "websocket"],
+                "description": "Communication protocol (defaults to 'rest' for API routes)",
+                "default": "rest"
+              },
               "http_methods": {
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
+              },
+              "operation": {
+                "type": "string",
+                "description": "GraphQL operation name (query/mutation/subscription) or RPC method"
+              },
+              "response_type": {
+                "type": "string",
+                "description": "Response format (e.g. 'json', 'sse', 'text/html')"
+              },
+              "auth": {
+                "type": "string",
+                "description": "Auth scheme id from system.auth_schemes, or freeform description"
               },
               "file_path": {
                 "type": "string"

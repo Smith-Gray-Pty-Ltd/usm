@@ -29,7 +29,15 @@ export interface ServiceRef {
   name: string;
   ref: string;
   port?: number;
+  type?: string;
   depends_on?: string[];
+}
+
+export interface AuthScheme {
+  id: string;
+  type: "oidc" | "api-key" | "session" | "basic" | "embed-key" | "oauth2" | "none";
+  description?: string;
+  config_ref?: string;
 }
 
 export interface ApiRef {
@@ -100,6 +108,7 @@ export interface SystemUsm extends UsmCommon {
   nextjs_breaking_changes?: string;
   principles?: Principle[];
   roles?: Role[];
+  auth_schemes?: AuthScheme[];
   local_development?: LocalDevelopment;
   feedback?: FeedbackPolicy;
 }
@@ -480,7 +489,11 @@ export interface Implementation {
 export interface FeatureRoute {
   path: string;
   type: "page" | "api";
+  protocol?: "rest" | "graphql" | "sse" | "websocket";
   http_methods?: string[];
+  operation?: string;
+  response_type?: string;
+  auth?: string;
   file_path?: string;
   app?: string;
   auth_required?: boolean;
