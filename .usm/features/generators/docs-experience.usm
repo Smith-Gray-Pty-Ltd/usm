@@ -4,21 +4,21 @@ $type: feature
 $version: 1
 $last_updated: "2026-08-14"
 summary: >-
-  Overhaul the generated docs site from a spec-dump into a real reading experience — suppress
-  empty templated stubs, surface the real TOGAF deliverables in the nav, widen the layout to use
-  the viewport, rebuild the homepage as navigation, and give the help and technical audiences
-  distinct voices.
+  Overhaul the generated docs site from a spec-dump into a real reading experience — suppress empty
+  templated stubs, surface the real TOGAF deliverables in the nav, widen the layout to use the
+  viewport, rebuild the homepage as navigation, and give the help and technical audiences distinct
+  voices.
 $system: usm/system
 $service: usm/cli
 intent: >-
   Strategic review found the docs generators faithfully dump .usm content into VitePress defaults
   but do not author a reading experience. Around 30 of 127 pages are empty placeholder stubs
-  (including a UI map for a CLI); the real TOGAF detailed-design output exists but is orphaned
-  from the nav; content is squeezed into VitePress's 688px default; the homepage is a layout:home
-  hero with no sidebar plus a README-style metrics dump; and the help/technical audiences differ
-  only by filtering, never by voice. Because usm generate produces this for every consumer
+  (including a UI map for a CLI); the real TOGAF detailed-design output exists but is orphaned from
+  the nav; content is squeezed into VitePress's 688px default; the homepage is a layout:home hero
+  with no sidebar plus a README-style metrics dump; and the help/technical audiences differ only by
+  filtering, never by voice. Because usm generate produces this for every consumer
   (daingerdainger-com and others), every flaw ships to every downstream docs site.
-status: in-progress
+status: built
 flows:
   - id: suppress-stubs
     name: Suppress templated stubs a service has no data for
@@ -46,7 +46,9 @@ flows:
         target: togaf output into the docs tree (not a parallel orphaned directory)
       - action: wire
         id: s2
-        target: sidebar Architecture group with Vision, Business, Data, Application, Technology, Governance links
+        target: >-
+          sidebar Architecture group with Vision, Business, Data, Application, Technology,
+          Governance links
       - action: scope
         id: s3
         target: help audience omits the Architecture section (internal detail)
@@ -56,7 +58,7 @@ flows:
     steps:
       - action: set
         id: s1
-        target: --vp-layout-max-width and content-container max-width via generated theme CSS
+        target: "--vp-layout-max-width and content-container max-width via generated theme CSS"
       - action: enable
         id: s2
         target: full-width code blocks and tables that break out of the prose column
@@ -71,7 +73,9 @@ flows:
         target: the At-a-glance, Identity, Who-its-for, Next-steps body markdown from index.md
       - action: add
         id: s2
-        target: a features grid of cards linking to Getting Started, Schema, CLI, MCP, Architecture (dev only)
+        target: >-
+          a features grid of cards linking to Getting Started, Schema, CLI, MCP, Architecture (dev
+          only)
       - action: keep
         id: s3
         target: the hero actions (Get Started, Schema Reference)
@@ -83,10 +87,14 @@ flows:
     steps:
       - action: render
         id: s1
-        target: help voice leads with when-to-run, example output, troubleshooting, derived from flows and contracts
+        target: >-
+          help voice leads with when-to-run, example output, troubleshooting, derived from flows and
+          contracts
       - action: render
         id: s2
-        target: technical voice is the full spec-faithful reference (intent, flows, contracts, tests, decisions)
+        target: >-
+          technical voice is the full spec-faithful reference (intent, flows, contracts, tests,
+          decisions)
       - action: share
         id: s3
         target: one source .usm file, two render paths
@@ -140,8 +148,8 @@ decisions:
   - id: emit-only-when-populated
     decision: Emit a templated page only when its source section is populated; never write a placeholder
     rationale: >-
-      A placeholder promises depth and delivers nothing — worse than the page not existing.
-      Omission is honest.
+      A placeholder promises depth and delivers nothing — worse than the page not existing. Omission
+      is honest.
   - id: togaf-as-architecture-section
     decision: Surface togaf output as the Architecture section of the docs site, not a separate target
     rationale: >-
@@ -153,19 +161,21 @@ decisions:
       CSS custom properties are the documented override path and survive VitePress minor bumps;
       config knobs for layout do not exist.
   - id: feature-cards-as-nav
-    decision: Use the VitePress features grid as homepage navigation rather than forcing a sidebar onto layout home
+    decision: >-
+      Use the VitePress features grid as homepage navigation rather than forcing a sidebar onto
+      layout home
     rationale: >-
       Cards are the canonical landing-page nav pattern and keep the hero; forcing a sidebar means
       abandoning the home layout entirely.
   - id: voice-is-render-mode
     decision: Audience is a render mode (voice), not just a filter
     rationale: >-
-      Filtering alone produced two identical sites; the brief needs two different documents from
-      one source.
+      Filtering alone produced two identical sites; the brief needs two different documents from one
+      source.
 implementation:
-  primary: ""
-  test_code: ""
-  test_code_status: none
+  primary: src/generators/markdown.ts
+  test_code: tests/generate.test.ts
+  test_code_status: manual
 see_also:
   - usm/gen-markdown
   - usm/gen-togaf
