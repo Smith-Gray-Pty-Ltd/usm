@@ -1686,7 +1686,8 @@ export function generateGettingStartedDoc(system: SystemUsm, root: string): Gene
   lines.push("");
   lines.push("```bash [3. Generate + serve]");
   lines.push("usm generate");
-  lines.push("pnpm add -D vitepress    # once, if you want local docs");
+  lines.push("# Install VitePress (optional but recommended for local docs preview)");
+  lines.push("npm install -D vitepress    # or: pnpm add -Dw vitepress (monorepo)");
   lines.push("usm docs serve --audience help");
   lines.push("# Open the printed localhost URL");
   lines.push("```");

@@ -157,15 +157,69 @@ function isVitePressInstalled(): boolean {
 }
 
 /**
- * Print helpful error if VitePress is missing.
+ * Ensure VitePress is available. If missing, offer to install it
+ * automatically (interactive prompt) or exit with guidance.
  */
-function requireVitePress(): void {
-  if (!isVitePressInstalled()) {
-    console.error("VitePress is not installed. It's an optional dependency of USM.");
-    console.error("\nInstall it with:");
-    console.error("  pnpm add -D vitepress");
-    console.error("  # or");
-    console.error("  npm install -D vitepress");
+async function requireVitePress(): Promise<void> {
+  if (isVitePressInstalled()) return;
+
+  const { execSync } = await import("node:child_process");
+
+  // Detect the package manager from lockfiles
+  const usePnpm = fs.existsSync(path.join(process.cwd(), "pnpm-lock.yaml"));
+  const isMonorepo = fs.existsSync(path.join(process.cwd(), "pnpm-workspace.yaml"));
+  const useNpm = fs.existsSync(path.join(process.cwd(), "package-lock.json"));
+
+  let installCmd: string;
+  if (usePnpm) {
+    installCmd = isMonorepo ? "pnpm add -Dw vitepress" : "pnpm add -D vitepress";
+  } else if (useNpm) {
+    installCmd = "npm install -D vitepress";
+  } else {
+    // Default to npm
+    installCmd = "npm install -D vitepress";
+  }
+
+  // Interactive prompt — offer to install automatically
+  const isTTY = process.stdin.isTTY;
+  if (isTTY) {
+    console.log("\nVitePress is not installed (optional peer dependency for docs preview).\n");
+    process.stdout.write(`Install it now with \`${installCmd}\`? [Y/n] `);
+
+    const answer = await new Promise<string>((resolve) => {
+      process.stdin.setEncoding("utf-8");
+      process.stdin.resume();
+      process.stdin.once("data", (data: string) => {
+        process.stdin.pause();
+        resolve(data.trim().toLowerCase());
+      });
+    });
+
+    if (answer === "" || answer === "y" || answer === "yes") {
+      console.log(`\nRunning: ${installCmd}\n`);
+      try {
+        execSync(installCmd, { cwd: process.cwd(), stdio: "inherit" });
+        // Verify it installed
+        if (isVitePressInstalled()) {
+          console.log("✓ VitePress installed.\n");
+          return;
+        }
+        // Maybe installed to a workspace root — check again after a moment
+        console.error("Install completed but VitePress still not resolvable. You may need to restart your terminal or install manually.");
+        process.exit(1);
+      } catch {
+        console.error(`\nInstall failed. Run \`${installCmd}\` manually and try again.`);
+        process.exit(1);
+      }
+    } else {
+      console.error(`\nSkipped. Install VitePress manually: \`${installCmd}\``);
+      process.exit(1);
+    }
+  } else {
+    // Non-interactive (CI, piped input) — just show the guidance
+    console.error("VitePress is not installed. It's an optional dependency of USM.\n");
+    console.error(`Install it with: \`${installCmd}\`\n`);
+    console.error("Or use --skip-docs with usm generate to skip the docs build step.");
     process.exit(1);
   }
 }
@@ -908,7 +962,7 @@ function ensureIndexPage(docsRoot: string): void {
  * Write the VitePress config and run vitepress build.
  */
 export async function docsBuild(root: string, audience: Audience = "developer"): Promise<void> {
-  requireVitePress();
+  await requireVitePress();
 
   // Determine docs root based on audience
   const docsRoot = audience === "help"
@@ -990,7 +1044,7 @@ export interface DocsServeOptions {
  */
 export async function docsServe(root: string, options: DocsServeOptions): Promise<void> {
   const { port: requestedPort, audience = "developer", autoPort = false, restart = false, watch = false, open = false } = options;
-  requireVitePress();
+  await requireVitePress();
 
   // Determine docs root based on audience
   const docsRoot = audience === "help"
