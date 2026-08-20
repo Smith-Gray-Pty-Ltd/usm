@@ -92,7 +92,7 @@ const jsonLd = {
       license: "https://github.com/Smith-Gray-Pty-Ltd/usm/blob/main/LICENSE",
       featureList: [
         "Spec-first workflow (discuss → spec → review → build → documented)",
-        "14 MCP tools (9 read + 5 write) for AI agents",
+        "18 MCP tools (9 read + 9 write) for AI agents",
         "Generates markdown, Mermaid, OpenAPI, AGENTS.md, Vitest specs, ArchiMate, TOGAF, Structurizr",
         "Works with opencode, Cursor, Claude Code, Codex, GitHub Copilot",
         "Per-message workflow enforcement via always-on iron rules",

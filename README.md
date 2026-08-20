@@ -138,7 +138,7 @@ spec becomes the docs.
 USM is a single Node.js package with three entry points:
 
 - **`usm` CLI** — `init`, `scan`, `validate`, `generate` (with `--only docs|togaf|archimate|structurizr|rules|…` targets), `query`, `import`, `docs serve/build`, `feedback`, `upgrade`, `enrich`, `scaffold`, `scaffold-project`, `info`, `mcp serve`
-- **MCP server** — 14 tools (`list`, `read`, `search`, `query`, `validate`, `summary`, `references`, `get_contracts`, `get_flows`, `draft_feature`, `write_feature`, `update_feature`, `update_feature_status`, `report_feedback`) for AI agents to navigate, query, and author your system
+- **MCP server** — 18 tools (`list`, `read`, `search`, `query`, `validate`, `summary`, `references`, `get_contracts`, `get_flows`, `draft_feature`, `write_feature`, `update_feature`, `update_feature_status`, `report_feedback`, `write_system`, `write_service`, `update_system`, `update_service`) for AI agents to navigate, query, and author your system
 - **Generators** — markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, Structurizr, AGENTS.md + rules files, Vitest specs — all derived from the same `.usm` source
 
 USM distributes as an **MCP server plus rules files** — it integrates with

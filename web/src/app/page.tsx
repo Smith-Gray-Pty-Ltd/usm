@@ -10,7 +10,7 @@ import { ToolLogos } from "@/components/tool-logos";
 import usmPkg from "../../../package.json";
 
 const USM_VERSION = usmPkg.version;
-const MCP_TOOL_COUNT = 14;
+const MCP_TOOL_COUNT = 18;
 import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,

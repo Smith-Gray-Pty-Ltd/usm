@@ -2,11 +2,11 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
-import { parseUsmFile, isFeatureFile, findAllUsmFiles } from "../parse.js";
+import { parseUsmFile, isFeatureFile, isSystemFile, isServiceFile, findAllUsmFiles } from "../parse.js";
 import { validateUsm, validateUsmString } from "../validate.js";
 import { generateMarkdown } from "../generators/markdown.js";
 import { resolvePath, readFileOrNull, allUsmFilesInMonorepo } from "../mcp-utils.js";
-import type { FeatureUsm } from "../types.js";
+import type { FeatureUsm, UsmFile } from "../types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -14,11 +14,18 @@ import type { FeatureUsm } from "../types.js";
  * Find a .usm file by its $id across the monorepo.
  */
 function findFeatureById(id: string): string | null {
+  return findFileById(id, isFeatureFile);
+}
+
+/**
+ * Find a file by $id and optional $type filter. Works for any .usm file type.
+ */
+function findFileById(id: string, typeCheck?: (file: unknown) => boolean): string | null {
   const files = allUsmFilesInMonorepo();
   for (const filePath of files) {
     try {
       const parsed = parseUsmFile(filePath);
-      if (parsed.$id === id && isFeatureFile(parsed)) {
+      if (parsed.$id === id && (!typeCheck || typeCheck(parsed))) {
         return filePath;
       }
     } catch {
@@ -545,5 +552,193 @@ export async function updateFeatureStatusTool(args: {
       }],
       isError: true,
     };
+  }
+}
+
+// ─── Tool 5: usm_write_system ───────────────────────────────────────────────
+
+export const writeSystemSchema = {
+  yaml: z.string().describe("Full YAML content of the system.usm file. Must validate against the v1 schema with $type: system."),
+  path: z.string().optional().describe("Output path (defaults to .usm/system.usm)"),
+};
+
+export async function writeSystemTool(args: { yaml: string; path?: string }) {
+  try {
+    const validation = validateUsmString(args.yaml);
+    if (!validation.valid) {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ written: false, errors: validation.errors }, null, 2) }],
+        isError: true,
+      };
+    }
+    const parsed = parseUsm(args.yaml);
+    if (parsed.$type !== "system") {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "$type must be 'system'" }, null, 2) }],
+        isError: true,
+      };
+    }
+    const filePath = args.path ? resolvePath(args.path) : path.resolve(".usm", "system.usm");
+    atomicWrite(filePath, args.yaml);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ written: true, path: filePath }, null, 2) }],
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ error: `Write failed: ${(err as Error).message}` }, null, 2) }],
+      isError: true,
+    };
+  }
+}
+
+// ─── Tool 6: usm_write_service ──────────────────────────────────────────────
+
+export const writeServiceSchema = {
+  yaml: z.string().describe("Full YAML content of the service .usm file. Must validate against the v1 schema with $type: service."),
+  path: z.string().describe("Output path (e.g. .usm/apps/my-app/service.usm or .usm/packages/my-pkg/service.usm)"),
+};
+
+export async function writeServiceTool(args: { yaml: string; path: string }) {
+  try {
+    const validation = validateUsmString(args.yaml);
+    if (!validation.valid) {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ written: false, errors: validation.errors }, null, 2) }],
+        isError: true,
+      };
+    }
+    const parsed = parseUsm(args.yaml);
+    if (parsed.$type !== "service") {
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ error: "$type must be 'service'" }, null, 2) }],
+        isError: true,
+      };
+    }
+    const filePath = resolvePath(args.path);
+    atomicWrite(filePath, args.yaml);
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ written: true, path: filePath }, null, 2) }],
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ error: `Write failed: ${(err as Error).message}` }, null, 2) }],
+      isError: true,
+    };
+  }
+}
+
+// ─── Tool 7: usm_update_system ──────────────────────────────────────────────
+
+export const updateSystemSchema = {
+  id: z.string().optional().describe("System $id to find (e.g. 'my-org/system')"),
+  path: z.string().optional().describe("Direct file path (alternative to id, defaults to .usm/system.usm)"),
+  fields: z.string().describe('JSON object of fields to update. Id-bearing arrays (services, index, roles) are MERGED by id — pass just new/changed items.'),
+  replace: z.string().optional().describe('JSON array of field names to REPLACE wholesale instead of merging by id.'),
+};
+
+export async function updateSystemTool(args: { id?: string; path?: string; fields: string; replace?: string }) {
+  try {
+    let filePath: string;
+    if (args.path) {
+      filePath = resolvePath(args.path);
+    } else if (args.id) {
+      const found = findFileById(args.id, isSystemFile);
+      if (!found) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `System file with $id '${args.id}' not found` }, null, 2) }], isError: true };
+      filePath = found;
+    } else {
+      filePath = path.resolve(".usm", "system.usm");
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: `File not found: ${filePath}` }, null, 2) }], isError: true };
+    }
+
+    const system = parseUsmFile(filePath) as Record<string, unknown>;
+    const updates = JSON.parse(args.fields) as Record<string, unknown>;
+
+    const replaceFields = args.replace ? (JSON.parse(args.replace) as string[]) : [];
+    const replaceSet = new Set(replaceFields);
+    const fieldsUpdated: string[] = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (ID_BEARING_ARRAY_FIELDS.includes(key) && Array.isArray(value) && !replaceSet.has(key)) {
+        const existing = Array.isArray(system[key]) ? (system[key] as unknown[]) : [];
+        const { merged } = upsertById(existing, value);
+        system[key] = merged;
+      } else {
+        system[key] = value;
+      }
+      fieldsUpdated.push(key);
+    }
+
+    const validation = validateUsm(system as unknown as UsmFile);
+    if (!validation.valid) {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Validation failed", errors: validation.errors }, null, 2) }], isError: true };
+    }
+
+    atomicWrite(filePath, yaml.dump(system, { indent: 2, lineWidth: 100, noRefs: true, quotingType: '"' }));
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ updated: true, path: filePath, fields_updated: fieldsUpdated }, null, 2) }],
+    };
+  } catch (err) {
+    return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Update failed: ${(err as Error).message}` }, null, 2) }], isError: true };
+  }
+}
+
+// ─── Tool 8: usm_update_service ─────────────────────────────────────────────
+
+export const updateServiceSchema = {
+  id: z.string().optional().describe("Service $id to find (e.g. 'my-org/my-app')"),
+  path: z.string().optional().describe("Direct file path (alternative to id)"),
+  fields: z.string().describe('JSON object of fields to update. Id-bearing arrays (data_models, routes, modules) are MERGED by id.'),
+  replace: z.string().optional().describe('JSON array of field names to REPLACE wholesale.'),
+};
+
+export async function updateServiceTool(args: { id?: string; path?: string; fields: string; replace?: string }) {
+  try {
+    let filePath: string;
+    if (args.path) {
+      filePath = resolvePath(args.path);
+    } else if (args.id) {
+      const found = findFileById(args.id, isServiceFile);
+      if (!found) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Service file with $id '${args.id}' not found` }, null, 2) }], isError: true };
+      filePath = found;
+    } else {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Either id or path is required" }, null, 2) }], isError: true };
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: `File not found: ${filePath}` }, null, 2) }], isError: true };
+    }
+
+    const service = parseUsmFile(filePath) as Record<string, unknown>;
+    const updates = JSON.parse(args.fields) as Record<string, unknown>;
+
+    const replaceFields = args.replace ? (JSON.parse(args.replace) as string[]) : [];
+    const replaceSet = new Set(replaceFields);
+    const fieldsUpdated: string[] = [];
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (ID_BEARING_ARRAY_FIELDS.includes(key) && Array.isArray(value) && !replaceSet.has(key)) {
+        const existing = Array.isArray(service[key]) ? (service[key] as unknown[]) : [];
+        const { merged } = upsertById(existing, value);
+        service[key] = merged;
+      } else {
+        service[key] = value;
+      }
+      fieldsUpdated.push(key);
+    }
+
+    const validation = validateUsm(service as unknown as UsmFile);
+    if (!validation.valid) {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: "Validation failed", errors: validation.errors }, null, 2) }], isError: true };
+    }
+
+    atomicWrite(filePath, yaml.dump(service, { indent: 2, lineWidth: 100, noRefs: true, quotingType: '"' }));
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ updated: true, path: filePath, fields_updated: fieldsUpdated }, null, 2) }],
+    };
+  } catch (err) {
+    return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Update failed: ${(err as Error).message}` }, null, 2) }], isError: true };
   }
 }

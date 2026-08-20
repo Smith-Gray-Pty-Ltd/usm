@@ -16,6 +16,7 @@ import { draftFeatureSchema, draftFeatureTool } from "../mcp/write.js";
 import { writeFeatureSchema, writeFeatureTool } from "../mcp/write.js";
 import { updateFeatureSchema, updateFeatureTool } from "../mcp/write.js";
 import { updateFeatureStatusSchema, updateFeatureStatusTool } from "../mcp/write.js";
+import { writeSystemSchema, writeSystemTool, writeServiceSchema, writeServiceTool, updateSystemSchema, updateSystemTool, updateServiceSchema, updateServiceTool } from "../mcp/write.js";
 import { reportFeedbackSchema, reportFeedbackTool } from "../mcp/feedback.js";
 
 const server = new McpServer({
@@ -133,6 +134,38 @@ server.tool(
   "Report a bug, improvement, or question ABOUT THIS PROJECT as a structured $type: feedback entry in .usm/feedback/. Scope matters: bugs in this project's code/specs belong here; bugs in the USM tool itself (CLI commands, MCP tool behaviour, generator output, schema validation) belong UPSTREAM at https://github.com/Smith-Gray-Pty-Ltd/usm/issues — not in this repo. Respects the configured feedback policy: human-gate returns a draft (no write), direct-to-feedback writes to disk, direct-to-github records locally and suggests a gh issue. Pass write=true to override human-gate after human approval. Validates against the v1 schema.",
   reportFeedbackSchema,
   reportFeedbackTool,
+);
+
+// Tool 15: usm_write_system (write)
+server.tool(
+  "usm_write_system",
+  "Create or replace a system.usm file. Validates against the v1 schema ($type: system) before writing atomically. Pass the full YAML content. Defaults to .usm/system.usm if no path given.",
+  writeSystemSchema,
+  writeSystemTool,
+);
+
+// Tool 16: usm_write_service (write)
+server.tool(
+  "usm_write_service",
+  "Create or replace a service .usm file. Validates against the v1 schema ($type: service) before writing atomically. Pass the full YAML content and output path (e.g. .usm/apps/my-app/service.usm).",
+  writeServiceSchema,
+  writeServiceTool,
+);
+
+// Tool 17: usm_update_system (write)
+server.tool(
+  "usm_update_system",
+  "Update fields on an existing system.usm file. Provide 'id' (system $id) or 'path', and 'fields' (JSON object). Id-bearing arrays (services, index, roles) are merged by id — pass just new/changed items. Use 'replace' param to replace arrays wholesale. Validates before writing.",
+  updateSystemSchema,
+  updateSystemTool,
+);
+
+// Tool 18: usm_update_service (write)
+server.tool(
+  "usm_update_service",
+  "Update fields on an existing service .usm file. Provide 'id' (service $id) or 'path', and 'fields' (JSON object). Id-bearing arrays (data_models, routes, modules) are merged by id. Use 'replace' param to replace arrays wholesale. Validates before writing.",
+  updateServiceSchema,
+  updateServiceTool,
 );
 
 export async function startMcpServer() {
