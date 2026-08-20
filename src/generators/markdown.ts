@@ -553,9 +553,10 @@ function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): G
   outputs.push({ path: `${appRoot}/operations/observability.md`, content: buildOpsObservability(file, slug) });
   outputs.push({ path: `${appRoot}/operations/incident-response.md`, content: buildOpsIncidentResponse(file, slug) });
 
-  // Decisions section
-  outputs.push({ path: `${appRoot}/decisions/README.md`, content: sectionReadme("Decisions", "Architecture Decision Records") });
-  outputs.push({ path: `${appRoot}/decisions/0001-template.md`, content: adrTemplate() });
+  // Decisions section — only emit if the service actually has decisions
+  if (file.decisions && file.decisions.length > 0) {
+    outputs.push({ path: `${appRoot}/decisions/README.md`, content: sectionReadme("Decisions", "Architecture Decision Records") });
+  }
 
   // Risks + Roadmap
   outputs.push({ path: `${appRoot}/risks.md`, content: buildRisksMd(file) });
