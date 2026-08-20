@@ -96,10 +96,9 @@ program
   .description("Scaffold a new .usm file")
   .arguments("[path]")
   .option("-t, --type <type>", "File type (system, service, feature)", "system")
-  .action((targetPath: string, options: { type: string }) => {
+  .action((targetPath: string | undefined, options: { type: string }) => {
     const templates: Record<string, string> = {
       system: `$schema: https://usm.dev/schema/v1.json
-$id: my-org/system
 $type: system
 $version: 1
 $last_updated: "${new Date().toISOString().split("T")[0]}"
@@ -211,7 +210,11 @@ see_also: []
       process.exit(1);
     }
 
-    const resolvedPath = path.resolve(targetPath);
+    // Default to .usm/system.usm when no path is given (prevents the
+    // path.resolve(undefined) crash that broke the bootstrap)
+    const resolvedPath = targetPath
+      ? path.resolve(targetPath)
+      : path.resolve(".usm", "system.usm");
     const dir = path.dirname(resolvedPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

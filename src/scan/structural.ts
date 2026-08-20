@@ -743,13 +743,79 @@ interface UpdateSystemParams {
 }
 
 function updateSystemUsm(params: UpdateSystemParams): boolean {
-  const { root, usmSourceDir, result, allFindings } = params;
+  const { root, usmSourceDir, result, allFindings, config } = params;
   const systemPath = path.join(usmSourceDir, "system.usm");
 
+  // Auto-create system.usm when it doesn't exist — the scan results have
+  // everything needed (services, features, identity from usmconfig.json).
+  // This fixes the broken bootstrap: init → scan → generate now works without
+  // any manual file creation.
   if (!fs.existsSync(systemPath)) {
-    // Don't create system.usm from scratch — it should exist already
-    result.warnings?.push("system.usm not found — skipping update. Create it with 'usm init-file' first.");
-    return false;
+    const systemName = config.name || "my-org";
+    const orgSlug = systemName.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
+
+    // Build services[] from scan results
+    const services: Array<Record<string, unknown>> = [];
+    for (const written of result.files_written) {
+      if (written.type !== "service") continue;
+      const name = path.basename(written.path, ".usm");
+      let port: number | undefined;
+      let dependsOn: string[] | undefined;
+      try {
+        const generated = yaml.load(
+          fs.readFileSync(path.join(root, written.path), "utf-8"),
+        ) as Record<string, unknown>;
+        port = generated.port as number | undefined;
+        dependsOn = generated.depends_on as string[] | undefined;
+      } catch { /* ignore */ }
+      services.push({
+        id: `${orgSlug}/${name}`,
+        name: formatServiceName(name),
+        ref: written.path.replace(/^\.usm\//, ""),
+        ...(port ? { port } : {}),
+        ...(dependsOn?.length ? { depends_on: dependsOn } : {}),
+      });
+    }
+
+    // Build index[] from feature findings
+    const index: Array<Record<string, unknown>> = [];
+    for (const feature of allFindings) {
+      const featureKey = `${feature.area}-${feature.name}`;
+      index.push({
+        id: featureKey,
+        name: feature.title,
+        ref: `.usm/${feature.outputPath}`,
+        status: "active",
+        tags: [feature.area, ...feature.apps],
+      });
+    }
+
+    const newSystem: Record<string, unknown> = {
+      $schema: "https://usm.dev/schema/v1.json",
+      $id: `${orgSlug}/system`,
+      $type: "system",
+      $version: 1,
+      $last_updated: todayDate(),
+      summary: `${systemName} — system description. Edit this to describe what the system does in 1-3 sentences.`,
+      identity: {
+        name: systemName,
+        domain: "example.com",
+      },
+      services,
+      roles: [],
+      apis: [],
+      data: [],
+      infrastructure: { cloud: "", region: "", dns: "" },
+      deployment: {
+        environments: [{ name: "dev", url: "http://localhost:3000", type: "local" }],
+      },
+      operations: { monitoring: "", alerts: "", on_call: "" },
+      policies: { refs: [] },
+      index,
+    };
+
+    fs.writeFileSync(systemPath, yamlStringify(newSystem), "utf-8");
+    return true;
   }
 
   // Parse existing system.usm
