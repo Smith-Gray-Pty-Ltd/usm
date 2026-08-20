@@ -37,13 +37,41 @@ const CURRENT_SCHEMA_VERSION = 1;
 
 /**
  * Validate a parsed .usm object against the v1 JSON Schema.
- * Also checks $version compatibility and adds warnings for mismatches.
+ * Uses $type as a discriminator to select the correct oneOf branch —
+ * without this, AJV tries ALL branches (system, service, feature, feedback)
+ * and reports errors from the wrong schemas (e.g. "must have property
+ * identity" when validating a feature). With the discriminator, only the
+ * matching branch is validated.
  */
 export function validateUsm(file: UsmFile): ValidationResult {
   const ajv = getAjv();
   const schema = getSchema();
 
-  const validate = ajv.compile(schema);
+  // Select the matching oneOf branch by $type — avoids cross-schema noise
+  const defs = (schema as Record<string, unknown>).$defs as Record<string, Record<string, unknown>>;
+  const typeToDef: Record<string, string> = {
+    system: "systemFile",
+    service: "serviceFile",
+    feature: "featureFile",
+    feedback: "feedbackFile",
+  };
+  const defName = typeToDef[file.$type];
+  if (!defName) {
+    return {
+      valid: false,
+      errors: [{ path: "/$type", message: `Unknown $type: '${file.$type}'. Must be one of: system, service, feature, feedback.` }],
+    };
+  }
+
+  const branchSchema = defs[defName];
+  if (!branchSchema) {
+    return {
+      valid: false,
+      errors: [{ path: "/$type", message: `Internal error: schema branch '${defName}' not found.` }],
+    };
+  }
+
+  const validate = ajv.compile(branchSchema);
   const valid = validate(file);
 
   if (!valid) {
