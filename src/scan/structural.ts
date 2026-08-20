@@ -83,7 +83,12 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
         if (!pkgJson) continue;
 
         const relativePath = path.relative(root, dir);
-        const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
+        // Directory name takes precedence over package name — the .usm
+        // path must mirror the repo directory, not the npm package name
+        // (e.g. apps/agency-website/ has package name @smith-gray/marketing;
+        // the .usm file should be apps/agency-website/service.usm, not
+        // apps/marketing/service.usm which creates a phantom directory)
+        const name = shortNameFromPath(relativePath) || shortNameFromPackageJson(pkgJson.name);
 
         const writeOutcome = generateServiceUsm({
           root,
