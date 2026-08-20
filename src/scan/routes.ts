@@ -310,41 +310,38 @@ export function groupRoutesIntoFeatures(findings: RouteFinding[]): FeatureFindin
 function determineFeatureKeyFromPage(finding: RouteFinding): string {
   const urlPath = finding.path;
   const segments = urlPath.split("/").filter(Boolean);
+  const appName = finding.app || "shared";
 
-  // Home page → dashboard
+  // Home page → {app}/dashboard
   if (segments.length === 0) {
-    return "dashboard";
+    return `${appName}/dashboard`;
   }
 
-  // Login → auth/login (match existing feature file)
+  // Login → {app}/auth/login
   if (segments[0] === "login") {
-    return "auth/login";
+    return `${appName}/auth/login`;
   }
 
-  // admin prefix → keep as sub-area to avoid collisions across apps
-  // e.g. /admin/dashboard → admin/dashboard (tenant admin dashboard)
-  // This prevents /admin/dashboard (tenant) from colliding with /dashboard (architect)
+  // admin prefix → {app}/admin/{section}
   if (segments[0] === "admin" && segments.length > 1) {
-    return `${segments[0]}/${segments[1]}`;
+    return `${appName}/${segments[0]}/${segments[1]}`;
   }
 
-  // Single meaningful segment → that's the feature
+  // Single meaningful segment → {app}/{segment}
   if (segments.length === 1) {
-    return segments[0];
+    return `${appName}/${segments[0]}`;
   }
 
   // Two segments: if second is static, it's a sub-feature
-  // e.g. /settings/memory → settings/memory
-  // e.g. /settings/doc-templates → settings/doc-templates
   const first = segments[0];
   const second = segments[1];
 
   if (second.startsWith(":")) {
-    // /projects/:id → just "projects"
-    return first;
+    // /projects/:id → {app}/projects
+    return `${appName}/${first}`;
   }
 
-  return `${first}/${second}`;
+  return `${appName}/${first}/${second}`;
 }
 
 /**
@@ -355,35 +352,30 @@ function determineFeatureKeyFromPage(finding: RouteFinding): string {
 function determineFeatureKeyFromApi(finding: RouteFinding): string {
   const urlPath = finding.path;
   const segments = urlPath.split("/").filter(Boolean);
+  const appName = finding.app || "shared";
 
-  // API auth routes → auth/login
+  // API auth routes → {app}/auth/login
   if (segments.length >= 2 && segments[0] === "api" && segments[1] === "auth") {
-    return "auth/login";
+    return `${appName}/auth/login`;
   }
 
   // Strip "api" prefix and dynamic segments (:id)
   const meaningful = segments.filter((s: string) => s !== "api" && !s.startsWith(":"));
 
   if (meaningful.length === 0) {
-    return "dashboard";
+    return `${appName}/dashboard`;
   }
 
-  // Single meaningful segment → simple key
-  // e.g. /api/health → health
-  // e.g. /api/credentials → credentials
+  // Single meaningful segment → {app}/{segment}
   if (meaningful.length === 1) {
-    return meaningful[0];
+    return `${appName}/${meaningful[0]}`;
   }
 
-  // Two meaningful segments → area/name sub-feature
-  // e.g. /api/settings/memory → settings/memory
-  // e.g. /api/agent/session → agent/session
+  // Two meaningful segments → {app}/{area}/{name}
   if (meaningful.length === 2) {
-    return `${meaningful[0]}/${meaningful[1]}`;
+    return `${appName}/${meaningful[0]}/${meaningful[1]}`;
   }
 
-  // Three or more meaningful segments → use first two
-  // e.g. /api/settings/providers/:id/models → settings/providers
-  // e.g. /api/projects/:id/docs → projects/docs (:id stripped)
-  return `${meaningful[0]}/${meaningful[1]}`;
+  // Three or more → {app}/{first}/{second}
+  return `${appName}/${meaningful[0]}/${meaningful[1]}`;
 }

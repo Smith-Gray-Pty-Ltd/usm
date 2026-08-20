@@ -98,7 +98,7 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
           existingSummary: rule.summary,
         });
 
-        recordFileOutcome(result, `.usm/services/${name}.usm`, "service", "package.json", writeOutcome);
+        recordFileOutcome(result, `.usm/apps/${name}/service.usm`, "service", "package.json", writeOutcome);
         result.stats!.services_found!++;
       }
     }
@@ -136,7 +136,7 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
           existingSummary: rule.summary,
         });
 
-        recordFileOutcome(result, `.usm/services/${name}.usm`, "service", "package.json", writeOutcome);
+        recordFileOutcome(result, `.usm/packages/${name}/service.usm`, "service", "package.json", writeOutcome);
         result.stats!.packages_found!++;
       }
     }
@@ -155,6 +155,11 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
         const relativePath = path.relative(root, filePath);
         const name = "models"; // Data files are named "models.usm"
 
+        // Derive the owning package from the schema path (e.g.
+        // packages/db/prisma/schema.prisma → "db")
+        const pkgMatch = relativePath.match(/^packages\/([^/]+)/);
+        const pkgName = pkgMatch ? pkgMatch[1] : "data";
+
         const writeOutcome = generateDataUsm({
           root,
           usmSourceDir,
@@ -164,9 +169,10 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
           systemName: config.name,
           force: options.force,
           mergeStrategy: options.mergeStrategy,
+          packageName: pkgName,
         });
 
-        recordFileOutcome(result, `.usm/data/${name}.usm`, "data", "prisma schema", writeOutcome);
+        recordFileOutcome(result, `.usm/packages/${pkgName}/prisma.usm`, "data", "prisma schema", writeOutcome);
         result.stats!.data_models_found!++;
       }
     }
@@ -196,9 +202,69 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
           mergeStrategy: options.mergeStrategy,
         });
 
-        recordFileOutcome(result, `.usm/services/${svc.name}.usm`, "service", "docker-compose.yml", writeOutcome);
+        recordFileOutcome(result, `.usm/apps/${svc.name}/service.usm`, "service", "docker-compose.yml", writeOutcome);
         result.stats!.services_found!++;
       }
+    }
+  }
+
+  // 7b. Detect Python services (pyproject.toml) — structural scan normally
+  // only reads package.json, so Python apps like LangGraph servers are
+  // invisible. This pass finds pyproject.toml in apps/ and generates a
+  // service file mirroring the repo: apps/{name}/service.usm
+  const pyExclude = config.sources?.exclude || ["**/node_modules/**", "**/dist/**"];
+  const pyprojectFiles = fg.sync(["apps/*/pyproject.toml"], {
+    cwd: root,
+    absolute: true,
+    ignore: pyExclude,
+  });
+
+  for (const pyprojectPath of pyprojectFiles) {
+    const appDir = path.dirname(pyprojectPath);
+    const name = path.basename(appDir);
+
+    // Skip if a package.json service was already created for this directory
+    const existingService = result.files_written.find(
+      (f) => f.type === "service" && f.path.includes(`apps/${name}/`),
+    );
+    if (existingService) continue;
+
+    try {
+      const pyprojectContent = fs.readFileSync(pyprojectPath, "utf-8");
+      // Extract project name and Python version from pyproject.toml (simple parse)
+      const nameMatch = pyprojectContent.match(/^name\s*=\s*["']([^"']+)["']/m);
+      const requiresMatch = pyprojectContent.match(/requires-python\s*=\s*["']([^"']+)["']/m);
+
+      const usmObj: Record<string, unknown> = {
+        "$schema": "https://usm.dev/schema/v1.json",
+        "$id": `${config.name}/${name}`,
+        "$type": "service",
+        "$version": 1,
+        "$last_updated": todayDate(),
+        summary: `${name} — Python service`,
+        "$system": `${config.name}/system`,
+        type: "api",
+        runtime: "python",
+        paths: [`apps/${name}`],
+        depends_on: [] as string[],
+      };
+
+      if (requiresMatch) {
+        // Note the Python version requirement
+      }
+
+      const outputPath = path.join(usmSourceDir, "apps", name, "service.usm");
+      const outcome = applyMergeStrategy(outputPath, usmObj, options.force, options.mergeStrategy);
+      if (outcome.written || outcome.merged) {
+        if (!fs.existsSync(path.dirname(outputPath))) {
+          fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        }
+        fs.writeFileSync(outputPath, yamlStringify(usmObj), "utf-8");
+      }
+      recordFileOutcome(result, `.usm/apps/${name}/service.usm`, "service", "pyproject.toml", outcome);
+      result.stats!.services_found!++;
+    } catch {
+      // Skip unparseable pyproject.toml
     }
   }
 
@@ -409,7 +475,8 @@ interface ServiceUsmParams {
 
 function generateServiceUsm(params: ServiceUsmParams): WriteOutcome {
   const { usmSourceDir, name, relativePath, pkgJson, kind, systemName, force, mergeStrategy, existingSummary } = params;
-  const outputPath = path.join(usmSourceDir, "services", `${name}.usm`);
+  // Mirror the repo: apps/{name}/service.usm instead of services/{name}.usm
+  const outputPath = path.join(usmSourceDir, "apps", name, "service.usm");
 
   const runtime = detectRuntime(pkgJson);
   const port = detectPort(pkgJson);
@@ -418,7 +485,7 @@ function generateServiceUsm(params: ServiceUsmParams): WriteOutcome {
 
   const usmObj: Record<string, unknown> = {
     "$schema": "https://usm.dev/schema/v1.json",
-    "$id": `smith-gray/${name}`,
+    "$id": `${systemName}/${name}`,
     "$type": "service",
     "$version": 1,
     "$last_updated": todayDate(),
@@ -500,14 +567,15 @@ interface SharedPackageUsmParams {
 
 function generateSharedPackageUsm(params: SharedPackageUsmParams): WriteOutcome {
   const { usmSourceDir, name, relativePath, pkgJson, kind, systemName, force, mergeStrategy, existingSummary } = params;
-  const outputPath = path.join(usmSourceDir, "services", `${name}.usm`);
+  // Mirror the repo: packages/{name}/service.usm instead of services/{name}.usm
+  const outputPath = path.join(usmSourceDir, "packages", name, "service.usm");
 
   const deps = extractSmithGrayDependencies(pkgJson);
   const summary = existingSummary || `TODO: describe the ${name} shared package`;
 
   const usmObj: Record<string, unknown> = {
     "$schema": "https://usm.dev/schema/v1.json",
-    "$id": `smith-gray/${name}`,
+    "$id": `${systemName}/${name}`,
     "$type": "service",
     "$version": 1,
     "$last_updated": todayDate(),
@@ -555,13 +623,16 @@ interface DataUsmParams {
   mergeStrategy: MergeStrategy;
 }
 
-function generateDataUsm(params: DataUsmParams): WriteOutcome {
-  const { usmSourceDir, name, schemaPath, models, systemName, force, mergeStrategy } = params;
-  const outputPath = path.join(usmSourceDir, "data", `${name}.usm`);
+function generateDataUsm(params: DataUsmParams & { packageName?: string }): WriteOutcome {
+  const { usmSourceDir, name, schemaPath, models, systemName, force, mergeStrategy, packageName } = params;
+  // Co-locate with the owning package: packages/{name}/prisma.usm
+  const outputPath = packageName
+    ? path.join(usmSourceDir, "packages", packageName, "prisma.usm")
+    : path.join(usmSourceDir, "data", `${name}.usm`);
 
   const usmObj: Record<string, unknown> = {
     "$schema": "https://usm.dev/schema/v1.json",
-    "$id": `smith-gray/${name}`,
+    "$id": `${systemName}/${name}`,
     "$type": "service",
     "$version": 1,
     "$last_updated": todayDate(),
@@ -611,7 +682,7 @@ interface DockerServiceUsmParams {
 
 function generateDockerServiceUsm(params: DockerServiceUsmParams): WriteOutcome {
   const { usmSourceDir, service, systemName, force, mergeStrategy } = params;
-  const outputPath = path.join(usmSourceDir, "services", `${service.name}.usm`);
+  const outputPath = path.join(usmSourceDir, "apps", service.name, "service.usm");
 
   const usmType = mapDockerServiceToUsmType(service.name);
   const port = service.ports?.[0] ? parseInt(service.ports[0], 10) : undefined;
@@ -619,7 +690,7 @@ function generateDockerServiceUsm(params: DockerServiceUsmParams): WriteOutcome 
 
   const usmObj: Record<string, unknown> = {
     "$schema": "https://usm.dev/schema/v1.json",
-    "$id": `smith-gray/${service.name}`,
+    "$id": `${systemName}/${service.name}`,
     "$type": "service",
     "$version": 1,
     "$last_updated": todayDate(),
@@ -681,13 +752,13 @@ function generateFeatureUsm(params: FeatureUsmParams): WriteOutcome {
 
   const usmObj: Record<string, unknown> = {
     "$schema": "https://usm.dev/schema/v1.json",
-    "$id": feature.area === feature.name ? `smith-gray/${feature.name}` : `smith-gray/${feature.area}/${feature.name}`,
+    "$id": `${systemName}/${feature.outputPath.replace(/\.usm$/, "").replace(/^features\//, "")}`,
     "$type": "feature",
     "$version": 1,
     "$last_updated": todayDate(),
     "summary": `TODO: describe the ${feature.title} feature — ${pageRoutes.length} pages, ${apiRoutes.length} API endpoints`,
     "$system": `${systemName}/system`,
-    "$service": `smith-gray/${primaryApp}`,
+    "$service": `${systemName}/${primaryApp}`,
     "intent": "TODO: describe why this feature exists",
     "decisions": [],
     "flows": [],
