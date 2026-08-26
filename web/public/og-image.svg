@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Dark background -->
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+
+  <!-- Subtle gradient overlay -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#grad)"/>
+
+  <!-- USM logo mark (boxes icon) -->
+  <g transform="translate(100, 90)">
+    <rect x="0" y="0" width="44" height="44" rx="8" fill="url(#accent)" opacity="0.9"/>
+    <rect x="12" y="12" width="20" height="20" rx="3" fill="#0a0a0a"/>
+    <text x="62" y="32" font-family="Helvetica Neue, Arial, sans-serif" font-size="28" font-weight="700" fill="#fafafa" letter-spacing="0.5">USM</text>
+  </g>
+
+  <!-- Version badge -->
+  <rect x="100" y="165" width="220" height="36" rx="18" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
+  <text x="210" y="188" font-family="Helvetica Neue, Arial, sans-serif" font-size="15" font-weight="500" fill="#a1a1aa" text-anchor="middle">v0.5.1 — Free &amp; open source</text>
+
+  <!-- Headline -->
+  <text x="100" y="290" font-family="Helvetica Neue, Arial, sans-serif" font-size="52" font-weight="800" fill="#fafafa" letter-spacing="-1.5">
+    <tspan x="100" dy="0">The source of truth for</tspan>
+    <tspan x="100" dy="64">human + AI software development</tspan>
+  </text>
+
+  <!-- Tagline (subhead) -->
+  <text x="100" y="440" font-family="Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="400" fill="#a1a1aa">
+    <tspan x="100" dy="0">Schema-validated specs. 10-20x fewer tokens.</tspan>
+    <tspan x="100" dy="30">Auto-generated docs and design artefacts.</tspan>
+  </text>
+
+  <!-- Feature chips at bottom -->
+  <g font-family="Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="500">
+    <rect x="100" y="535" width="155" height="40" rx="20" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.10"/>
+    <text x="177" y="560" fill="#7dd3fc" text-anchor="middle">Spec-first</text>
+
+    <rect x="270" y="535" width="170" height="40" rx="20" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.10"/>
+    <text x="355" y="560" fill="#c4b5fd" text-anchor="middle">18 MCP tools</text>
+
+    <rect x="455" y="535" width="210" height="40" rx="20" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.10"/>
+    <text x="560" y="560" fill="#86efac" text-anchor="middle">10-20x fewer tokens</text>
+
+    <rect x="680" y="535" width="175" height="40" rx="20" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.10"/>
+    <text x="767" y="560" fill="#fde68a" text-anchor="middle">LLM enrichment</text>
+  </g>
+
+  <!-- URL at bottom right -->
+  <text x="1100" y="600" font-family="Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="500" fill="#525252" text-anchor="end">usm.dev</text>
+</svg>

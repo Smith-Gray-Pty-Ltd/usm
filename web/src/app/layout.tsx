@@ -17,8 +17,8 @@ const jetbrainsMono = JetBrains_Mono({
 const siteUrl = "https://usm.dev";
 
 export const metadata: Metadata = {
-  title: "USM — A Shared Focused Brain for Human + AI Development",
-  description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with opencode, Cursor, Claude Code, Codex, and GitHub Copilot.",
+  title: "USM — The source of truth for human + AI software development",
+  description: "USM is a schema-validated source of truth for agentic software development that reduces token burn, persists structured knowledge across coding sessions, and automatically generates documentation and design artefacts in a spec-first development cycle.",
   keywords: [
     "USM",
     "Universal System Map",
@@ -44,21 +44,52 @@ export const metadata: Metadata = {
   creator: "Smith & Gray Pty Ltd",
   publisher: "Smith & Gray Pty Ltd",
   metadataBase: new URL(siteUrl),
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png" },
+      { url: "/apple-icon-57x57.png", sizes: "57x57" },
+      { url: "/apple-icon-60x60.png", sizes: "60x60" },
+      { url: "/apple-icon-72x72.png", sizes: "72x72" },
+      { url: "/apple-icon-76x76.png", sizes: "76x76" },
+      { url: "/apple-icon-114x114.png", sizes: "114x114" },
+      { url: "/apple-icon-120x120.png", sizes: "120x120" },
+      { url: "/apple-icon-144x144.png", sizes: "144x144" },
+      { url: "/apple-icon-152x152.png", sizes: "152x152" },
+      { url: "/apple-icon-180x180.png", sizes: "180x180" },
+      { url: "/apple-icon-precomposed.png" },
+    ],
+  },
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
     url: siteUrl,
-    title: "USM — A Shared Focused Brain for Human + AI Development",
-    description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using far fewer tokens than bloated Markdown vaults. Works with opencode, Cursor, Claude Code, Codex, and GitHub Copilot.",
+    title: "USM — The source of truth for human + AI software development",
+    description: "USM is a schema-validated source of truth for agentic software development that reduces token burn, persists structured knowledge across coding sessions, and automatically generates documentation and design artefacts in a spec-first development cycle.",
     siteName: "USM",
     locale: "en_US",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "USM — The source of truth for human + AI software development",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "USM — A Shared Focused Brain for Human + AI Development",
-    description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using 10-20x fewer tokens than bloated Markdown vaults.",
+    title: "USM — The source of truth for human + AI software development",
+    description: "USM is a schema-validated source of truth for agentic software development that reduces token burn, persists structured knowledge across coding sessions, and automatically generates documentation and design artefacts in a spec-first development cycle.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -168,6 +199,9 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} dark h-full antialiased`}
     >
       <head>
+        <meta name="msapplication-config" content="/browserconfig.xml" />
+        <meta name="msapplication-TileColor" content="#ffffff" />
+        <meta name="theme-color" content="#000000" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
