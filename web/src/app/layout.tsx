@@ -80,7 +80,7 @@ const jsonLd = {
       "@type": "SoftwareApplication",
       "@id": `${siteUrl}/#software`,
       name: "USM — Universal System Map",
-      description: "A structured source of truth for agentic systems. Write specs first, agents build from them, docs stay in sync. Uses 10-20x fewer tokens than raw Markdown vaults via MCP.",
+      description: "The source of truth for human + AI software development. Write specs first, agents build from them, docs stay in sync. Uses 10-20x fewer tokens than raw Markdown vaults via MCP.",
       url: siteUrl,
       applicationCategory: "DeveloperApplication",
       operatingSystem: "Cross-platform",
@@ -107,7 +107,7 @@ const jsonLd = {
       "@id": `${siteUrl}/#website`,
       url: siteUrl,
       name: "USM",
-      description: "A shared focused brain for human + AI development",
+      description: "The source of truth for human + AI software development",
       publisher: { "@id": `${siteUrl}/#org` },
     },
     {
