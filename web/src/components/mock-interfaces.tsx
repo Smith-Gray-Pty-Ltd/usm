@@ -107,7 +107,7 @@ const chatScenes: ChatScene[] = [
             { type: "text", spans: [
               { text: "✓ ", kind: "success" },
               { text: "Docs live at ", kind: "plain" },
-              { text: "docs.usm.dev", kind: "spec" },
+              { text: "localhost:5173", kind: "spec" },
             ]},
           ],
         },
@@ -198,7 +198,7 @@ interface BrowserScene { name: string; url: string; blocks: DocBlock[]; holdAfte
 const browserScenes: BrowserScene[] = [
   {
     name: "login-spec",
-    url: "docs.usm.dev/features/auth/login",
+    url: "localhost:5173/features/auth/login",
     holdAfter: 4500,
     blocks: [
       { kind: "h1", delay: 400, text: "usm/auth-login" },
@@ -218,7 +218,7 @@ const browserScenes: BrowserScene[] = [
   },
   {
     name: "docs-index",
-    url: "docs.usm.dev",
+    url: "localhost:5173",
     holdAfter: 4500,
     blocks: [
       { kind: "h1", delay: 400, text: "USM — Generated Docs" },
