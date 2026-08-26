@@ -7,14 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { LanguageCarousel } from "@/components/language-carousel";
 import { ToolLogos } from "@/components/tool-logos";
+import { CliAnimation } from "@/components/cli-animation";
+import { MockInterfaces } from "@/components/mock-interfaces";
 import usmPkg from "../../../package.json";
 
 const USM_VERSION = usmPkg.version;
-const MCP_TOOL_COUNT = 18;
 import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,
-  Boxes, GitBranch, Building2, Users, ArrowRight, Star,
+  GitBranch, Building2, Users, ArrowRight, Star,
   Search, Sparkles, Wand2
 } from "lucide-react";
 
@@ -61,20 +62,6 @@ const tools = [
   "Grok Code", "OpenCode", "Windsurf", "Continue.dev", "Zed",
 ];
 
-const codeLines = [
-  { text: "$ usm draft_feature \\", comment: false },
-  { text: "    --summary 'Login with email' \\", comment: false },
-  { text: "    --flows '[{\"id\":\"login\",\"steps\":[...]}]'", comment: false },
-  { text: "", comment: false },
-  { text: "✓ validation_status: valid", comment: true },
-  { text: "✓ yaml: 247 bytes generated", comment: true },
-  { text: "✓ markdown: 1.2kb preview ready", comment: true },
-  { text: "", comment: false },
-  { text: "→ Show human the markdown for review...", comment: false },
-];
-
-const externalLink = "target=\"_blank\" rel=\"noopener noreferrer\"";
-
 function useInView<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [inView, setInView] = useState(false);
@@ -89,33 +76,11 @@ function useInView<T extends HTMLElement>() {
   return { ref, inView };
 }
 
-function FadeIn({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+function FadeIn({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
   const { ref, inView } = useInView<HTMLDivElement>();
   return (
-    <div ref={ref} className={inView ? "animate-fade-in-up" : "opacity-0"} style={{ animationDelay: `${delay}ms` }}>
+    <div ref={ref} className={`${inView ? "animate-fade-in-up" : "opacity-0"} ${className}`} style={{ animationDelay: `${delay}ms` }}>
       {children}
-    </div>
-  );
-}
-
-function CodeEditor() {
-  return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden shadow-2xl">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/30">
-        <div className="flex gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-muted-foreground/30" />
-          <div className="w-3 h-3 rounded-full bg-muted-foreground/30" />
-          <div className="w-3 h-3 rounded-full bg-muted-foreground/30" />
-        </div>
-        <span className="text-xs text-muted-foreground font-mono ml-2">terminal — usm</span>
-      </div>
-      <div className="p-4 font-mono text-sm space-y-0.5">
-        {codeLines.map((line, i) => (
-          <div key={i} className={line.comment ? "text-muted-foreground" : "text-foreground"}>
-            {line.text || "\u00A0"}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -144,10 +109,10 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
       <nav className="border-b sticky top-0 bg-background/95 backdrop-blur z-50">
-        <div className="mx-auto max-w-5xl px-6 h-14 flex items-center justify-between">
-          <a href="/" className="font-semibold tracking-tight text-lg flex items-center gap-2">
-            <Boxes className="w-5 h-5" />
-            USM
+        <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/usm-logo.svg" alt="USM" className="h-[47px] w-auto" />
           </a>
           <div className="flex items-center gap-5 text-sm">
             <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Help Docs</a>
@@ -155,6 +120,10 @@ export default function Home() {
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <Star className="w-4 h-4" />
               GitHub
+            </a>
+            <a href="https://www.npmjs.com/package/@smithgray/usm" target="_blank" rel="noopener noreferrer" className="flex items-center transition-opacity hover:opacity-80">
+              <img src="https://img.shields.io/npm/v/@smithgray/usm?label=npm&style=flat&color=525252" alt="npm version" className="h-5" />
+              <img src="https://img.shields.io/npm/dt/@smithgray/usm?label=installs&style=flat&color=525252" alt="npm total installs" className="h-5 ml-1.5" />
             </a>
             <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm" })}>Get Started</a>
           </div>
@@ -164,22 +133,20 @@ export default function Home() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-foreground/[0.03] to-transparent" />
-        <div className="relative mx-auto max-w-5xl px-6 py-24">
+        <div className="relative mx-auto max-w-6xl px-6 py-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
               <Badge variant="secondary" className="mb-5">v{USM_VERSION} — Free &amp; open source</Badge>
               <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-5 leading-tight">
-                The source of truth for<br />human + AI software development
+                The source of truth for human + AI software development
               </h1>
-              <p className="text-lg text-muted-foreground mb-6 max-w-md">
-                Write specs first. Agents build from them. Docs stay perfectly in sync —
-                using far fewer tokens than bloated Markdown vaults.
+              <p className="text-lg text-muted-foreground mb-6 max-w-lg">
+                USM is a schema-validated source of truth for agentic software development, that reduces token burn, persists structured knowledge across coding sessions, and automatically generates, documentation and design artefacts in a spec first development cycle
               </p>
               <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground mb-8">
-                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Spec-first workflow</span>
-                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> {MCP_TOOL_COUNT} MCP tools</span>
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> 10-20x fewer tokens</span>
-                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> LLM enrichment</span>
+                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Cross session memory</span>
+                <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Hot loading specs/docs</span>
               </div>
               <div className="flex items-center gap-3">
                 <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "lg" })}>
@@ -187,17 +154,32 @@ export default function Home() {
                 </a>
                 <a href="#see-it" className={buttonVariants({ size: "lg", variant: "outline" })}>Try in 60 seconds</a>
               </div>
-              <div className="text-sm text-muted-foreground">
-                Docs:{" "}
-                <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground transition-colors">Help Docs</a>
-                {" · "}
-                <a href="https://dev-docs.usm.dev" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-foreground transition-colors">Technical Docs</a>
-              </div>
             </div>
             <FadeIn delay={200}>
-              <CodeEditor />
+              <p className="text-xs text-muted-foreground mb-2">CLI</p>
+              <CliAnimation />
             </FadeIn>
           </div>
+        </div>
+      </section>
+
+      <Separator />
+
+      {/* Tool Logos — moved below hero */}
+      <section className="bg-card/30">
+        <div className="mx-auto max-w-6xl px-6 py-14 text-center">
+          <FadeIn>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-8">Works with your client</h2>
+          </FadeIn>
+          <FadeIn delay={150}>
+            <MockInterfaces />
+          </FadeIn>
+          <FadeIn delay={300}>
+            <div className="mt-12">
+              <ToolLogos />
+              <p className="text-xs text-muted-foreground mt-5">Any MCP-compatible AI coding tool</p>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
@@ -207,7 +189,7 @@ export default function Home() {
       <section className="bg-card/30">
         <div className="mx-auto max-w-3xl px-6 py-20">
           <FadeIn>
-            <h2 className="text-2xl font-semibold text-center mb-10">Sound familiar?</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold text-center mb-10">Sound familiar?</h2>
           </FadeIn>
           <div className="space-y-3.5 max-w-xl mx-auto mb-8">
             {[
@@ -237,11 +219,11 @@ export default function Home() {
       <Separator />
 
       {/* How It Works — Multiple Workflows */}
-      <section className="mx-auto max-w-5xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-24">
         <FadeIn>
           <div className="text-center mb-16">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">How it works</p>
-            <h2 className="text-3xl font-semibold mb-3">Three ways to use USM</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Three ways to use USM</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
               Onboard an existing codebase, run the spec-first dev loop, or enrich specs with LLM.
             </p>
@@ -358,11 +340,11 @@ export default function Home() {
 
       {/* Benefits */}
       <section className="bg-card/30">
-        <div className="mx-auto max-w-5xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-24">
           <FadeIn>
             <div className="text-center mb-14">
               <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Benefits</p>
-              <h2 className="text-3xl font-semibold mb-3">What you get</h2>
+              <h2 className="text-3xl md:text-4xl font-semibold mb-3">What you get</h2>
               <p className="text-muted-foreground max-w-xl mx-auto">Less time re-explaining. Fewer review cycles. Docs that match the code.</p>
             </div>
           </FadeIn>
@@ -398,7 +380,7 @@ export default function Home() {
         <FadeIn>
           <div className="text-center mb-12">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Token efficiency</p>
-            <h2 className="text-3xl font-semibold mb-3">Stop wasting tokens</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Stop wasting tokens</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
               USM delivers structured, high-signal context via MCP. No more feeding entire vaults or codebases.
             </p>
@@ -443,11 +425,11 @@ export default function Home() {
       <Separator />
 
       {/* Language Support Carousel */}
-      <section className="mx-auto max-w-5xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-24">
         <FadeIn>
           <div className="text-center mb-12">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Language support</p>
-            <h2 className="text-3xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
               Click a language to see supported frameworks and route detection patterns.
             </p>
@@ -460,25 +442,12 @@ export default function Home() {
 
       <Separator />
 
-      {/* Tool Logos */}
-      <section className="bg-card/30">
-        <div className="mx-auto max-w-5xl px-6 py-14 text-center">
-          <FadeIn>
-            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-6">Works seamlessly with</p>
-            <ToolLogos />
-            <p className="text-xs text-muted-foreground mt-5">Any MCP-compatible AI coding tool</p>
-          </FadeIn>
-        </div>
-      </section>
-
-      <Separator />
-
       {/* Before / After */}
-      <section className="mx-auto max-w-5xl px-6 py-24">
+      <section className="mx-auto max-w-6xl px-6 py-24">
         <FadeIn>
           <div className="text-center mb-12">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Comparison</p>
-            <h2 className="text-3xl font-semibold">Before USM vs With USM</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold">Before USM vs With USM</h2>
           </div>
         </FadeIn>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -523,11 +492,11 @@ export default function Home() {
 
       {/* Outputs */}
       <section className="bg-card/30">
-        <div className="mx-auto max-w-5xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-24">
           <FadeIn>
             <div className="text-center mb-14">
               <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Outputs</p>
-              <h2 className="text-3xl font-semibold mb-3">One source, many outputs</h2>
+              <h2 className="text-3xl md:text-4xl font-semibold mb-3">One source, many outputs</h2>
               <p className="text-muted-foreground max-w-xl mx-auto">A single .usm/ directory generates all of these.</p>
             </div>
           </FadeIn>
@@ -570,7 +539,7 @@ export default function Home() {
         <FadeIn>
           <div className="text-center mb-12">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Quick start</p>
-            <h2 className="text-3xl font-semibold mb-3">See it in action</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">See it in action</h2>
             <p className="text-muted-foreground max-w-lg mx-auto">Install in 60 seconds. Scan your codebase. Generate docs.</p>
           </div>
         </FadeIn>
@@ -596,11 +565,11 @@ export default function Home() {
 
       {/* Use Cases */}
       <section className="bg-card/30">
-        <div className="mx-auto max-w-5xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-24">
           <FadeIn>
             <div className="text-center mb-14">
               <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Use cases</p>
-              <h2 className="text-3xl font-semibold mb-3">Who is it for?</h2>
+              <h2 className="text-3xl md:text-4xl font-semibold mb-3">Who is it for?</h2>
               <p className="text-muted-foreground max-w-xl mx-auto">If you use AI agents to write code, USM gives you a shared artifact between human intent and agent output.</p>
             </div>
           </FadeIn>
@@ -632,7 +601,7 @@ export default function Home() {
       {/* CTA */}
       <section className="mx-auto max-w-3xl px-6 py-20 text-center">
         <FadeIn>
-          <h2 className="text-3xl font-semibold mb-4">Start building with a spec</h2>
+          <h2 className="text-3xl md:text-4xl font-semibold mb-4">Start building with a spec</h2>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
             Free, open source, MIT licensed. Works with opencode, Cursor, Claude Code, Codex, and GitHub Copilot. Self-hosting — your .usm files stay in your repo.
           </p>
@@ -645,7 +614,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t">
-        <div className="mx-auto max-w-5xl px-6 py-8 flex items-center justify-between text-sm text-muted-foreground">
+        <div className="mx-auto max-w-6xl px-6 py-8 flex items-center justify-between text-sm text-muted-foreground">
           <div>MIT © 2026 Smith &amp; Gray Pty Ltd — v{USM_VERSION}</div>
           <div className="flex items-center gap-5">
             <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Help Docs</a>
