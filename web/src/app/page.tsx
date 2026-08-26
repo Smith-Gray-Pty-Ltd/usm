@@ -112,7 +112,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/usm-logo.svg" alt="USM" className="h-[47px] w-auto" />
+            <img src="/usm-logo.svg" alt="USM" className="h-[40px] w-auto" />
           </a>
           <div className="flex items-center gap-5 text-sm">
             <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Help Docs</a>
@@ -169,7 +169,8 @@ export default function Home() {
       <section className="bg-card/30">
         <div className="mx-auto max-w-6xl px-6 py-14 text-center">
           <FadeIn>
-            <h2 className="text-3xl md:text-4xl font-semibold mb-8">Works with your client</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Works with your editor</h2>
+            <p className="text-sm text-muted-foreground mb-8">Supports 36 editors or any MCP compatible client</p>
           </FadeIn>
           <FadeIn delay={150}>
             <MockInterfaces />
@@ -177,10 +178,32 @@ export default function Home() {
           <FadeIn delay={300}>
             <div className="mt-12">
               <ToolLogos />
-              <p className="text-xs text-muted-foreground mt-5">Any MCP-compatible AI coding tool</p>
+              <div className="mt-8">
+                <a href="https://docs.usm.dev/editor-setup" target="_blank" rel="noopener noreferrer" className={buttonVariants()}>
+                  Browse all editor setup guides <ArrowRight className="w-4 h-4 ml-1" />
+                </a>
+              </div>
             </div>
           </FadeIn>
         </div>
+      </section>
+
+      <Separator />
+
+      {/* Language Support Carousel */}
+      <section className="mx-auto max-w-6xl px-6 py-24">
+        <FadeIn>
+          <div className="text-center mb-12">
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Language support</p>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Click a language to see supported frameworks and route detection patterns.
+            </p>
+          </div>
+        </FadeIn>
+        <FadeIn delay={200}>
+          <LanguageCarousel />
+        </FadeIn>
       </section>
 
       <Separator />
@@ -419,24 +442,6 @@ export default function Home() {
               </tbody>
             </table>
           </div>
-        </FadeIn>
-      </section>
-
-      <Separator />
-
-      {/* Language Support Carousel */}
-      <section className="mx-auto max-w-6xl px-6 py-24">
-        <FadeIn>
-          <div className="text-center mb-12">
-            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Language support</p>
-            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              Click a language to see supported frameworks and route detection patterns.
-            </p>
-          </div>
-        </FadeIn>
-        <FadeIn delay={200}>
-          <LanguageCarousel />
         </FadeIn>
       </section>
 
