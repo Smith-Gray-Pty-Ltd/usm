@@ -1,0 +1,361 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/cli-color-output
+$type: feature
+$version: 1
+$last_updated: "2026-08-26"
+summary: >-
+  Comprehensive CLI polish for the USM CLI — colorized status output, animated spinners with elapsed
+  time for long operations, progress bars for batch file operations, tree-view rendering of file
+  lists, an ASCII art USM banner on no-args/help, did-you-mean suggestions for typos, a non-blocking
+  update-notifier hint, and --quiet/--verbose verbosity flags. Uses battle-tested libraries
+  (picocolors, ora, cli-progress, treeify, update-notifier) pinned to CJS-compatible versions. All
+  honor NO_COLOR and non-TTY (pipes/CI) by emitting plain text automatically.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  The CLI ships plain monochrome text with no progress feedback, flat file lists, no typo help, and
+  no update awareness — it feels dated and is hard to scan during long operations. A comprehensive
+  polish layer using battle-tested CLI libraries adds colorized status (green ✓, red ✗, yellow ⚠,
+  cyan →, dim secondary), animated spinners with elapsed time for async work, progress bars for
+  batch operations, tree-view file lists, an ASCII brand banner, did-you-mean suggestions, a
+  non-blocking update notifier, and --quiet/--verbose flags. Every layer degrades gracefully to
+  plain text in non-TTY/CI/NO_COLOR environments.
+status: built
+decisions:
+  - id: use-deps-not-inline
+    decision: Use battle-tested CLI libraries, not hand-rolled inline helpers
+    rationale: >-
+      Libraries like picocolors, ora, cli-progress, and update-notifier are tiny, battle-tested by
+      millions of downloads, and handle edge cases (Windows terminals, truecolor detection, spinner
+      cleanup) that inline code would miss. Less code to maintain, better UX, and they auto-install
+      via npm with no user action needed.
+    alternatives:
+      - option: Strictly zero new deps (all inline)
+        rejected_because: More code to maintain, misses edge cases, reinvents wheels
+    consequences: >-
+      Adds ~5 small runtime dependencies to package.json, all pinned to CJS-compatible versions
+      (ora@5, cli-progress@3, update-notifier@5 — newer majors are ESM-only and incompatible with
+      the CJS package).
+    status: accepted
+  - id: respect-no-color
+    decision: Honor NO_COLOR env var and non-TTY stdout/stderr by emitting plain text
+    rationale: >-
+      Standard CLI convention (https://no-color.org) and CI hygiene. Piped/redirected output must
+      stay plain so logs and grep work; colored escape codes in CI logs are noise. picocolors
+      respects NO_COLOR natively; ora disables spinner in non-TTY.
+    consequences: >-
+      Color helpers short-circuit when process.stdout.isTTY is false or NO_COLOR is set.
+      Spinner/progress bars suppressed in non-TTY.
+    status: accepted
+  - id: palette
+    decision: green=✓, red=✗, yellow=⚠, cyan=→/info, dim=secondary values
+    rationale: >-
+      Conventional semantic mapping that reads correctly in both light and dark terminals. Dim for
+      file paths and counts keeps the primary message in foreground.
+    consequences: Single palette in src/cli/colors.ts applied consistently
+    status: accepted
+  - id: cjs-pin-versions
+    decision: Pin dependency versions to CJS-compatible majors
+    rationale: >-
+      The package is CommonJS (no type field = module). Newer majors of ora (v6+) and
+      update-notifier (v7+) are ESM-only and would break the CJS build. Pin to the last
+      CJS-compatible major.
+    consequences: >-
+      package.json dependencies list exact major versions: picocolors (^1), ora (^5), cli-progress
+      (^3), treeify (^0.1), update-notifier (^5).
+    status: accepted
+flows:
+  - id: color-output
+    name: Colored status output across all commands
+    description: >-
+      Every success/error/warning/skip/info line uses color helpers. Symbols are colored (green ✓,
+      red ✗, yellow ⚠, dim ⊘, cyan →). File paths and counts dimmed.
+    steps:
+      - id: s1
+        action: import
+        target: color helpers from src/cli/colors.ts (picocolors wrapper)
+      - id: s2
+        action: replace
+        target: console.log with success symbol → success() helper
+      - id: s3
+        action: replace
+        target: console.error with fail symbol → error() helper
+      - id: s4
+        action: replace
+        target: console.warn with warn symbol → warning() helper
+  - id: spinner-flow
+    name: Spinner during long operations
+    description: >-
+      scan, enrich, generate show a spinner with elapsed seconds while work is in progress. Spinner
+      clears on completion and is replaced by the result line.
+    steps:
+      - id: s1
+        action: start
+        target: ora spinner before async work begins
+      - id: s2
+        action: tick
+        target: spinner updates with next frame automatically
+      - id: s3
+        action: stop
+        target: spinner.succeed() or spinner.fail() with colored result
+      - id: s4
+        action: fallback
+        target: non-TTY shows plain log line (ora auto-disables)
+  - id: progress-flow
+    name: Progress bar for batch operations
+    description: >-
+      generate writing N files and scan detecting N services show an inline progress bar that
+      updates without scrolling.
+    steps:
+      - id: s1
+        action: init
+        target: cli-progress single bar with total count
+      - id: s2
+        action: update
+        target: bar.increment() after each file written
+      - id: s3
+        action: complete
+        target: bar.stop(), newline, summary line
+      - id: s4
+        action: fallback
+        target: non-TTY logs count only (bar auto-disabled)
+  - id: tree-flow
+    name: Tree view for file lists
+    description: >-
+      Files written/skipped lists render as a tree with connectors mirroring .usm/ structure via
+      treeify.
+    steps:
+      - id: s1
+        action: collect
+        target: file paths from result
+      - id: s2
+        action: build
+        target: nested object from path segments
+      - id: s3
+        action: render
+        target: treeify.asTree() with dimmed paths via picocolors
+      - id: s4
+        action: fallback
+        target: non-TTY flat list
+  - id: banner-flow
+    name: ASCII banner on no-args/help
+    description: usm with no args shows an ASCII USM banner then the help text.
+    steps:
+      - id: s1
+        action: detect
+        target: no args or --help flag
+      - id: s2
+        action: render
+        target: ASCII banner constant from banner.ts
+      - id: s3
+        action: follow
+        target: with help text and command list
+  - id: did-you-mean-flow
+    name: Did you mean suggestions for typos
+    description: >-
+      Unknown command triggers a did-you-mean suggestion. Commander has built-in suggestion support
+      — just needs enabling.
+    steps:
+      - id: s1
+        action: detect
+        target: unknown command
+      - id: s2
+        action: configure
+        target: program.showSuggestionAfterError = true
+      - id: s3
+        action: render
+        target: Commander emits did-you-mean closest match
+  - id: update-flow
+    name: Update notifier hint
+    description: >-
+      Non-blocking check of npm registry for newer @smithgray/usm. Cached 24h. One-line hint if
+      newer exists.
+    steps:
+      - id: s1
+        action: init
+        target: update-notifier with 24h check interval
+      - id: s2
+        action: notify
+        target: updateNotifier.notify() renders one-line hint in TTY
+      - id: s3
+        action: fallback
+        target: suppressed in non-TTY automatically
+  - id: verbosity-flow
+    name: Verbosity flags
+    description: Global --quiet and --verbose flags control output level across all commands.
+    steps:
+      - id: s1
+        action: parse
+        target: "--quiet / --verbose global options via Commander"
+      - id: s2
+        action: route
+        target: "--quiet routes to errors and final summary only"
+      - id: s3
+        action: route
+        target: "--verbose routes to timestamps, full paths, debug"
+      - id: s4
+        action: default
+        target: current output level
+contracts:
+  - id: symbols-colored
+    description: Status symbols are colored in TTY output
+    must_have:
+      - ✓ green
+      - ✗ red
+      - ⚠ yellow
+      - ⊘ dim/yellow
+      - → cyan
+  - id: no-color-respected
+    description: NO_COLOR env var disables all color
+    must_have:
+      - NO_COLOR set → output is plain text
+      - NO_COLOR unset → colors active in TTY
+  - id: non-tty-plain
+    description: Piped/redirected output is plain text
+    must_have:
+      - stdout not a TTY → no ANSI codes
+      - stderr not a TTY → no ANSI codes
+      - spinner suppressed in non-TTY
+      - progress bar suppressed in non-TTY
+      - output remains grep-friendly
+  - id: palette-consistent
+    description: Color semantics are consistent across all commands
+    must_have:
+      - success states green across init/scan/validate/generate/enrich/etc
+      - error states red across all commands
+      - warning states yellow across all commands
+      - file paths and counts dim across all commands
+  - id: deps-cjs-compatible
+    description: All new dependencies are CJS-compatible
+    must_have:
+      - picocolors ^1 (CJS)
+      - ora ^5 (last CJS major; v6+ is ESM)
+      - cli-progress ^3 (CJS)
+      - treeify ^0.1 (CJS)
+      - update-notifier ^5 (last CJS major; v7+ is ESM)
+      - package.json remains CommonJS (no module type field)
+  - id: spinner-long-ops
+    description: Animated spinner during async operations
+    must_have:
+      - scan, enrich, generate show spinner with elapsed context
+      - spinner clears and is replaced by result line on completion
+      - spinner suppressed in non-TTY (plain log fallback)
+  - id: progress-batch
+    description: Progress bar for batch file operations
+    must_have:
+      - generate writing N files shows progress bar with current/total
+      - scan detecting services shows count progress
+      - bar hidden in non-TTY
+  - id: tree-file-lists
+    description: File lists rendered as tree view
+    must_have:
+      - Files written/skipped lists use tree connectors
+      - nested .usm/ structure shown hierarchically
+      - flat fallback in non-TTY
+  - id: ascii-banner
+    description: ASCII art USM banner on no-args/help
+    must_have:
+      - usm with no args shows ASCII USM banner then help
+      - banner suppressed in non-TTY
+  - id: did-you-mean
+    description: Suggestions for unknown commands
+    must_have:
+      - usm scaan suggests scan via did-you-mean
+      - suggestion shown via Commander built-in
+  - id: update-notifier
+    description: One-line hint when a newer @smithgray/usm is published
+    must_have:
+      - checks npm registry in background, non-blocking
+      - cached with 24h interval
+      - hint only shown if newer version exists and in TTY
+  - id: verbosity-flags
+    description: "--quiet and --verbose flags across commands"
+    must_have:
+      - "--quiet shows only errors and final summary"
+      - default shows current output level
+      - "--verbose shows timestamps, full paths, debug info"
+tests:
+  - id: tty-colored
+    setup:
+      tty: true
+      no_color_unset: true
+    expect:
+      - assertion: success lines contain green ANSI codes
+      - assertion: error lines contain red ANSI codes
+  - id: no-color-plain
+    setup:
+      env:
+        NO_COLOR: "1"
+    expect:
+      - assertion: no ANSI escape codes in output
+      - assertion: symbols still present as plain characters
+  - id: piped-plain
+    setup:
+      stdout_not_tty: true
+    expect:
+      - assertion: no ANSI escape codes in piped output
+      - assertion: no spinner animation in piped output
+      - assertion: no progress bar in piped output
+  - id: spinner-during-async
+    setup:
+      tty: true
+      long_op: true
+    expect:
+      - assertion: spinner frames appear while work in progress
+      - assertion: spinner cleared on completion
+  - id: progress-bar-batch
+    setup:
+      tty: true
+      batch_op: true
+    expect:
+      - assertion: bar appears with current/total
+      - assertion: bar at 100% on completion
+  - id: tree-file-list
+    setup:
+      tty: true
+      generate_run: true
+    expect:
+      - assertion: file list uses tree connectors
+      - assertion: .usm structure shown hierarchically
+  - id: ascii-banner
+    setup:
+      no_args: true
+    expect:
+      - assertion: ASCII USM banner rendered
+      - assertion: help text follows banner
+  - id: did-you-mean
+    setup:
+      command: scaan
+    expect:
+      - assertion: did-you-mean scan suggestion shown
+  - id: update-notifier
+    setup:
+      newer_version_available: true
+    expect:
+      - assertion: one-line Update available hint in TTY
+      - assertion: hint suppressed in non-TTY
+  - id: verbosity-quiet
+    setup:
+      flag: "--quiet"
+    expect:
+      - assertion: only errors and final summary shown
+      - assertion: success lines suppressed
+  - id: verbosity-verbose
+    setup:
+      flag: "--verbose"
+    expect:
+      - assertion: timestamps present
+      - assertion: full paths shown
+  - id: all-commands-covered
+    setup:
+      review: true
+    expect:
+      - assertion: >-
+          init, scan, validate, generate, enrich, scaffold, info, check, query, import, docs, mcp
+          all use color/spinner/verbosity helpers
+implementation:
+  primary: src/cli/index.ts
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/cli
