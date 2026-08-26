@@ -1,0 +1,132 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mkt-mock-interfaces
+$type: feature
+$version: 1
+$last_updated: "2026-08-26"
+summary: >-
+  Add two side-by-side animated mock interfaces below the "Works with your client" section — left is
+  an agentic IDE/chat with USM-aware agent prompts and responses, right is a mock browser showing
+  the corresponding spec/docs loading. Both animate in sync to demonstrate the spec-first
+  development cycle. Responsive (stacks on mobile, side-by-side on desktop).
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Show visitors the spec-first workflow in action by animating two synced mock interfaces — an
+  agentic IDE/chat on the left where the agent references USM specs and tools, and a browser on the
+  right where the corresponding spec/docs page loads. Makes the abstract "specs drive code, code
+  drives docs" loop concrete and visual.
+status: built
+flows:
+  - id: chat-mock-flow
+    name: Chat mock animation
+    description: Cycles through 2 scenes showing an agentic IDE/chat interface with USM-aware agent responses.
+    steps:
+      - id: s1
+        action: render
+        target: IDE chrome with file tabs and chat panel
+      - id: s2
+        action: type
+        target: user prompt about adding a login feature
+      - id: s3
+        action: stream
+        target: agent response referencing usm_draft_feature and the spec
+      - id: s4
+        action: show
+        target: agent writes code referencing the spec contracts
+      - id: s5
+        action: cycle
+        target: advance to next scene after hold
+  - id: browser-mock-flow
+    name: Browser mock animation
+    description: >-
+      Cycles through 2 scenes showing a browser loading the spec/docs corresponding to the chat
+      action.
+    steps:
+      - id: s1
+        action: render
+        target: browser chrome with URL bar
+      - id: s2
+        action: navigate
+        target: URL changes to the spec/docs page
+      - id: s3
+        action: load
+        target: skeleton placeholders then content fills in
+      - id: s4
+        action: show
+        target: spec content (contracts, flows) rendered
+      - id: s5
+        action: cycle
+        target: advance to next scene after hold
+contracts:
+  - id: two-mock-interfaces
+    description: Two side-by-side animated mock interfaces below the Works with your client section
+    must_have:
+      - Left mock = agentic IDE/chat with agent prompts and responses referencing USM
+      - Right mock = browser window showing specs/docs loading for the corresponding command
+      - Both mock interfaces animate (typing, streaming responses, page loads)
+      - Layout is responsive (stacks on mobile, side-by-side on desktop)
+  - id: usm-references-in-chat
+    description: Agent chat references USM tools and specs
+    must_have:
+      - Agent mentions usm_read, usm_write_feature, or similar MCP tools
+      - Agent references a feature spec before coding
+      - Spec-first workflow is visible in the dialogue
+  - id: browser-specs-loading
+    description: Right mock browser shows specs/docs loading in response to the agent action
+    must_have:
+      - Browser URL bar updates to a docs/spec URL
+      - Page content loads progressively (skeleton then content)
+      - Loaded content matches the spec the agent just wrote or read
+  - id: synced-timing
+    description: The two mocks are loosely synced so the chat action appears to trigger the browser load
+    must_have:
+      - Chat completes an action then browser loads the corresponding spec
+      - Cycle repeats with a different command/spec pair
+decisions:
+  - id: reuse-cli-animation-pattern
+    decision: Reuse the line-by-line reveal pattern from CliAnimation for both mocks
+    rationale: >-
+      CliAnimation already has a working scene/line/delay system with typewriter reveal. Reusing it
+      keeps the two new mocks consistent and low-risk.
+    consequences: A new ChatMock and BrowserMock component, each with their own scenes array
+    status: accepted
+  - id: two-command-cycle
+    decision: "Cycle two command/spec pairs: draft_feature then generate"
+    rationale: >-
+      Shows the spec-first write flow (draft to spec appears in browser) and the docs flow (generate
+      to docs page appears). Two scenes cover both halves of the USM value prop.
+    consequences: Each mock has 2 scenes that loop
+    status: accepted
+  - id: responsive-stack
+    decision: Side-by-side on md+ screens, stacked on mobile
+    rationale: >-
+      Standard responsive pattern for two-column comparisons. Both mocks should be fully visible
+      side-by-side on desktop for the synced effect.
+    consequences: grid grid-cols-1 md:grid-cols-2 gap-6 layout
+    status: accepted
+tests:
+  - id: both-mocks-render
+    setup:
+      render: true
+    expect:
+      - assertion: both mocks render with chrome (window controls / tabs)
+      - assertion: chat mock shows user prompts and agent responses
+      - assertion: browser mock shows URL bar and page content
+  - id: usm-references-visible
+    setup:
+      scene: 1
+    expect:
+      - assertion: left mock references usm tools or specs
+      - assertion: right mock shows the spec content that matches
+  - id: responsive-layout
+    setup:
+      viewport: both
+    expect:
+      - assertion: mocks stack vertically on small screens
+      - assertion: mocks are side-by-side on md+
+implementation:
+  primary: web/src/components/mock-interfaces.tsx
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/mkt-language-tabs

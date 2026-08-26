@@ -1,0 +1,49 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mkt-mock-interfaces-v2
+$type: feature
+$version: 1
+$last_updated: "2026-08-26"
+summary: >-
+  Update the mock interfaces to look like the real USM tooling — browser mock styled as VitePress
+  docs with sidebar/nav/real doc structure, IDE mock with file explorer showing .usm files being
+  created.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Make the mocks instantly recognizable as real USM tooling by matching the actual VitePress docs
+  layout and adding a file explorer that shows .usm files appearing as the agent writes them.
+status: built
+contracts:
+  - id: browser-vitepress-look
+    description: Browser mock looks like the real VitePress docs site
+    must_have:
+      - Left sidebar with grouped nav sections (Getting Started, Features, etc.)
+      - Top bar with USM logo, search placeholder, Report Issue link
+      - >-
+        Content area renders real doc structure: H1, Usage code block, How it works numbered steps,
+        Guarantees checkbox criteria
+  - id: ide-file-explorer
+    description: IDE mock has a file explorer sidebar showing .usm files being created
+    must_have:
+      - Left file explorer panel with tree of project files
+      - .usm files appear with green + badge as the agent writes them
+      - Explorer syncs with the agent's file-write actions
+decisions:
+  - id: reuse-real-doc-structure
+    decision: Model browser mock content on real generated feature docs
+    rationale: >-
+      The actual VitePress docs render H1 + Usage + How it works + Guarantees. Matching this makes
+      the mock instantly recognizable as the real docs site.
+    consequences: Browser scenes use structured content blocks matching real doc layout
+    status: accepted
+  - id: file-explorer-sync
+    decision: IDE file explorer reveals .usm files in sync with agent file-write actions
+    rationale: Shows the spec-first workflow visually — file appears in explorer as agent writes it
+    consequences: File explorer state tied to chat animation phase
+    status: accepted
+implementation:
+  primary: web/src/components/mock-interfaces.tsx
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/mkt-mock-interfaces
