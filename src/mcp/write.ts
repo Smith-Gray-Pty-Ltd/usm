@@ -14,7 +14,7 @@ import type { FeatureUsm, UsmFile } from "../types.js";
  * Find a .usm file by its $id across the monorepo.
  */
 function findFeatureById(id: string): string | null {
-  return findFileById(id, isFeatureFile);
+  return findFileById(id, (file) => isFeatureFile(file as UsmFile));
 }
 
 /**
@@ -25,7 +25,7 @@ function findFileById(id: string, typeCheck?: (file: unknown) => boolean): strin
   for (const filePath of files) {
     try {
       const parsed = parseUsmFile(filePath);
-      if (parsed.$id === id && (!typeCheck || typeCheck(parsed))) {
+      if (parsed.$id === id && (!typeCheck || typeCheck(parsed as unknown))) {
         return filePath;
       }
     } catch {
@@ -642,7 +642,7 @@ export async function updateSystemTool(args: { id?: string; path?: string; field
     if (args.path) {
       filePath = resolvePath(args.path);
     } else if (args.id) {
-      const found = findFileById(args.id, isSystemFile);
+      const found = findFileById(args.id, (file) => isSystemFile(file as UsmFile));
       if (!found) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `System file with $id '${args.id}' not found` }, null, 2) }], isError: true };
       filePath = found;
     } else {
@@ -653,7 +653,7 @@ export async function updateSystemTool(args: { id?: string; path?: string; field
       return { content: [{ type: "text" as const, text: JSON.stringify({ error: `File not found: ${filePath}` }, null, 2) }], isError: true };
     }
 
-    const system = parseUsmFile(filePath) as Record<string, unknown>;
+    const system = parseUsmFile(filePath) as unknown as Record<string, unknown>;
     const updates = JSON.parse(args.fields) as Record<string, unknown>;
 
     const replaceFields = args.replace ? (JSON.parse(args.replace) as string[]) : [];
@@ -700,7 +700,7 @@ export async function updateServiceTool(args: { id?: string; path?: string; fiel
     if (args.path) {
       filePath = resolvePath(args.path);
     } else if (args.id) {
-      const found = findFileById(args.id, isServiceFile);
+      const found = findFileById(args.id, (file) => isServiceFile(file as UsmFile));
       if (!found) return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Service file with $id '${args.id}' not found` }, null, 2) }], isError: true };
       filePath = found;
     } else {
@@ -711,7 +711,7 @@ export async function updateServiceTool(args: { id?: string; path?: string; fiel
       return { content: [{ type: "text" as const, text: JSON.stringify({ error: `File not found: ${filePath}` }, null, 2) }], isError: true };
     }
 
-    const service = parseUsmFile(filePath) as Record<string, unknown>;
+    const service = parseUsmFile(filePath) as unknown as Record<string, unknown>;
     const updates = JSON.parse(args.fields) as Record<string, unknown>;
 
     const replaceFields = args.replace ? (JSON.parse(args.replace) as string[]) : [];

@@ -70,6 +70,14 @@ import {
 } from "../generators/rulesFiles.js";
 import type { MergeStrategy } from "../scan/types.js";
 import type { SystemUsm, ServiceUsm, FeatureUsm, DataUsm, GenerationResult } from "../types.js";
+// CLI polish: colors, spinner, progress, tree, banner, update notifier, verbosity
+import { ok, fail, warn, skip, arrow, success, error, warning, info, dim, bold, metric } from "./colors.js";
+import { startSpinner } from "./spinner.js";
+import { startProgress } from "./progress.js";
+import { renderFileTree } from "./tree.js";
+import { printBanner } from "./banner.js";
+import { checkForUpdates } from "./updateCheck.js";
+import { setVerbosity, getLevel, logInfo, logError, logDebug } from "./verbosity.js";
 
 const program = new Command();
 
@@ -87,7 +95,31 @@ try {
 program
   .name("usm")
   .description("Universal System Map — CLI for .usm files")
-  .version(version);
+  .version(version)
+  // Global verbosity flags — available on every command
+  .option("--quiet", "Suppress info/success lines; show only errors and final summary")
+  .option("--verbose", "Show timestamps, full paths, and debug info")
+  // Commander built-in: suggest closest command name on typos
+  .showSuggestionAfterError(true)
+  .hook("preAction", (cmd) => {
+    // Apply verbosity from the global flags on the *command* (inherited)
+    const opts = cmd.opts();
+    setVerbosity({ quiet: opts.quiet, verbose: opts.verbose });
+    // Non-blocking update check — runs on every command but is async/cached.
+    // We don't await it; it renders a hint asynchronously when ready.
+    checkForUpdates().catch(() => {});
+  });
+
+// Show ASCII banner when no args or --help. Commander calls this on parse.
+const originalParse = program.parse.bind(program);
+program.parse = function (argv?: readonly string[]): Command {
+  // If no args (just `usm`) or `--help`/`-h`, show the banner first.
+  const args = argv ?? process.argv.slice(2);
+  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
+    printBanner();
+  }
+  return originalParse(argv);
+};
 
 // ─── scaffold (renamed from init) ────────────────────────────────────────────
 
@@ -206,7 +238,7 @@ see_also: []
 
     const type = options.type;
     if (!templates[type]) {
-      console.error(`Unknown type: ${type}. Must be system, service, or feature.`);
+      console.error(fail(`Unknown type: ${error(type)}. Must be system, service, or feature.`));
       process.exit(1);
     }
 
@@ -221,12 +253,12 @@ see_also: []
     }
 
     if (fs.existsSync(resolvedPath)) {
-      console.error(`File already exists: ${resolvedPath}`);
+      console.error(fail(`File already exists: ${dim(resolvedPath)}`));
       process.exit(1);
     }
 
     fs.writeFileSync(resolvedPath, templates[type], "utf-8");
-    console.log(`Created ${resolvedPath}`);
+    console.log(ok(`Created ${dim(resolvedPath)}`));
   });
 
 // ─── scaffold project ─────────────────────────────────────────────────────────
@@ -257,11 +289,11 @@ program
         fs.mkdirSync(dir, { recursive: true });
       }
       if (fs.existsSync(fullPath)) {
-        console.log(`  ⊘ ${relPath} — already exists`);
+        console.log(`  ${skip(relPath)} — ${dim("already exists")}`);
         return;
       }
       fs.writeFileSync(fullPath, content, "utf-8");
-      console.log(`  ✓ ${relPath}`);
+      console.log(`  ${ok(relPath)}`);
     }
 
     // ── Templates ──────────────────────────────────────────────────────────
@@ -373,7 +405,7 @@ see_also: []
 
     // ── Generate based on type ─────────────────────────────────────────────
 
-    console.log(`\nScaffolding ${options.type} project: ${name}\n`);
+    console.log(`\n${bold(`Scaffolding ${options.type} project: ${options.name}`)}\n`);
 
     if (options.type === "single-app") {
       writeFile(".usm/system.usm", systemTemplate);
@@ -388,7 +420,7 @@ see_also: []
       writeFile(`apps/web/.usm/services/web.usm`, serviceTemplate.replace(/name/g, "web").replace(/port: 3000/, "port: 3000"));
     }
 
-    console.log(`\n✓ Project scaffolded! Next steps:`);
+    console.log(`\n${ok(`Project scaffolded!`)} Next steps:`);
     console.log(`  1. Edit the .usm files to describe your system`);
     console.log(`  2. Run 'usm validate' to check the files`);
     console.log(`  3. Run 'usm generate' to produce documentation`);
@@ -407,14 +439,14 @@ program
     try {
       const config = await initConfig({ root: options.root });
       const outputPath = writeConfig(config, options.output, options.force);
-      console.log(`Created ${outputPath}`);
-      console.log(`  Name:    ${config.name}`);
-      console.log(`  Services: ${config.services?.length || 0}`);
-      console.log(`  Shared:   ${config.shared?.length || 0}`);
-      console.log(`  Data:     ${config.data?.length || 0}`);
-      console.log(`\nRun 'usm scan' to generate .usm files from this config.`);
+      console.log(ok(`Created ${dim(outputPath)}`));
+      console.log(`  Name:      ${config.name}`);
+      console.log(`  Services:  ${metric(String(config.services?.length || 0))}`);
+      console.log(`  Shared:    ${metric(String(config.shared?.length || 0))}`);
+      console.log(`  Data:      ${metric(String(config.data?.length || 0))}`);
+      console.log(`\n${info("Run 'usm scan' to generate .usm files from this config.")}`);
     } catch (err) {
-      console.error(`Error: ${(err as Error).message}`);
+      console.error(fail((err as Error).message));
       process.exit(1);
     }
   });
@@ -448,7 +480,7 @@ program
         // Non-interactive mode — resolve from flags
         const valid = ["human-gate", "direct-to-feedback", "direct-to-github"];
         if (!valid.includes(options.policy)) {
-          console.error(`Error: --policy must be one of ${valid.join(", ")}`);
+          console.error(fail(`--policy must be one of ${error(valid.join(", "))}`));
           process.exit(1);
         }
         // githubAuth is undefined if neither flag was passed; treat as false
@@ -459,30 +491,30 @@ program
           tracker: options.tracker,
         });
         if (options.policy === "direct-to-github" && !gh) {
-          console.warn("Warning: direct-to-github requires --github-auth; downgraded to human-gate.");
+          console.warn(warn("direct-to-github requires --github-auth; downgraded to human-gate."));
         }
       } else {
         // Interactive mode (TTY) — prompts; returns null if non-TTY
         const prompted = await promptFeedbackPolicy();
         policy = prompted ?? DEFAULT_FEEDBACK_POLICY;
         if (prompted === null) {
-          console.log("Non-interactive shell — defaulting policy to human-gate. Re-run with --policy to set explicitly.");
+          console.log(skip("Non-interactive shell — defaulting policy to human-gate. Re-run with --policy to set explicitly."));
         }
         if (options.tracker) policy.tracker = options.tracker;
       }
 
       const result = applyFeedbackToSystem(systemPath, policy);
       if (!result.applied) {
-        console.error("Could not apply feedback policy:");
-        for (const e of result.errors || []) console.error(`  ${e.path}: ${e.message}`);
+        console.error(fail("Could not apply feedback policy:"));
+        for (const e of result.errors || []) console.error(`  ${dim(e.path)}: ${e.message}`);
         process.exit(1);
       }
 
-      console.log(`Feedback policy written to ${result.path}`);
-      console.log(`  Policy:     ${policy.policy}`);
-      console.log(`  GitHub auth: ${policy.github_auth ?? "(unset)"}`);
-      if (policy.tracker) console.log(`  Tracker:    ${policy.tracker}`);
-      console.log(`\nRe-run 'usm generate' to update the Feedback Protocol in agent rules files.`);
+      console.log(ok(`Feedback policy written to ${dim(result.path ?? "(system.usm)")}`));
+      console.log(`  Policy:      ${info(policy.policy ?? "(unset)")}`);
+      console.log(`  GitHub auth:  ${dim(String(policy.github_auth ?? "(unset)"))}`);
+      if (policy.tracker) console.log(`  Tracker:     ${dim(policy.tracker)}`);
+      console.log(`\n${info("Re-run 'usm generate' to update the Feedback Protocol in agent rules files.")}`);
     } catch (err) {
       console.error(`Error: ${(err as Error).message}`);
       process.exit(1);
@@ -512,7 +544,7 @@ program
         : path.resolve(options.root, ".usm", "system.usm");
 
       if (!fs.existsSync(systemPath)) {
-        console.error(`system.usm not found at ${systemPath}. Create it with 'usm init-file' or 'usm scan' first.`);
+        console.error(fail(`system.usm not found at ${dim(systemPath)}. Create it with 'usm init-file' or 'usm scan' first.`));
         process.exit(1);
       }
 
@@ -520,38 +552,38 @@ program
       const report = detectUpgrade(system);
 
       // ── Report ────────────────────────────────────────────────────────────
-      const staleTag = report.stale ? "stale" : "up to date";
-      console.log(`USM ${report.installedVersion} — project is at ${report.projectVersion} (${staleTag})`);
+      const staleTag = report.stale ? warning("stale") : success("up to date");
+      console.log(`USM ${info(report.installedVersion)} — project is at ${metric(report.projectVersion)} (${staleTag})`);
       console.log("");
 
       if (report.missing.length === 0 && !report.stale) {
-        console.log("✓ Everything is configured and up to date. Nothing to do.");
+        console.log(ok("Everything is configured and up to date. Nothing to do."));
         return;
       }
 
       if (report.recommendedMissing.length > 0) {
-        console.log("Missing recommended capabilities:");
+        console.log(bold("Missing recommended capabilities:"));
         for (const s of report.recommendedMissing) {
-          const newTag = s.isNew ? " [new]" : "";
-          console.log(`  ⚠ ${s.capability.id}${newTag}  ${s.capability.name}`);
-          console.log(`      ${s.capability.description}`);
+          const newTag = s.isNew ? warning(" [new]") : "";
+          console.log(`  ${warn(`${s.capability.id}${newTag}`)}  ${dim(s.capability.name)}`);
+          console.log(`      ${dim(s.capability.description)}`);
         }
         console.log("");
       }
 
       if (report.missing.length > report.recommendedMissing.length) {
         const optional = report.missing.filter((s) => !s.capability.recommended);
-        console.log("Other available capabilities:");
+        console.log(bold("Other available capabilities:"));
         for (const s of optional) {
-          console.log(`    ${s.capability.id}  ${s.capability.name}`);
+          console.log(`    ${dim(s.capability.id)}  ${s.capability.name}`);
         }
         console.log("");
       }
 
       if (report.configured.length > 0) {
-        console.log("Already configured:");
+        console.log(bold("Already configured:"));
         for (const s of report.configured) {
-          console.log(`  ✓ ${s.capability.id}`);
+          console.log(`  ${ok(s.capability.id)}`);
         }
         console.log("");
       }
@@ -559,7 +591,7 @@ program
       // ── --check: report only, exit non-zero if stale ─────────────────────
       if (options.check) {
         if (report.stale || report.recommendedMissing.length > 0) {
-          console.log("Run 'usm upgrade' to set up missing capabilities.");
+          console.log(info("Run 'usm upgrade' to set up missing capabilities."));
           process.exit(1);
         }
         return;
@@ -569,18 +601,18 @@ program
       if (options.apply) {
         const targets = options.capability ? [options.capability] : [];
         const result = await applyUpgrade(systemPath, targets, false);
-        for (const a of result.applied) console.log(`✓ ${a.id}: ${a.message}`);
-        for (const f of result.failed) console.error(`✗ ${f.id}: ${f.message}`);
+        for (const a of result.applied) console.log(ok(`${a.id}: ${a.message}`));
+        for (const f of result.failed) console.error(fail(`${f.id}: ${f.message}`));
         if (result.versionBumped) {
-          console.log(`\nProject version bumped to ${report.installedVersion}.`);
-          console.log("Run 'usm generate' to refresh rules files and docs.");
+          console.log(`\n${ok(`Project version bumped to ${metric(report.installedVersion)}.`)}`);
+          console.log(info("Run 'usm generate' to refresh rules files and docs."));
         }
         process.exit(result.failed.length > 0 ? 1 : 0);
       }
 
       // ── Interactive (TTY) ────────────────────────────────────────────────
       if (!process.stdin.isTTY) {
-        console.log("Non-interactive shell — showing report only. Re-run with --apply to configure, or in a TTY for guided setup.");
+        console.log(skip("Non-interactive shell — showing report only. Re-run with --apply to configure, or in a TTY for guided setup."));
         return;
       }
 
@@ -595,15 +627,15 @@ program
           }
         }
         if (targets.length === 0) {
-          console.log("No capabilities selected. Exiting.");
+          console.log(skip("No capabilities selected. Exiting."));
           return;
         }
         const result = await applyUpgrade(systemPath, targets, true);
-        for (const a of result.applied) console.log(`✓ ${a.id}: ${a.message}`);
-        for (const f of result.failed) console.error(`✗ ${f.id}: ${f.message}`);
+        for (const a of result.applied) console.log(ok(`${a.id}: ${a.message}`));
+        for (const f of result.failed) console.error(fail(`${f.id}: ${f.message}`));
         if (result.versionBumped) {
-          console.log(`\nProject version bumped to ${report.installedVersion}.`);
-          console.log("Run 'usm generate' to refresh rules files and docs.");
+          console.log(`\n${ok(`Project version bumped to ${metric(report.installedVersion)}.`)}`);
+          console.log(info("Run 'usm generate' to refresh rules files and docs."));
         }
       } finally {
         rl.close();
@@ -633,6 +665,7 @@ program
   .option("--routes", "Only extract routes (skip service/package/data detection)", false)
   .option("--merge <strategy>", "Merge strategy: smart (default), skip (old behavior), overwrite", "smart")
   .action(async (options: ScanCliOptions) => {
+    const spinner = startSpinner("Scanning codebase...");
     try {
       const validStrategies: MergeStrategy[] = ["smart", "skip", "overwrite"];
       const mergeStrategy = validStrategies.includes(options.merge)
@@ -648,36 +681,38 @@ program
         mergeStrategy: effectiveStrategy,
       });
 
-      console.log(`Scan complete in ${result.stats?.duration_ms || 0}ms`);
-      console.log(`  Services found:  ${result.stats?.services_found || 0}`);
-      console.log(`  Packages found:  ${result.stats?.packages_found || 0}`);
-      console.log(`  Data models:     ${result.stats?.data_models_found || 0}`);
-      console.log(`  Features found:  ${result.stats?.features_found || 0}`);
+      spinner.succeed(ok(`Scan complete in ${metric(String(result.stats?.duration_ms || 0))}ms`));
+      console.log(`  Services found:  ${metric(String(result.stats?.services_found || 0))}`);
+      console.log(`  Packages found:  ${metric(String(result.stats?.packages_found || 0))}`);
+      console.log(`  Data models:     ${metric(String(result.stats?.data_models_found || 0))}`);
+      console.log(`  Features found:  ${metric(String(result.stats?.features_found || 0))}`);
       console.log();
 
       if (result.files_written.length > 0) {
-        console.log("Files written:");
-        for (const f of result.files_written) {
-          console.log(`  ✓ ${f.path} (${f.type}, from ${f.source})`);
-        }
+        console.log(bold("Files written:"));
+        const tree = renderFileTree(
+          result.files_written.map((f) => f.path),
+        );
+        console.log(tree);
       }
 
       if (result.files_skipped.length > 0) {
-        console.log("Files skipped:");
+        console.log(bold("Files skipped:"));
         for (const f of result.files_skipped) {
-          console.log(`  ⊘ ${f.path} (${f.reason})`);
+          console.log(`  ${skip(`${f.path}`)} ${dim(`(${f.reason})`)}`);
         }
-        console.log(`\nUse --force to overwrite, or --merge (default) to smart-merge.`);
+        console.log(`\n${info("Use --force to overwrite, or --merge (default) to smart-merge.")}`);
       }
 
       if (result.warnings && result.warnings.length > 0) {
-        console.log("Warnings:");
+        console.log(bold("Warnings:"));
         for (const w of result.warnings) {
-          console.log(`  ⚠ ${w}`);
+          console.log(`  ${warn(w)}`);
         }
       }
     } catch (err) {
-      console.error(`Error: ${(err as Error).message}`);
+      spinner.fail(fail("Scan failed"));
+      console.error(fail((err as Error).message));
       process.exit(1);
     }
   });
@@ -700,32 +735,32 @@ scanCommand
       });
 
       if (result.warnings.length > 0) {
-        console.log("Warnings:");
+        console.log(bold("Warnings:"));
         for (const w of result.warnings) {
-          console.log(`  ⚠ ${w}`);
+          console.log(`  ${warn(w)}`);
         }
         console.log();
       }
 
       if (result.services.length === 0) {
-        console.log("No infrastructure data could be extracted from Terraform files.");
+        console.log(skip("No infrastructure data could be extracted from Terraform files."));
         return;
       }
 
-      console.log(`Extracted infrastructure data for ${result.services.length} service(s):\n`);
+      console.log(bold(`Extracted infrastructure data for ${metric(String(result.services.length))} service(s):\n`));
 
       for (const svc of result.services) {
-        console.log(`─── ${svc.serviceId} ───`);
-        console.log(`Source: ${svc.source}`);
+        console.log(`${bold(`─── ${info(svc.serviceId)} ───`)}`);
+        console.log(`Source: ${dim(svc.source)}`);
         console.log();
         console.log(svc.yamlBlock);
         console.log();
       }
 
-      console.log("Copy the infrastructure: block above into the corresponding service .usm file.");
-      console.log("Review and adjust any values before committing.");
+      console.log(info("Copy the infrastructure: block above into the corresponding service .usm file."));
+      console.log(dim("Review and adjust any values before committing."));
     } catch (err) {
-      console.error(`Error: ${(err as Error).message}`);
+      console.error(fail((err as Error).message));
       process.exit(1);
     }
   });
@@ -764,7 +799,7 @@ program
     }
 
     if (allPaths.length === 0) {
-      console.log("No .usm files found.");
+      console.log(skip("No .usm files found."));
       return;
     }
 
@@ -772,22 +807,22 @@ program
     for (const filePath of allPaths) {
       const result = validateUsmFile(filePath);
       if (result.valid) {
-        console.log(`✓ ${filePath}`);
-        for (const warn of result.warnings || []) {
-          console.log(`  ⚠ ${warn.path}: ${warn.message}`);
+        console.log(ok(filePath));
+        for (const warnItem of result.warnings || []) {
+          console.log(`  ${warn(`${warnItem.path}: ${warnItem.message}`)}`);
         }
         // Parse-integrity check: list ids in raw YAML missing from parsed data
         // would validate fine but silently vanish from generated docs (issue #13)
         try {
           const { warnings } = parseUsmFileWithWarnings(filePath);
-          for (const warn of warnings) {
-            console.log(`  ⚠ ${filePath}: ${warn}`);
+          for (const warnItem of warnings) {
+            console.log(`  ${warn(`${filePath}: ${warnItem}`)}`);
           }
         } catch {
           // Parse errors are reported by validateUsmFile above
         }
       } else {
-        console.log(`✗ ${filePath}`);
+        console.log(fail(filePath));
         for (const err of result.errors || []) {
           console.log(`  ${err.path}: ${err.message}`);
         }
@@ -815,7 +850,7 @@ program
     // Validate --only target early (before any generation)
     const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md", "structurizr", "readme-facts"];
     if (onlyTarget && !validTargets.includes(onlyTarget)) {
-      console.error(`Invalid --only target: ${onlyTarget}. Valid targets: ${validTargets.join(", ")}`);
+      console.error(fail(`Invalid --only target: ${error(onlyTarget)}. Valid targets: ${validTargets.join(", ")}`));
       process.exit(1);
     }
 
@@ -823,14 +858,15 @@ program
     if (onlyTarget === "help-docs") {
       const docsRoot = path.join(root, ".usm-workspace", "docs");
       if (!fs.existsSync(docsRoot)) {
-        console.error("No developer docs found. Run 'usm generate' first.");
+        console.error(fail("No developer docs found. Run 'usm generate' first."));
         process.exit(1);
       }
       const { filterForHelpAudience } = await import("./docs.js");
       const helpRoot = path.join(root, ".usm-workspace", "help-docs");
+      const spinner = startSpinner("Generating help docs...");
       console.log("Generating help docs (filtering developer docs)...");
       const count = filterForHelpAudience(root, docsRoot, helpRoot);
-      console.log(`✓ ${count} file(s) written to .usm-workspace/help-docs/`);
+      spinner.succeed(ok(`${metric(String(count))} file(s) written to ${dim(".usm-workspace/help-docs/")}`));
       return;
     }
 
@@ -838,24 +874,28 @@ program
     if (onlyTarget === "archimate") {
       const systemPath = path.join(root, ".usm", "system.usm");
       if (!fs.existsSync(systemPath)) {
-        console.error("No .usm/system.usm found.");
+        console.error(fail("No .usm/system.usm found."));
         process.exit(1);
       }
       const system = parseUsmFile(systemPath) as SystemUsm;
+      const spinner = startSpinner("Generating ArchiMate model...");
       const result = generateArchiMateModel(system, root);
       if (result.outputs.length > 0) {
-        console.log(`Generated ArchiMate model: ${path.relative(root, result.outputs[0].path)}`);
+        spinner.succeed(ok(`Generated ArchiMate model: ${dim(path.relative(root, result.outputs[0].path))}`));
+      } else {
+        spinner.warn(skip("No ArchiMate output generated"));
       }
       return;
     }
 
     // Handle readme-facts target (anti-drift: version/commands/tools into README)
     if (onlyTarget === "readme-facts") {
+      const spinner = startSpinner("Updating README facts...");
       const result = generateReadmeFacts(root);
       for (const output of result.outputs) {
         fs.mkdirSync(path.dirname(output.path), { recursive: true });
         fs.writeFileSync(output.path, output.content, "utf-8");
-        console.log(`Updated README facts: ${path.relative(root, output.path)}`);
+        spinner.succeed(ok(`Updated README facts: ${dim(path.relative(root, output.path))}`));
       }
       return;
     }
@@ -864,7 +904,7 @@ program
     if (onlyTarget === "structurizr") {
       const systemPath = path.join(root, ".usm", "system.usm");
       if (!fs.existsSync(systemPath)) {
-        console.error("No .usm/system.usm found.");
+        console.error(fail("No .usm/system.usm found."));
         process.exit(1);
       }
       const system = parseUsmFile(systemPath) as SystemUsm;
@@ -872,11 +912,12 @@ program
       const featureFiles = findAllUsmFiles(root).filter((f) => f.includes(`${path.sep}features${path.sep}`));
       const services = serviceFiles.map((f) => parseUsmFile(f) as unknown as import("../types.js").ServiceUsm).filter((s) => s.$type === "service");
       const features = featureFiles.map((f) => parseUsmFile(f) as unknown as import("../types.js").FeatureUsm).filter((s) => s.$type === "feature");
+      const spinner = startSpinner("Generating Structurizr workspace...");
       const result = generateStructurizrDsl(system, services, features, root);
       for (const output of result.outputs) {
         fs.mkdirSync(path.dirname(output.path), { recursive: true });
         fs.writeFileSync(output.path, output.content, "utf-8");
-        console.log(`Generated Structurizr workspace: ${path.relative(root, output.path)}`);
+        spinner.succeed(ok(`Generated Structurizr workspace: ${dim(path.relative(root, output.path))}`));
       }
       return;
     }
@@ -889,17 +930,17 @@ program
       if (fs.existsSync(usmDir)) {
         const rootFiles = findUsmFiles(usmDir);
         if (rootFiles.length === 0) {
-          console.log("No .usm files found.");
+          console.log(skip("No .usm files found."));
           return;
         }
         files.push(...rootFiles);
       } else {
-        console.error(`No .usm/ directories found in ${root}`);
+        console.error(fail(`No .usm/ directories found in ${dim(root)}`));
         process.exit(1);
       }
     }
 
-    console.log(`Found ${files.length} .usm file(s)\n`);
+    console.log(bold(`Found ${metric(String(files.length))} .usm file(s)\n`));
 
     // Detect duplicate $ids
     const idMap = new Map<string, string[]>();
@@ -918,11 +959,11 @@ program
     }
     const dupes = Array.from(idMap.entries()).filter(([_, paths]) => paths.length > 1);
     if (dupes.length > 0) {
-      console.warn(`⚠ Found ${dupes.length} duplicate $id(s) — this may cause overwrites:`);
+      console.log(warn(`Found ${warning(String(dupes.length))} duplicate $id(s) — this may cause overwrites:`));
       for (const [id, paths] of dupes) {
-        console.warn(`    $id="${id}" in: ${paths.join(", ")}`);
+        console.log(`    ${warn(`$id="${id}"`)} in: ${dim(paths.join(", "))}`);
       }
-      console.warn();
+      console.log();
     }
 
     // Collect parsed files for aggregator generators
@@ -932,18 +973,20 @@ program
     const dataFiles: DataUsm[] = [];
 
     // ─── Pass 1: Per-file generation (system, service, feature) ────────────
+    const progressBar = startProgress("Generating", files.length);
     for (const filePath of files) {
       try {
         const { parsed, warnings: parseIntegrityWarnings } = parseUsmFileWithWarnings(filePath);
-        for (const warn of parseIntegrityWarnings) {
-          console.warn(`⚠ ${filePath}: ${warn}`);
+        for (const warnItem of parseIntegrityWarnings) {
+          console.log(`  ${warn(`${filePath}: ${warnItem}`)}`);
         }
         const validation = validateUsm(parsed);
         if (!validation.valid) {
-          console.log(`✗ ${filePath} — validation failed, skipping`);
+          console.log(fail(`${filePath} — validation failed, skipping`));
           for (const err of validation.errors || []) {
             console.log(`  ${err.path}: ${err.message}`);
           }
+          progressBar.increment();
           continue;
         }
 
@@ -960,12 +1003,12 @@ program
             if (fs.existsSync(output.path)) {
               const existing = fs.readFileSync(output.path, "utf-8");
               if (existing === output.content) {
-                console.log(`✓ ${output.path} (up to date)`);
+                console.log(ok(`${output.path} ${dim("(up to date)")}`));
               } else {
-                console.log(`✗ ${output.path} (out of date)`);
+                console.log(fail(`${output.path} ${dim("(out of date)")}`));
               }
             } else {
-              console.log(`✗ ${output.path} (missing)`);
+              console.log(fail(`${output.path} ${dim("(missing)")}`));
             }
           } else {
             const outDir = path.dirname(output.path);
@@ -973,13 +1016,15 @@ program
               fs.mkdirSync(outDir, { recursive: true });
             }
             fs.writeFileSync(output.path, output.content, "utf-8");
-            console.log(`→ ${output.path}`);
+            console.log(arrow(output.path));
           }
         }
       } catch (err) {
-        console.error(`✗ ${filePath} — ${(err as Error).message}`);
+        console.error(fail(`${filePath} — ${(err as Error).message}`));
       }
+      progressBar.increment();
     }
+    progressBar.finish();
 
     // ─── Pass 2: Area overview stubs ──────────────────────────────────────
     const areaResult = generateAreaOverviews(root);
@@ -989,12 +1034,12 @@ program
         if (fs.existsSync(output.path)) {
           const existing = fs.readFileSync(output.path, "utf-8");
           if (existing === output.content) {
-            console.log(`✓ ${output.path} (up to date)`);
+            console.log(ok(`${output.path} ${dim("(up to date)")}`));
           } else {
-            console.log(`✗ ${output.path} (out of date)`);
+            console.log(fail(`${output.path} ${dim("(out of date)")}`));
           }
         } else {
-          console.log(`✗ ${output.path} (missing)`);
+          console.log(fail(`${output.path} ${dim("(missing)")}`));
         }
       } else {
         const outDir = path.dirname(output.path);
@@ -1002,7 +1047,7 @@ program
           fs.mkdirSync(outDir, { recursive: true });
         }
         fs.writeFileSync(output.path, output.content, "utf-8");
-        console.log(`→ ${output.path} (area overview)`);
+        console.log(arrow(`${output.path} ${dim("(area overview)")}`));
       }
     }
 
@@ -1056,12 +1101,12 @@ program
               if (fs.existsSync(output.path)) {
                 const existing = fs.readFileSync(output.path, "utf-8");
                 if (existing === output.content) {
-                  console.log(`✓ ${output.path} (up to date)`);
+                  console.log(ok(`${output.path} ${dim("(up to date)")}`));
                 } else {
-                  console.log(`✗ ${output.path} (out of date)`);
+                  console.log(fail(`${output.path} ${dim("(out of date)")}`));
                 }
               } else {
-                console.log(`✗ ${output.path} (missing)`);
+                console.log(fail(`${output.path} ${dim("(missing)")}`));
               }
             } else {
               const outDir = path.dirname(output.path);
@@ -1069,11 +1114,11 @@ program
                 fs.mkdirSync(outDir, { recursive: true });
               }
               fs.writeFileSync(output.path, output.content, "utf-8");
-              console.log(`→ ${output.path} (${agg.name})`);
+              console.log(arrow(`${output.path} ${dim(`(${agg.name})`)}`));
             }
           }
         } catch (err) {
-          console.error(`✗ aggregator:${agg.name} — ${(err as Error).message}`);
+          console.error(fail(`aggregator:${agg.name} — ${(err as Error).message}`));
         }
       }
     }
@@ -1085,10 +1130,10 @@ program
         const surfaceResult = generateSurfaceTables(featureFiles, serviceFiles, root);
         for (const output of surfaceResult.outputs) {
           fs.writeFileSync(output.path, output.content, "utf-8");
-          console.log(`→ ${output.path} (surface tables)`);
+          console.log(arrow(`${output.path} ${dim("(surface tables)")}`));
         }
       } catch (err) {
-        console.error(`✗ surface-tables — ${(err as Error).message}`);
+        console.error(fail(`surface-tables — ${(err as Error).message}`));
       }
     }
 
@@ -1118,10 +1163,10 @@ program
               fs.mkdirSync(outDir, { recursive: true });
             }
             fs.writeFileSync(output.path, output.content, "utf-8");
-            console.log(`→ ${output.path} (${gen.name})`);
+            console.log(arrow(`${output.path} ${dim(`(${gen.name})`)}`));
           }
         } catch (err) {
-          console.error(`✗ ${gen.name} — ${(err as Error).message}`);
+          console.error(fail(`${gen.name} — ${(err as Error).message}`));
         }
       }
     }
@@ -1136,7 +1181,7 @@ program
             fs.mkdirSync(outDir, { recursive: true });
           }
           fs.writeFileSync(output.path, output.content, "utf-8");
-          console.log(`→ ${output.path} (togaf)`);
+          console.log(arrow(`${output.path} ${dim("(togaf)")}`));
 
           // Also surface in the developer docs tree as the Architecture section
           // (help audience omits it). Only during full generate, not standalone togaf.
@@ -1147,7 +1192,7 @@ program
           }
         }
       } catch (err) {
-        console.error(`✗ togaf — ${(err as Error).message}`);
+        console.error(fail(`togaf — ${(err as Error).message}`));
       }
     }
   });
@@ -1161,35 +1206,35 @@ program
   .action((filePath: string) => {
     const resolved = path.resolve(filePath);
 
-    console.log("1. Parsing original file...");
+    console.log(`${bold("1.")} Parsing original file...`);
     const original = parseUsmFile(resolved);
     console.log(`   Type: ${original.$type}, ID: ${original.$id}`);
 
-    console.log("2. Validating original...");
+    console.log(`${bold("2.")} Validating original...`);
     const validation = validateUsm(original);
     if (!validation.valid) {
-      console.log("   Validation failed:");
+      console.log(`   ${fail("Validation failed:")}`);
       for (const err of validation.errors || []) {
         console.log(`   ${err.path}: ${err.message}`);
       }
       process.exit(1);
     }
-    console.log("   Validation: ✓");
+    console.log(`   Validation: ${ok("")}`.trim());
 
-    console.log("3. Generating markdown...");
+    console.log(`${bold("3.")} Generating markdown...`);
     const result = generate(original, ["markdown"]);
     for (const output of result.outputs) {
-      console.log(`   → ${output.path} (${output.content.length} chars)`);
+      console.log(`   ${arrow(`${output.path} (${metric(String(output.content.length))} chars)`)}`);
     }
 
-    console.log("4. Re-parsing original...");
+    console.log(`${bold("4.")} Re-parsing original...`);
     const reparsed = parseUsmFile(resolved);
     console.log(`   Type: ${reparsed.$type}, ID: ${reparsed.$id}`);
 
     if (reparsed.$type === original.$type && reparsed.$id === original.$id && reparsed.$version === original.$version) {
-      console.log("5. Roundtrip: ✓ (key fields match)");
+      console.log(`${bold("5.")} Roundtrip: ${ok("key fields match")}`);
     } else {
-      console.log("5. Roundtrip: ✗ (key fields mismatch)");
+      console.log(`${bold("5.")} Roundtrip: ${fail("key fields mismatch")}`);
       process.exit(1);
     }
   });
@@ -1221,7 +1266,7 @@ program
       if (fs.existsSync(usmDir)) files.push(...findUsmFiles(usmDir));
     }
     if (files.length === 0) {
-      console.log("No .usm files found.");
+      console.log(skip("No .usm files found."));
       return;
     }
 
@@ -1240,7 +1285,7 @@ program
       hits = runQuery(expr, hitsWithPaths);
     } catch (err) {
       if (err instanceof QueryParseError) {
-        console.error(`Query error: ${err.message}`);
+        console.error(fail(`Query error: ${error(err.message)}`));
         process.exit(1);
       }
       throw err;
@@ -1257,11 +1302,11 @@ program
         const file = hit.file;
         const id = String(file.$id ?? path.basename(hit.path));
         const status = file.status ? String(file.status) : String(file.$type ?? "");
-        const summary = String(file.summary ?? "").split("\n")[0].slice(0, 80);
-        console.log(`${id}  [${status}]  ${summary}`);
+        const summaryText = String(file.summary ?? "").split("\n")[0].slice(0, 80);
+        console.log(`${info(id)}  ${dim(`[${status}]`)}  ${dim(summaryText)}`);
       }
     }
-    console.error(`\n${hits.length} match(es)${truncated ? ` (showing ${shown.length})` : ""} across ${hitsWithPaths.length} file(s)`);
+    console.error(`\n${metric(String(hits.length))} match(es)${truncated ? ` ${dim(`(showing ${shown.length})`)}` : ""} across ${metric(String(hitsWithPaths.length))} file(s)`);
   });
 
 // ─── import ─────────────────────────────────────────────────────────────────────
@@ -1278,12 +1323,12 @@ program
   .option("--dry-run", "List planned writes without writing", false)
   .action((file: string, opts: { format: string; root: string; id?: string; domain: string; force: boolean; dryRun: boolean }) => {
     if (opts.format !== "structurizr-json") {
-      console.error(`Unknown import format '${opts.format}'. Supported: structurizr-json`);
+      console.error(fail(`Unknown import format ${error(opts.format)}. Supported: structurizr-json`));
       process.exit(1);
     }
     const resolved = path.resolve(file);
     if (!fs.existsSync(resolved)) {
-      console.error(`File not found: ${resolved}`);
+      console.error(fail(`File not found: ${dim(resolved)}`));
       process.exit(1);
     }
     const root = path.resolve(opts.root);
@@ -1292,7 +1337,7 @@ program
     try {
       parseStructurizrWorkspace(raw);
     } catch (err) {
-      console.error(`Error: ${(err as Error).message}`);
+      console.error(fail((err as Error).message));
       process.exit(1);
     }
 
@@ -1305,30 +1350,31 @@ program
     });
 
     if (opts.dryRun) {
-      console.log("Planned writes (--dry-run, nothing written):");
+      console.log(bold("Planned writes (--dry-run, nothing written):"));
       for (const entry of result.planned) {
-        console.log(`  ${entry.wouldOverwrite ? "OVERWRITE" : "create  "} ${path.relative(root, entry.path)}  (${entry.name})`);
+        const tag = entry.wouldOverwrite ? warning("OVERWRITE") : "create  ";
+        console.log(`  ${tag} ${dim(path.relative(root, entry.path))}  ${dim(`(${entry.name})`)}`);
       }
       return;
     }
 
     if (result.skipped.length > 0) {
-      console.error("Refusing to overwrite existing files (use --force to override):");
+      console.error(fail("Refusing to overwrite existing files (use --force to override):"));
       for (const entry of result.skipped) {
-        console.error(`  ${path.relative(root, entry.path)}`);
+        console.error(`  ${dim(path.relative(root, entry.path))}`);
       }
       process.exit(1);
     }
 
     for (const entry of result.written) {
-      console.log(`✓ wrote ${path.relative(root, entry.path)}  (${entry.name})`);
+      console.log(ok(`wrote ${dim(path.relative(root, entry.path))}  ${dim(`(${entry.name})`)}`));
     }
     if (result.errors.length > 0) {
-      console.error("Errors:");
-      for (const err of result.errors) console.error(`  ⚠ ${err}`);
+      console.error(fail("Errors:"));
+      for (const err of result.errors) console.error(`  ${warn(err)}`);
       process.exit(1);
     }
-    console.log(`\nImported ${result.written.length} file(s). Review them, set a real identity.domain, then run 'usm generate'.`);
+    console.log(`\n${ok(`Imported ${metric(String(result.written.length))} file(s)`)}. Review them, set a real identity.domain, then run 'usm generate'.`);
   });
 
 // ─── info ──────────────────────────────────────────────────────────────────────
@@ -1341,27 +1387,27 @@ program
     const resolved = path.resolve(filePath);
     const parsed = parseUsmFile(resolved);
 
-    console.log(`ID:       ${parsed.$id}`);
-    console.log(`Type:     ${parsed.$type}`);
-    console.log(`Version:  ${parsed.$version}`);
-    console.log(`Updated:  ${parsed.$last_updated || "—"}`);
-    console.log(`Summary:  ${parsed.summary}`);
+    console.log(`${bold("ID:")}       ${info(parsed.$id ?? "")}`);
+    console.log(`${bold("Type:")}     ${info(parsed.$type ?? "")}`);
+    console.log(`${bold("Version:")}  ${metric(String(parsed.$version ?? ""))}`);
+    console.log(`${bold("Updated:")}  ${dim(parsed.$last_updated || "—")}`);
+    console.log(`${bold("Summary:")}  ${parsed.summary}`);
 
     if (isSystemFile(parsed)) {
-      console.log(`Identity: ${parsed.identity.name} (${parsed.identity.domain})`);
-      console.log(`Features: ${parsed.index?.length || 0}`);
-      console.log(`Services: ${parsed.services?.length || 0}`);
+      console.log(`${bold("Identity:")} ${info(parsed.identity.name)} ${dim(`(${parsed.identity.domain})`)}`);
+      console.log(`${bold("Features:")} ${metric(String(parsed.index?.length || 0))}`);
+      console.log(`${bold("Services:")} ${metric(String(parsed.services?.length || 0))}`);
     } else if (isServiceFile(parsed)) {
-      console.log(`System:   ${parsed.$system}`);
-      console.log(`Runtime:  ${parsed.runtime}`);
-      console.log(`Port:     ${parsed.port || "—"}`);
-      console.log(`Modules:  ${parsed.modules?.length || 0}`);
+      console.log(`${bold("System:")}   ${info(parsed.$system ?? "")}`);
+      console.log(`${bold("Runtime:")}  ${info(parsed.runtime ?? "")}`);
+      console.log(`${bold("Port:")}     ${metric(String(parsed.port ?? "—"))}`);
+      console.log(`${bold("Modules:")}  ${metric(String(parsed.modules?.length || 0))}`);
     } else if (isFeatureFile(parsed)) {
-      console.log(`System:   ${parsed.$system}`);
-      console.log(`Service:  ${parsed.$service}`);
-      console.log(`Flows:    ${parsed.flows?.length || 0}`);
-      console.log(`Tests:    ${parsed.tests?.length || 0}`);
-      console.log(`Contracts: ${parsed.contracts?.length || 0}`);
+      console.log(`${bold("System:")}     ${info(parsed.$system ?? "")}`);
+      console.log(`${bold("Service:")}    ${info(parsed.$service ?? "")}`);
+      console.log(`${bold("Flows:")}      ${metric(String(parsed.flows?.length || 0))}`);
+      console.log(`${bold("Tests:")}      ${metric(String(parsed.tests?.length || 0))}`);
+      console.log(`${bold("Contracts:")}  ${metric(String(parsed.contracts?.length || 0))}`);
     }
   });
 
@@ -1403,7 +1449,7 @@ program
         const enrichSection = config.enrichment as Partial<EnrichmentConfig> | undefined;
 
         if (enrichSection && enrichSection.enabled === false) {
-          console.log("Enrichment is disabled in usmconfig.json. Set enrichment.enabled to true to enable.");
+          console.log(skip("Enrichment is disabled in usmconfig.json. Set enrichment.enabled to true to enable."));
           return;
         }
 
@@ -1445,67 +1491,68 @@ program
 
       if (options.file) {
         const filePath = path.resolve(options.file);
-        console.log(`Enriching: ${filePath}`);
+        const spinner = startSpinner(`Enriching: ${dim(filePath)}`);
         const result = await enrichFile(filePath, enrichConfig, enrichOptions);
 
         if (result.error) {
-          console.error(`✗ ${result.file}: ${result.error}`);
+          spinner.fail(fail(`${result.file}: ${result.error}`));
           process.exit(1);
         }
 
         if (result.fields_filled.length > 0) {
-          console.log(`✓ ${result.file}`);
-          console.log(`  Filled:     ${result.fields_filled.join(", ")}`);
-          console.log(`  Preserved:  ${result.fields_preserved.join(", ") || "none"}`);
-          console.log(`  Skipped:    ${result.fields_skipped.join(", ") || "none"}`);
-          if (result.tokens_used) console.log(`  Tokens:     ${result.tokens_used}`);
-          console.log(`  Duration:   ${result.duration_ms}ms`);
+          spinner.succeed(ok(result.file));
+          console.log(`  Filled:     ${success(result.fields_filled.join(", "))}`);
+          console.log(`  Preserved:  ${dim(result.fields_preserved.join(", ") || "none")}`);
+          console.log(`  Skipped:    ${dim(result.fields_skipped.join(", ") || "none")}`);
+          if (result.tokens_used) console.log(`  Tokens:     ${metric(String(result.tokens_used))}`);
+          console.log(`  Duration:   ${metric(String(result.duration_ms))}ms`);
         } else if (result.fields_preserved.length > 0) {
-          console.log(`⊘ ${result.file} — no TODO fields found`);
+          spinner.warn(skip(`${result.file} — no TODO fields found`));
         } else if (options.dryRun) {
-          console.log(`⊘ ${result.file} — dry run, no changes made`);
+          spinner.info(skip(`${result.file} — dry run, no changes made`));
         } else {
-          console.log(`⊘ ${result.file} — no fields were filled`);
+          spinner.info(skip(`${result.file} — no fields were filled`));
         }
       } else {
         const usmDir = path.join(root, ".usm");
         if (!fs.existsSync(usmDir)) {
-          console.error(`No .usm/ directory found at ${usmDir}`);
+          console.error(fail(`No .usm/ directory found at ${dim(usmDir)}`));
           process.exit(1);
         }
 
-        console.log(`Enriching all files with TODOs in: ${usmDir}`);
+        console.log(bold(`Enriching all files with TODOs in: ${dim(usmDir)}`));
+        const spinner = startSpinner("Running enrichment...");
         const results = await enrichDirectory(usmDir, enrichConfig, enrichOptions);
 
         if (results.length === 0) {
-          console.log("No .usm files with TODO: describe placeholders found.");
+          spinner.info(skip("No .usm files with TODO: describe placeholders found."));
           return;
         }
 
-        console.log(`\nEnrichment complete: ${results.length} file(s) processed`);
+        spinner.succeed(ok(`Enrichment complete: ${metric(String(results.length))} file(s) processed`));
         let totalFilled = 0;
         let totalPreserved = 0;
         let totalErrors = 0;
 
         for (const result of results) {
           if (result.error) {
-            console.error(`  ✗ ${result.file}: ${result.error}`);
+            console.error(`  ${fail(`${result.file}: ${result.error}`)}`);
             totalErrors++;
           } else if (result.fields_filled.length > 0) {
-            console.log(`  ✓ ${result.file} — filled: ${result.fields_filled.join(", ")}`);
+            console.log(`  ${ok(`${result.file}`)} — filled: ${success(result.fields_filled.join(", "))}`);
             totalFilled += result.fields_filled.length;
           } else {
-            console.log(`  ⊘ ${result.file} — no fields filled`);
+            console.log(`  ${skip(`${result.file}`)} — no fields filled`);
           }
           totalPreserved += result.fields_preserved.length;
         }
 
-        console.log(`\n  Fields filled:    ${totalFilled}`);
-        console.log(`  Fields preserved: ${totalPreserved}`);
-        console.log(`  Errors:           ${totalErrors}`);
+        console.log(`\n  Fields filled:    ${metric(String(totalFilled))}`);
+        console.log(`  Fields preserved: ${metric(String(totalPreserved))}`);
+        console.log(`  Errors:           ${error(String(totalErrors))}`);
       }
     } catch (err) {
-      console.error(`Error: ${(err as Error).message}`);
+      console.error(fail((err as Error).message));
       process.exit(1);
     }
   });
@@ -1521,7 +1568,7 @@ program
       const { startMcpServer } = await import("./mcp.js");
       await startMcpServer();
     } else {
-      console.error(`Unknown mcp action: ${action}. Use 'serve'.`);
+      console.error(fail(`Unknown mcp action: ${error(action)}. Use 'serve'.`));
       process.exit(1);
     }
   });
@@ -1567,7 +1614,7 @@ program
     } else if (action === "stop") {
       docsStop(root, audience);
     } else {
-      console.error(`Unknown docs action: ${action}. Use 'build', 'serve', 'status', or 'stop'.`);
+      console.error(fail(`Unknown docs action: ${error(action)}. Use 'build', 'serve', 'status', or 'stop'.`));
       process.exit(1);
     }
   });
@@ -1584,13 +1631,13 @@ program
     let errors = 0;
     let warnings = 0;
 
-    console.log(`Checking ${allFiles.length} .usm file(s)...\n`);
+    console.log(bold(`Checking ${metric(String(allFiles.length))} .usm file(s)...\n`));
 
     for (const filePath of allFiles) {
       // 1. Validate against schema
       const validation = validateUsmFile(filePath);
       if (!validation.valid) {
-        console.log(`✗ ${filePath}`);
+        console.log(fail(filePath));
         for (const err of validation.errors || []) {
           console.log(`  ${err.path}: ${err.message}`);
         }
@@ -1600,9 +1647,9 @@ program
 
       // 2. Check for $version warnings
       let hasWarnings = false;
-      for (const warn of validation.warnings || []) {
-        console.log(`⚠ ${filePath}`);
-        console.log(`  ${warn.path}: ${warn.message}`);
+      for (const warnItem of validation.warnings || []) {
+        console.log(warn(filePath));
+        console.log(`  ${warnItem.path}: ${warnItem.message}`);
         hasWarnings = true;
         warnings++;
       }
@@ -1615,7 +1662,7 @@ program
           if (feature.implementation?.primary) {
             const implPath = path.resolve(root, feature.implementation.primary);
             if (!fs.existsSync(implPath)) {
-              console.log(`⚠ ${filePath}`);
+              console.log(warn(filePath));
               console.log(`  implementation.primary: ${feature.implementation.primary} does not exist`);
               warnings++;
               hasWarnings = true;
@@ -1627,11 +1674,11 @@ program
       }
 
       if (!hasWarnings) {
-        console.log(`✓ ${filePath}`);
+        console.log(ok(filePath));
       }
     }
 
-    console.log(`\n${allFiles.length - errors - warnings} valid, ${warnings} warnings, ${errors} errors`);
+    console.log(`\n${ok(String(allFiles.length - errors - warnings))} valid, ${warn(String(warnings))} warnings, ${fail(String(errors))} errors`);
 
     if (errors > 0) {
       process.exit(1);
