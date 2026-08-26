@@ -1,0 +1,126 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/mcp-setup-guides
+$type: feature
+$version: 1
+$last_updated: "2026-08-26"
+summary: >-
+  Add per-editor MCP setup guides for all 35 MCP-ready editors as dedicated pages under /mcp-setup
+  in the help docs, plus update the marketing site ToolLogos to show the top 10 editors. Each setup
+  page covers MCP connection config AND the installable rules/skills file for editors that support
+  always-on hooks.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Every USM user needs to connect their AI editor to the USM MCP server and, for editors that
+  support it, install the always-on rules/skills file that enforces the spec-first workflow on every
+  message. Currently only 3 editors are documented. Covering all 35 MCP-ready editors with
+  per-editor setup guides (MCP config + rules file where applicable) makes USM instantly usable by
+  anyone, regardless of editor choice — matching the bar set by shadcn's MCP setup page.
+status: built
+flows:
+  - id: setup-flow
+    name: Editor setup flow
+    description: >-
+      User lands on the MCP setup index, sees a grid of 35 editor cards, clicks their editor, gets
+      the exact MCP config and rules file installation.
+    steps:
+      - id: s1
+        action: navigate
+        target: docs.usm.dev/mcp-setup
+      - id: s2
+        action: scan
+        target: grid of editor cards grouped by category
+      - id: s3
+        action: click
+        target: their editor card
+      - id: s4
+        action: read
+        target: exact MCP config snippet + restart flag
+      - id: s5
+        action: install
+        target: rules/skills file for editors that support always-on hooks
+      - id: s6
+        action: copy
+        target: config into their editor
+contracts:
+  - id: mcp-setup-index
+    description: Index page at /mcp-setup with a grid of all 35 editor cards
+    must_have:
+      - Grid layout of 35 editor cards grouped by category
+      - Each card links to a per-editor setup page
+      - Cards show editor name and one-line setup summary
+  - id: per-editor-pages
+    description: One dedicated setup page per editor (35 total) with exact config
+    must_have:
+      - H1 with editor name
+      - Exact MCP config snippet (JSON/TOML/YAML/CLI command depending on editor)
+      - Restart-required flag where applicable
+      - Rules/skills file installation for editors that support always-on hooks
+      - Link back to the index page
+  - id: rules-files-coverage
+    description: Editors with always-on hook support document the rules file install
+    must_have:
+      - "opencode: .opencode/skills/usm-workflow/SKILL.md + .opencode/usm-instructions.md"
+      - "Claude Code: CLAUDE.md + .claude/skills/usm-workflow/SKILL.md"
+      - "Cursor: .cursor/rules/usm.mdc + .cursor/rules/usm-always.mdc"
+      - "Copilot: .github/copilot-instructions.md + .github/instructions/usm-iron-rules.md"
+      - "Codex: AGENTS.md"
+      - "Other editors: note if always-on hooks are not supported"
+  - id: tool-logos-top-10
+    description: Marketing site ToolLogos updated with top 10 editors
+    must_have:
+      - >-
+        Top 10: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, JetBrains, opencode, Codex,
+        Zed, Continue
+      - SVG paths from Simple Icons where available, fallback Terminal icon otherwise
+  - id: help-audience
+    description: Setup pages are in the help docs (public audience), not developer docs
+    must_have:
+      - Pages sit under .usm-workspace/docs/mcp-setup/
+      - Accessible at docs.usm.dev/mcp-setup
+      - Sidebar entry under Getting Started
+decisions:
+  - id: all-35-in-docs
+    decision: Generate per-editor setup pages for all 35 editors
+    rationale: >-
+      Maximizes compatibility coverage. Any USM user using any MCP-ready editor can find their
+      setup. Matches shadcn's coverage bar.
+    consequences: 35 markdown files under .usm-workspace/docs/mcp-setup/ plus index.md
+    status: accepted
+  - id: top-10-logos
+    decision: Marketing site ToolLogos shows top 10 editors only
+    rationale: >-
+      35 logos would overwhelm the marketing hero area. Top 10 covers the most popular. Full 35
+      coverage lives in the docs.
+    consequences: tool-logos.tsx updated with top 10, sorted by popularity
+    status: accepted
+  - id: index-plus-per-editor
+    decision: Index page plus per-editor pages (shadcn pattern)
+    rationale: >-
+      Best UX. Users land on a grid, click their editor, get exact config. Matches the shadcn setup
+      pattern users are familiar with.
+    consequences: 1 index page + 35 editor pages = 36 markdown files
+    status: accepted
+  - id: rules-files-per-editor
+    decision: Document rules/skills file installation on each editor page where supported
+    rationale: >-
+      The always-on rules file is a key USM differentiator. Editors that support always-on hooks
+      (opencode, Claude Code, Cursor, Copilot, Codex) should document both the MCP config AND the
+      rules file install.
+    consequences: >-
+      Per-editor pages include a Rules File section when the editor supports always-on hooks; pages
+      for editors without hook support note this.
+    status: accepted
+  - id: stdio-config-pattern
+    decision: Use the standard USM stdio pattern (usm mcp serve) for all editors
+    rationale: >-
+      USM's MCP server is stdio-based. Most editors accept the command/args JSON pattern. HTTP-only
+      clients use mcp-remote as a bridge.
+    consequences: Configs use command usm args mcp serve. HTTP-only editors get a mcp-remote bridge note.
+    status: accepted
+implementation:
+  primary: web/src/components/tool-logos.tsx
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/cli
