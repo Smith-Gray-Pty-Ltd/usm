@@ -397,3 +397,170 @@ reference_pages:
     title: Language Support
     audience: public
     source: detectors
+  - id: agent-setup-guide
+    title: Adding USM to Your Project
+    audience: public
+    content:
+      - type: paragraph
+        text: "Install USM, scan your codebase, configure your AI agent, and start the spec-first workflow."
+      - type: heading
+        level: 2
+        text: "Step 1: Install"
+      - type: code
+        language: bash
+        source: npm install -g @smithgray/usm
+      - type: heading
+        level: 2
+        text: "Step 2: Initialize and Scan"
+      - type: code
+        language: bash
+        source: "cd your-repo\nusm init          # Creates usmconfig.json\nusm scan          # Detects services, routes, data models"
+      - type: heading
+        level: 2
+        text: "Step 3: Generate Docs"
+      - type: code
+        language: bash
+        source: "usm generate      # Produces markdown, Mermaid, OpenAPI, test specs\nusm docs serve    # Preview docs at localhost:5173"
+      - type: heading
+        level: 2
+        text: "Step 4: Start the MCP Server"
+      - type: paragraph
+        text: "The MCP server lets your AI agent read the .usm system map."
+      - type: code
+        language: bash
+        source: usm mcp serve
+      - type: heading
+        level: 3
+        text: Configure MCP in Your AI Tool
+      - type: heading
+        level: 2
+        text: "Step 5: Generate Rules Files"
+      - type: code
+        language: bash
+        source: usm generate --only rules
+      - type: paragraph
+        text: "Creates per-tool rules files — teaching your agent the spec-first workflow automatically:"
+      - type: table
+        headers: ["Tool", "Detail file", "Always-on file (every request)"]
+        rows:
+          - ["opencode", ".opencode/skills/usm-workflow/SKILL.md", ".opencode/usm-instructions.md (wired into opencode.json)"]
+          - ["Claude Code", "CLAUDE.md", ".claude/skills/usm-workflow/SKILL.md"]
+          - ["Cursor", ".cursor/rules/usm.mdc", ".cursor/rules/usm-always.mdc (alwaysApply)"]
+          - ["Copilot", ".github/copilot-instructions.md", ".github/instructions/usm-iron-rules.md"]
+          - ["Codex", "AGENTS.md", "— (no per-message mechanism)"]
+      - type: paragraph
+        text: "The always-on files carry short iron rules that re-anchor the workflow on every request — countering drift in long agent sessions."
+      - type: heading
+        level: 2
+        text: "Step 6: (Optional) Enrich with LLM"
+      - type: paragraph
+        text: "Scanned .usm files contain `TODO: describe` placeholders. Fill them with an LLM:"
+      - type: code
+        language: bash
+        source: "usm enrich --dry-run          # Preview changes\nusm enrich                     # Fill TODOs (requires LLM config)"
+      - type: paragraph
+        text: "Supports OpenAI, Anthropic, Ollama, and LiteLLM (any OpenAI-compatible model)."
+      - type: divider
+      - type: heading
+        level: 2
+        text: How to Prompt Your Agent
+      - type: heading
+        level: 3
+        text: First-time setup
+      - type: callout
+        variant: tip
+        text: "Install USM in this repo: run `npm install -g @smithgray/usm`, then `usm init`, `usm scan`, and `usm generate`. Start the MCP server with `usm mcp serve`. Read the generated .usm files to understand the project structure. Going forward, before implementing any feature, draft a .usm spec first using the MCP write tools, show me the markdown for review, then build from the approved spec."
+      - type: heading
+        level: 3
+        text: New feature
+      - type: callout
+        variant: tip
+        text: "I want to add [feature description]. Use USM to draft a feature spec first — call `usm_draft_feature` with the summary, intent, flows, and contracts. Show me the generated markdown. Once I approve, write the .usm file and implement the feature. Update the feature status to `built` when done."
+      - type: heading
+        level: 3
+        text: Quick agent context
+      - type: callout
+        variant: tip
+        text: "Read the .usm system map before starting work. Use `usm_list` to see all files, `usm_search` to find relevant features, and `usm_read` to get details."
+      - type: heading
+        level: 3
+        text: Bug fix
+      - type: callout
+        variant: tip
+        text: "Fix [bug description]. First, search the .usm files with `usm_search` to find the relevant feature spec. Read it with `usm_read` to understand the contracts and tests. Fix the bug, then update the feature spec if the behavior changed."
+      - type: divider
+      - type: heading
+        level: 2
+        text: Available MCP Tools (18)
+      - type: paragraph
+        text: "**Read (9):** `usm_list`, `usm_read`, `usm_search`, `usm_validate`, `usm_summary`, `usm_references`, `usm_get_contracts`, `usm_get_flows`, `usm_query`"
+      - type: paragraph
+        text: "**Write (9):** `usm_draft_feature`, `usm_write_feature`, `usm_update_feature`, `usm_update_feature_status`, `usm_report_feedback`, `usm_write_system`, `usm_write_service`, `usm_update_system`, `usm_update_service`"
+      - type: heading
+        level: 2
+        text: Verify It's Working
+      - type: code
+        language: bash
+        source: "usm check                        # Validate all .usm files\nusm info .usm/system.usm         # Show system summary"
+      - type: heading
+        level: 2
+        text: Next Steps
+      - type: paragraph
+        text: "- [CLI Reference](cli-reference.md) - [Configuration](config-reference.md) - [Schema Reference](schema-reference.md) - [MCP Tools](mcp-reference.md) - [Language Support](language-support.md)"
+  - id: getting-started
+    title: Getting Started
+    audience: public
+    content:
+      - type: callout
+        variant: tip
+        text: "Install → `usm init` → `usm scan` → `usm generate` → `usm docs serve`. Everything below is copy-pasteable."
+      - type: heading
+        level: 2
+        text: The first-run loop
+      - type: mermaid
+        diagram: "sequenceDiagram\n  participant You\n  participant USM as usm CLI\n  participant Disk as .usm/ + docs\n  You->>USM: npm i -g @smithgray/usm\n  You->>USM: usm init\n  USM->>Disk: usmconfig.json\n  You->>USM: usm scan\n  USM->>Disk: .usm/**/*.usm\n  You->>USM: usm generate\n  USM->>Disk: docs, Mermaid, AGENTS.md, OpenAPI…\n  You->>USM: usm docs serve --audience help\n  USM-->>You: http://localhost:5173"
+      - type: heading
+        level: 2
+        text: Quick start
+      - type: code
+        language: bash
+        title: "1. Install"
+        source: "npm install -g @smithgray/usm\n# or: pnpm add -g @smithgray/usm\nusm --version"
+      - type: code
+        language: bash
+        title: "2. Init + scan"
+        source: "cd your-project\nusm init                 # creates usmconfig.json\nusm scan                 # detects services, routes, data\n# Review .usm/ — this is your source of truth"
+      - type: code
+        language: bash
+        title: "3. Generate + serve"
+        source: "usm generate\n# Install VitePress (optional but recommended for local docs preview)\nnpm install -D vitepress    # or: pnpm add -Dw vitepress (monorepo)\nusm docs serve --audience help\n# Open the printed localhost URL"
+      - type: code
+        language: bash
+        title: "4. Wire agents"
+        source: "usm mcp serve            # MCP for Cursor / Claude / Copilot\n# See Agent Setup Guide for IDE config"
+      - type: heading
+        level: 2
+        text: Common first-run issues
+      - type: callout
+        variant: info
+        text: "**Node / package manager**: USM requires **Node ≥ 18**. Prefer pnpm 9+ in monorepos. If `usm` is not found after install, check your global bin is on `PATH`."
+      - type: callout
+        variant: info
+        text: "**`usm docs serve` fails with \"VitePress is not installed\"**: VitePress is an optional peer dependency. Install it once: `pnpm add -D vitepress` or `npm install -D vitepress`."
+      - type: callout
+        variant: info
+        text: "**Validation warnings about `$version`**: A warning (not an error) means a file's `$version` differs from the schema version this USM understands. Run `usm upgrade` to adopt new optional capabilities."
+      - type: callout
+        variant: info
+        text: "**Agents inventing `bugs.md` / ad-hoc tracking files**: Configure feedback policy with `usm feedback`. Default is `human-gate`: agents must ask before filing. Rules files forbid root-level ad-hoc trackers."
+      - type: heading
+        level: 2
+        text: Where to go next
+      - type: table
+        headers: ["Page", "Why"]
+        rows:
+          - ["[Schema Reference](/schema-reference)", "Field-by-field answers for every .usm type"]
+          - ["[CLI Reference](/cli-reference)", "Every command and flag"]
+          - ["[MCP Tools](/mcp-reference)", "Spec-first tools for agents"]
+          - ["[Agent Setup Guide](/agent-setup-guide)", "Cursor / Claude / Copilot wiring"]
+          - ["[Roadmap](/roadmap)", "What's shipping next"]
