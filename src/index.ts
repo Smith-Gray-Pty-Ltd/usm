@@ -18,7 +18,6 @@ export {
   generateConfigReference,
   generateSchemaReference,
   generateMcpReference,
-  generateLanguageSupportDoc,
   generateAgentSetupGuide,
   generateFeedbackPage,
   generateDataModelDoc,

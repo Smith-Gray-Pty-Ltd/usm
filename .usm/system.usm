@@ -391,3 +391,9 @@ roles:
       - "Cross-cutting views — decisions, risks, roadmap"
       - "Architecture diagrams"
       - "Feature status overview (planned vs built)"
+
+reference_pages:
+  - id: language-support
+    title: Language Support
+    audience: public
+    source: detectors
