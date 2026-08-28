@@ -1,0 +1,514 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-content-blocks
+$type: feature
+$version: 1
+$last_updated: "2026-08-28"
+status: planned
+summary: >-
+  First-principles redesign of the docs generator. Introduces a content-block
+  schema (mermaid, code, tabs, callout, table, steps, cards, badge) so any .usm
+  spec can express VitePress-rich documentation declaratively. A single generic
+  renderer converts content blocks to VitePress markdown — replacing ~40% of
+  the docs generator that is currently hardcoded prose/constants. Deletes the
+  LANGUAGE_SUPPORT constant and the bespoke functions that hand-author pages
+  (generateLanguageSupportDoc, generateAgentSetupGuide, generateGettingStartedDoc
+  prose). Adds reference_pages to system.usm and reference blocks to feature
+  specs. Existing spec-driven generators (generateCliReference, generateMcpReference,
+  generateMarkdown) are preserved. The help-doc filter is updated to keep
+  public-audience content blocks while stripping contracts/tests/implementation.
+  Backward compatible: existing .usm files without content blocks generate
+  identical docs.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  The docs generator has drifted from USM's first principle (structured source
+  of truth, no scattered stale docs). ~40% of markdown.ts is hardcoded prose
+  and constants — generateLanguageSupportDoc has a stale 12-language table that
+  duplicates the detector registry, generateAgentSetupGuide is fully hand-written,
+  the Data Model Detection table lists 10 ORMs but only Prisma is implemented.
+  The schema has no fields for reference content, onboarding prose, Mermaid
+  diagrams as documentation (not architecture diagrams), code snippets, tabs,
+  or callouts — so when someone needed these, they hand-wrote them in generator
+  code. This feature makes the schema expressive enough that any page's content
+  can live in .usm specs as structured content blocks, and the generator becomes
+  a pure renderer. This is the fix that makes USM docs generation truly universal
+  and drift-proof.
+decisions:
+  - id: content-block-system
+    decision: >-
+      Define a content-block schema (heading, paragraph, code, mermaid, tabs,
+      callout, table, steps, cards, badge, divider) that any .usm spec can use
+      to express VitePress-rich content declaratively.
+    rationale: >-
+      The schema currently has no fields for reference content, onboarding
+      prose, code snippets, Mermaid-as-doc, tabs, or callouts. When someone
+      needed these, they hand-wrote them in generator code (LANGUAGE_SUPPORT,
+      generateAgentSetupGuide, generateGettingStartedDoc prose). A content-block
+      schema gives specs a structured way to express any VitePress content,
+      making the generator a pure renderer and eliminating drift. This is the
+      first-principles fix: make the schema expressive enough that docs content
+      lives in specs.
+    alternatives:
+      - option: Keep bespoke generators but make them read from specs/registry
+        rejected_because: >-
+          Still one function per content type; doesn't scale; every new page
+          needs a new generator function.
+      - option: Markdown-in-YAML (raw markdown strings in spec fields)
+        rejected_because: >-
+          Not structured, not agent-writable via MCP tools, no audience
+          filtering, defeats the point of structured source of truth.
+      - option: A separate .md file per reference page committed alongside .usm
+        rejected_because: Not generated from source; duplicates the spec; will drift.
+    consequences: >-
+      Schema gains content-block types (a new $def in v1.json). Generators
+      gain one renderContentBlocks function. Hardcoded functions deleted after
+      migration.
+    status: accepted
+  - id: reference-pages-on-system
+    decision: >-
+      system.usm gains reference_pages[] for product-level reference pages
+      (language support, getting started, agent setup) with inline content
+      or runtime sources (detectors, schema, config).
+    rationale: >-
+      Some reference pages document the product, not a single feature.
+      system.usm is the right home. source: detectors lets the language-support
+      page render from the detector registry at generation time — always in
+      sync, no constant. Inline content lets getting-started/agent-setup pages
+      carry their prose as structured content blocks. This replaces the
+      hardcoded functions that currently own these pages.
+    consequences: >-
+      system.usm schema gains an optional reference_pages field. The generator
+      iterates reference_pages and renders each.
+    status: accepted
+  - id: reference-blocks-on-features
+    decision: >-
+      Feature specs gain an optional reference[] field for user-facing reference
+      content that survives the help filter.
+    rationale: >-
+      Some feature docs need reference tables that are NOT acceptance criteria
+      (e.g. the multi-lang-scan spec's supported-languages table is user
+      reference, not a developer contract). Today these live in contracts[]
+      which the help filter strips. A reference[] field with audience: public
+      gives feature specs a place for user-facing content that survives into
+      help docs.
+    consequences: >-
+      Feature schema gains an optional reference field. The help filter is
+      updated to keep public reference blocks. generateFeatureMarkdown appends
+      rendered reference blocks after standard sections.
+    status: accepted
+  - id: block-level-audience-filter
+    decision: >-
+      The help-doc filter operates at content-block granularity (keep audience:
+      public, drop audience: internal) instead of section-level granularity
+      (strip ## Contracts by heading name).
+    rationale: >-
+      The current filter strips entire sections by heading name, which is
+      coarse and breaks if headings change. Block-level audience filtering is
+      precise — each block declares its audience and the filter keeps or drops
+      it. This also lets a single page mix public and internal content.
+    consequences: >-
+      simplifyFeatureDoc in docs.ts is rewritten to filter content blocks by
+      audience. Contracts/tests/implementation/decisions continue to be stripped
+      (they are developer-only by definition).
+    status: accepted
+  - id: preserve-schema-reading-generators
+    decision: >-
+      generateConfigReference and generateSchemaReference are preserved — they
+      read JSON schema files which ARE the source of truth for config/schema
+      fields.
+    rationale: >-
+      These two functions read usmconfig-v1.json and v1.json respectively. The
+      JSON schemas are the structured source of truth for those fields —
+      reading them at runtime is spec-driven in spirit. Converting them to
+      content blocks would mean duplicating the schema's field descriptions
+      into a spec, which would drift. They stay as-is but can be invoked via
+      reference_pages[source: config|schema].
+    consequences: >-
+      These two functions are wrapped as source renderers callable from
+      reference_pages, not deleted. Their internal logic is unchanged.
+    status: accepted
+  - id: delete-after-migration
+    decision: >-
+      Hardcoded functions are deleted only after their content is migrated to
+      specs and the replacement is proven by tests.
+    rationale: >-
+      Deleting first risks breaking docs with no fallback. Migrate content to
+      reference_pages/reference blocks, prove the generated output matches (or
+      corrects) the old output, then delete. This is the cleanup pass, not the
+      first step.
+    consequences: >-
+      The delete-hardcoded-generators flow runs last. LANGUAGE_SUPPORT,
+      generateLanguageSupportDoc, generateAgentSetupGuide, and hardcoded prose
+      in generateGettingStartedDoc are removed only after tests confirm the
+      replacement works.
+    status: accepted
+flows:
+  - id: render-content-blocks
+    name: Render content blocks to VitePress markdown
+    description: >-
+      The generic renderer takes an array of content blocks from a spec (or a
+      reference_pages entry) and converts each block type to its VitePress
+      markdown equivalent. This is the ONE rendering function — all pages flow
+      through it.
+    steps:
+      - id: s1
+        action: read
+        target: content[] from a spec field or reference_pages entry
+      - id: s2
+        action: dispatch
+        target: each block to its block-type renderer
+      - id: s3
+        action: render
+        target: mermaid to fenced code with mermaid language tag
+      - id: s4
+        action: render
+        target: code to fenced code block with language and optional title
+      - id: s5
+        action: render
+        target: tabs to VitePress tabs and tab containers
+      - id: s6
+        action: render
+        target: callout to VitePress info/tip/warning/danger containers
+      - id: s7
+        action: render
+        target: table to markdown table with headers and rows
+      - id: s8
+        action: render
+        target: steps to ordered list with optional code inline
+      - id: s9
+        action: render
+        target: cards to VitePress features grid
+      - id: s10
+        action: render
+        target: badge to VitePress Badge component
+  - id: reference-pages-from-system
+    name: Generate reference pages declared on system.usm
+    description: >-
+      system.usm gains a reference_pages[] field. Each entry declares an id,
+      title, audience (public/internal), and either inline content[] (content
+      blocks) or a source (detectors, schema, config) for runtime-generated
+      content. The generator renders each declared page through the generic
+      content-block renderer. This replaces generateLanguageSupportDoc (source:
+      detectors), generateAgentSetupGuide (inline content), and
+      generateGettingStartedDoc (inline content).
+    steps:
+      - id: s1
+        action: read
+        target: system.usm reference_pages array
+      - id: s2
+        action: for-each
+        target: page — resolve source or use inline content
+      - id: s3
+        action: if-source-detectors
+        target: call getDetectors and build content blocks from the registry
+      - id: s4
+        action: render
+        target: content blocks through the generic renderer
+      - id: s5
+        action: write
+        target: .usm-workspace/docs/id.md
+  - id: feature-reference-blocks
+    name: Render feature spec reference blocks in feature docs
+    description: >-
+      Feature specs gain an optional reference[] field — content blocks that
+      appear in the feature's generated doc page AFTER the standard sections
+      (summary, intent, flows). Unlike contracts (stripped by help filter),
+      reference blocks marked audience: public survive into help docs. This
+      lets a feature spec carry user-facing reference tables (e.g. the
+      multi-lang-scan spec carries its supported-languages table as a reference
+      block, not a contract).
+    steps:
+      - id: s1
+        action: read
+        target: feature spec reference array
+      - id: s2
+        action: filter
+        target: keep blocks where audience is public OR help filter is off
+      - id: s3
+        action: render
+        target: surviving blocks through the generic renderer
+      - id: s4
+        action: append
+        target: rendered blocks after the standard feature doc sections
+  - id: help-filter-content-blocks
+    name: Help-doc filter respects content block audience
+    description: >-
+      The help-doc filter (simplifyFeatureDoc in docs.ts) is updated. Instead
+      of stripping entire ## sections by heading name, it parses content blocks
+      and keeps those with audience: public (or no audience field), drops those
+      with audience: internal. This makes audience filtering block-level
+      granular rather than section-level coarse.
+    steps:
+      - id: s1
+        action: parse
+        target: generated feature doc back into content blocks
+      - id: s2
+        action: filter
+        target: "drop blocks with audience: internal"
+      - id: s3
+        action: re-render
+        target: surviving blocks to help-doc markdown
+  - id: delete-hardcoded-generators
+    name: Delete hardcoded generator functions
+    description: >-
+      After the content-block system and reference_pages are working, the
+      hardcoded functions are deleted and their content migrated into specs.
+      This is the cleanup pass — it must not happen until the replacement is
+      proven.
+    steps:
+      - id: s1
+        action: migrate
+        target: LANGUAGE_SUPPORT constant to reference_pages source detectors on system.usm
+      - id: s2
+        action: migrate
+        target: generateAgentSetupGuide prose to reference_pages agent-setup inline content
+      - id: s3
+        action: migrate
+        target: generateGettingStartedDoc prose to reference_pages getting-started inline content
+      - id: s4
+        action: migrate
+        target: Data Model Detection hardcoded table to reference block on usm/cli-multi-lang-scan spec
+      - id: s5
+        action: delete
+        target: >-
+          generateLanguageSupportDoc, LANGUAGE_SUPPORT constant,
+          generateAgentSetupGuide, hardcoded prose in generateGettingStartedDoc
+      - id: s6
+        action: verify
+        target: >-
+          all existing tests pass; generated pages match previous output (where
+          content was correct) or are corrected (where it was stale)
+contracts:
+  - id: content-block-schema
+    description: >-
+      The schema defines a content block type with variants for every VitePress
+      feature needed for rich docs.
+    must_have:
+      - >-
+        Block types: heading, paragraph, code, mermaid, tabs, callout, table,
+        steps, cards, badge, divider
+      - code block supports language, title (VitePress code-group), and line highlighting
+      - >-
+        mermaid block outputs a fenced code block with language mermaid
+        (rendered by VitePress mermaid plugin)
+      - tabs block contains tab entries with label + content blocks (nested)
+      - callout block supports types: info, tip, warning, danger (VitePress containers)
+      - table block has headers array and rows array of arrays
+      - steps block has ordered items with optional inline code
+      - >-
+        cards block has items with title, description, optional icon/link
+        (VitePress features grid)
+      - badge block supports type info/tip/warning/danger and text
+  - id: reference-pages-on-system
+    description: system.usm can declare reference pages with inline content or runtime sources.
+    must_have:
+      - reference_pages array field on system.usm schema (optional)
+      - >-
+        Each entry has id, title, audience (public or internal, default
+        internal), optional content array (content blocks), optional source
+        (detectors, schema, or config)
+      - source detectors renders from the detector registry at generation time
+      - source schema renders from v1.json (delegates to existing generateSchemaReference logic)
+      - source config renders from usmconfig-v1.json (delegates to existing generateConfigReference logic)
+      - Pages with audience public appear in help docs; internal only in developer docs
+  - id: reference-blocks-on-features
+    description: Feature specs can carry user-facing reference content that survives the help filter.
+    must_have:
+      - reference array field on feature schema (optional)
+      - Each reference entry has heading, audience (public or internal), content array (content blocks)
+      - Reference blocks rendered after standard feature doc sections (summary, intent, flows)
+      - Help filter keeps reference blocks with audience public; drops audience internal
+      - Feature docs without reference array are unchanged (backward compatible)
+  - id: generic-renderer
+    description: >-
+      One rendering function converts content blocks to VitePress markdown —
+      no per-page bespoke functions for content.
+    must_have:
+      - renderContentBlocks function is the single entry point
+      - Every block type has a renderer; unknown block types produce a warning and are skipped
+      - Nested blocks (tabs contain blocks, cards may contain blocks) render recursively
+      - Output is valid VitePress markdown (containers ::: syntax, code fences, mermaid fences)
+  - id: delete-hardcoded-content
+    description: Hardcoded content functions and constants are removed and their content migrated to specs.
+    must_have:
+      - LANGUAGE_SUPPORT constant deleted from markdown.ts
+      - generateLanguageSupportDoc replaced by reference_pages source detectors rendering
+      - generateAgentSetupGuide replaced by reference_pages agent-setup inline content
+      - Hardcoded prose in generateGettingStartedDoc migrated to reference_pages getting-started
+      - Data Model Detection hardcoded table migrated to a reference block on usm/cli-multi-lang-scan
+      - >-
+        generateConfigReference and generateSchemaReference preserved (they
+        read JSON schema files, which ARE the source of truth)
+  - id: backward-compatible-existing-specs
+    description: Existing .usm files without content blocks or reference_pages generate identical docs.
+    must_have:
+      - Feature specs without reference array produce the same doc output as before
+      - system.usm without reference_pages does not produce the deleted hardcoded pages (they are opt-in)
+      - All existing tests pass without modification
+      - >-
+        Spec-driven generators (generateCliReference, generateMcpReference,
+        generateMarkdown, generateOpenApiSpec, generateTestSpecs,
+        generateArchiMateModel, generateMermaid architecture/ER/deps) are unchanged
+  - id: audience-filter-block-level
+    description: The help-doc filter operates at content-block granularity, not section granularity.
+    must_have:
+      - simplifyFeatureDoc updated to filter content blocks by audience field
+      - Blocks with audience public or no audience field survive the help filter
+      - Blocks with audience internal are dropped from help docs
+      - Contracts, tests, implementation, decisions continue to be stripped (developer-only)
+  - id: universal-not-usm-specific
+    description: The content-block system works for any USM project, not just USM's own docs.
+    must_have:
+      - Any project system.usm can declare reference_pages with inline content or detector/schema/config sources
+      - Any project feature specs can carry reference blocks
+      - The generic renderer has no USM-specific content baked in
+      - A project with no reference_pages and no reference blocks generates the same docs as before this feature
+tests:
+  - id: render-mermaid-block
+    setup:
+      content_block:
+        type: mermaid
+        diagram: "graph LR\nA-->B"
+    expect:
+      - assertion: output is a fenced code block with language mermaid
+      - assertion: diagram content is inside the fence
+  - id: render-code-block-with-title
+    setup:
+      content_block:
+        type: code
+        language: bash
+        title: Install
+        source: npm install -g @smithgray/usm
+    expect:
+      - assertion: output is a fenced code block with language bash
+      - assertion: title rendered as VitePress code-group title or comment line
+  - id: render-tabs-block
+    setup:
+      content_block:
+        type: tabs
+        tabs:
+          - label: npm
+            content:
+              - type: code
+                language: bash
+                source: npm install
+          - label: pnpm
+            content:
+              - type: code
+                language: bash
+                source: pnpm install
+    expect:
+      - assertion: output uses VitePress tabs container
+      - assertion: each tab rendered with its label
+      - assertion: nested code blocks rendered inside tabs
+  - id: render-callout-block
+    setup:
+      content_block:
+        type: callout
+        variant: tip
+        title: Pro tip
+        content:
+          - type: paragraph
+            text: Use --force to overwrite.
+    expect:
+      - assertion: output uses VitePress tip container
+      - assertion: title and paragraph text present
+  - id: render-table-block
+    setup:
+      content_block:
+        type: table
+        headers:
+          - Language
+          - Manifest
+        rows:
+          - - Go
+            - go.mod
+          - - Rust
+            - Cargo.toml
+    expect:
+      - assertion: output is a markdown table with correct headers and rows
+  - id: reference-page-from-detectors
+    setup:
+      system_usm_reference_pages:
+        - id: language-support
+          title: Language Support
+          audience: public
+          source: detectors
+    expect:
+      - assertion: language-support.md generated from the detector registry
+      - assertion: table contains Go, Rust, TypeScript (from built-in detectors)
+      - assertion: no hardcoded LANGUAGE_SUPPORT constant involved
+  - id: reference-page-inline-content
+    setup:
+      system_usm_reference_pages:
+        - id: getting-started
+          title: Getting Started
+          audience: public
+          content:
+            - type: heading
+              level: 2
+              text: Install
+            - type: code
+              language: bash
+              source: npm install -g @smithgray/usm
+    expect:
+      - assertion: getting-started.md generated from inline content blocks
+      - assertion: contains the heading and code block
+  - id: feature-reference-block-public
+    setup:
+      feature_spec_with_reference:
+        - heading: Supported Frameworks
+          audience: public
+          content:
+            - type: table
+              headers:
+                - Framework
+                - Detection
+              rows:
+                - - Gin
+                  - gin-gonic/gin
+    expect:
+      - assertion: feature doc page contains the Supported Frameworks table
+      - assertion: "table survives the help-doc filter (audience: public)"
+  - id: feature-reference-block-internal-stripped
+    setup:
+      feature_spec_with_reference:
+        - heading: Internal Detector Regex
+          audience: internal
+          content:
+            - type: code
+              language: regex
+              source: app\.(get|post)
+    expect:
+      - assertion: feature doc page (developer) contains the block
+      - assertion: "help doc page does NOT contain the block (audience: internal stripped)"
+  - id: backward-compatible-no-reference
+    setup:
+      feature_spec_without_reference: true
+      system_without_reference_pages: true
+    expect:
+      - assertion: generated docs identical to pre-feature output
+  - id: hardcoded-constants-removed
+    setup:
+      inspect_markdown_ts: true
+    expect:
+      - assertion: LANGUAGE_SUPPORT constant not present
+      - assertion: generateLanguageSupportDoc function not present
+      - assertion: generateAgentSetupGuide function not present
+  - id: unknown-block-type-warning
+    setup:
+      content_block:
+        type: banana
+        data: {}
+    expect:
+      - assertion: renderer emits a warning
+      - assertion: block skipped, no crash
+implementation:
+  primary: ""
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/cli-generate
+  - usm/gen-help-reference
+  - usm/vitepress-schema-polish
+  - usm/cli-multi-lang-scan
