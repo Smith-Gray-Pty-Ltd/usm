@@ -598,6 +598,19 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
   }
   pushIfAny("Core Concepts", coreConcepts, true);
 
+  // ── Code Map (source mapping views) ──────────────────────────────────────────
+  const codeMap: SidebarItem[] = [];
+  if (docExists("code-navigator")) {
+    codeMap.push({ text: "Code Navigator", link: "/code-navigator" });
+  }
+  if (docExists("spec-coverage")) {
+    codeMap.push({ text: "Spec Coverage", link: "/spec-coverage" });
+  }
+  if (docExists("orphan-files")) {
+    codeMap.push({ text: "Unspecced Files", link: "/orphan-files" });
+  }
+  pushIfAny("Code Map", codeMap, true);
+
   // ── Workflows ──────────────────────────────────────────────────────────────
   const workflows: SidebarItem[] = [];
   if (docExists("cli-reference")) {
