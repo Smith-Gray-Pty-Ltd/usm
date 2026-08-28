@@ -141,7 +141,7 @@ export default function Home() {
                 The source of truth for human + AI software development
               </h1>
               <p className="text-lg text-muted-foreground mb-6 max-w-lg">
-                USM is a schema-validated source of truth for agentic software development, that reduces token burn, persists structured knowledge across coding sessions, and automatically generates, documentation and design artefacts in a spec first development cycle
+                .USM (Universal System Map) is a schema driven source of truth for agentic software development, that reduces token burn, persists system knowledge across coding sessions, and automatically generates, documentation and design artefacts in a spec first development cycle
               </p>
               <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground mb-8">
                 <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> 10-20x fewer tokens</span>
@@ -161,6 +161,24 @@ export default function Home() {
             </FadeIn>
           </div>
         </div>
+      </section>
+
+      <Separator />
+
+      {/* Step 1 - Scan & Map */}
+      <section className="mx-auto max-w-6xl px-6 py-24">
+        <FadeIn>
+          <div className="text-center mb-12">
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Step 1 — Scan &amp; Map</p>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Click a language to see supported frameworks and route detection patterns.
+            </p>
+          </div>
+        </FadeIn>
+        <FadeIn delay={200}>
+          <LanguageCarousel />
+        </FadeIn>
       </section>
 
       <Separator />
@@ -186,24 +204,6 @@ export default function Home() {
             </div>
           </FadeIn>
         </div>
-      </section>
-
-      <Separator />
-
-      {/* Language Support Carousel */}
-      <section className="mx-auto max-w-6xl px-6 py-24">
-        <FadeIn>
-          <div className="text-center mb-12">
-            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Language support</p>
-            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              Click a language to see supported frameworks and route detection patterns.
-            </p>
-          </div>
-        </FadeIn>
-        <FadeIn delay={200}>
-          <LanguageCarousel />
-        </FadeIn>
       </section>
 
       <Separator />
