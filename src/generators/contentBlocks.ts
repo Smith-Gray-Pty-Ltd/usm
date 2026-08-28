@@ -258,7 +258,7 @@ export interface ReferencePage {
   id: string;
   title: string;
   audience?: Audience;
-  source?: "detectors" | "schema" | "config";
+  source?: "detectors" | "schema" | "config" | "file-tree" | "coverage-matrix" | "orphan-report";
   content?: ContentBlock[];
 }
 

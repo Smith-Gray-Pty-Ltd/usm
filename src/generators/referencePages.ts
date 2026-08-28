@@ -7,18 +7,25 @@
 // runtime sources (detectors, schema, config), and this function renders them.
 
 import path from "node:path";
-import type { SystemUsm, GenerationResult } from "../types.js";
+import type { SystemUsm, ServiceUsm, FeatureUsm, GenerationResult } from "../types.js";
 import {
   renderReferencePage,
   type ContentBlock,
   type ReferencePage,
 } from "./contentBlocks.js";
 import { getDetectors } from "../scan/detectors.js";
+import {
+  buildSourceMap,
+  renderFileTreeBlocks,
+  renderCoverageMatrixBlocks,
+  renderOrphanReportBlocks,
+} from "./sourceMapping.js";
 
 /**
  * Generate reference pages declared on system.usm.
  * Each entry in system.usm.reference_pages[] produces a markdown page.
  * Pages with source: detectors render from the detector registry.
+ * Pages with source: file-tree/coverage-matrix/orphan-report render from the source map.
  * Pages with inline content[] render through the generic content-block renderer.
  *
  * Returns a GenerationResult with one output per reference page.
@@ -27,11 +34,22 @@ import { getDetectors } from "../scan/detectors.js";
 export function generateReferencePages(
   system: SystemUsm,
   root: string,
+  services: ServiceUsm[] = [],
+  features: FeatureUsm[] = [],
   warnings: string[] = [],
 ): GenerationResult {
   const refPages = (system as SystemUsm & { reference_pages?: ReferencePage[] }).reference_pages;
   if (!refPages || refPages.length === 0) {
     return { outputs: [] };
+  }
+
+  // Build the source map lazily — only if a source-mapping view is requested
+  let sourceMap: ReturnType<typeof buildSourceMap> | null = null;
+  function getSourceMap() {
+    if (!sourceMap) {
+      sourceMap = buildSourceMap(services, features, root);
+    }
+    return sourceMap;
   }
 
   const outputs: Array<{ path: string; content: string }> = [];
@@ -41,6 +59,12 @@ export function generateReferencePages(
 
     if (page.source === "detectors") {
       content = buildDetectorContentBlocks(warnings);
+    } else if (page.source === "file-tree") {
+      content = renderFileTreeBlocks(getSourceMap());
+    } else if (page.source === "coverage-matrix") {
+      content = renderCoverageMatrixBlocks(getSourceMap());
+    } else if (page.source === "orphan-report") {
+      content = renderOrphanReportBlocks(getSourceMap());
     } else if (page.content) {
       content = page.content;
     }

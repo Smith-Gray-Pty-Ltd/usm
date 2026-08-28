@@ -564,3 +564,15 @@ reference_pages:
           - ["[MCP Tools](/mcp-reference)", "Spec-first tools for agents"]
           - ["[Agent Setup Guide](/agent-setup-guide)", "Cursor / Claude / Copilot wiring"]
           - ["[Roadmap](/roadmap)", "What's shipping next"]
+  - id: code-navigator
+    title: Code Navigator
+    audience: internal
+    source: file-tree
+  - id: spec-coverage
+    title: Spec Coverage
+    audience: internal
+    source: coverage-matrix
+  - id: orphan-files
+    title: Unspecced Files
+    audience: internal
+    source: orphan-report

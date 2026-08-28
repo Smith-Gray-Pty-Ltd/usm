@@ -3,96 +3,85 @@ $id: usm/gen-source-mapping
 $type: feature
 $version: 1
 $last_updated: "2026-08-28"
-status: planned
+status: built
 summary: >-
-  Source mapping generator — reads all service and feature specs to build a
-  bidirectional file-to-feature-to-service-to-module mapping, then renders
-  multiple views from that one mapping. Available views: file-tree (code
-  navigator with descriptions), coverage-matrix (which files are specced vs
-  unspecced), orphan-report (files with no governing spec). Each view is a
-  reference_pages source on system.usm, rendered through the generic
-  content-block renderer. Universal — reads the project's own .usm specs, no
-  USM-specific content. Backward compatible: no reference_pages entries =
-  no output.
+  Source mapping generator — reads all service and feature specs to build a bidirectional
+  file-to-feature-to-service-to-module mapping, then renders multiple views from that one mapping.
+  Available views: file-tree (code navigator with descriptions), coverage-matrix (which files are
+  specced vs unspecced), orphan-report (files with no governing spec). Each view is a
+  reference_pages source on system.usm, rendered through the generic content-block renderer.
+  Universal — reads the project's own .usm specs, no USM-specific content. Backward compatible: no
+  reference_pages entries = no output.
 $system: usm/system
 $service: usm/cli
 intent: >-
-  USM specs already capture the file-to-feature relationship bidirectionally:
-  feature specs point at implementation.primary and routes[].file_path, and
-  service specs group files into modules with paths and purposes. But this
-  data is never rendered as a file-level view — the technical docs show
-  feature pages and service pages but no code navigator, no coverage matrix,
-  no orphan report. For agents and developers, the most useful question is
-  "which files do what, and which are undocumented?" Source mapping answers
-  that by inverting the implementation relationship across all specs,
-  building one mapping, and rendering multiple views from it. This is drift
-  detection at the file level — files in the codebase not claimed by any
-  feature spec are orphans, and that's a signal the spec coverage is
-  incomplete.
+  USM specs already capture the file-to-feature relationship bidirectionally: feature specs point at
+  implementation.primary and routes[].file_path, and service specs group files into modules with
+  paths and purposes. But this data is never rendered as a file-level view — the technical docs show
+  feature pages and service pages but no code navigator, no coverage matrix, no orphan report. For
+  agents and developers, the most useful question is "which files do what, and which are
+  undocumented?" Source mapping answers that by inverting the implementation relationship across all
+  specs, building one mapping, and rendering multiple views from it. This is drift detection at the
+  file level — files in the codebase not claimed by any feature spec are orphans, and that's a
+  signal the spec coverage is incomplete.
 decisions:
   - id: source-mapping-name
     decision: >-
-      Name the feature source mapping rather than code navigator or file
-      tree, because the capability is building a bidirectional
-      source-to-spec mapping and rendering multiple views from it.
+      Name the feature source mapping rather than code navigator or file tree, because the
+      capability is building a bidirectional source-to-spec mapping and rendering multiple views
+      from it.
     rationale: >-
-      Code navigator describes one view (the file tree). Source mapping
-      describes the capability — the underlying file-to-feature-to-service
-      relationship that powers file-tree, coverage-matrix, and orphan-report
-      views. The name should reflect the general capability, not one output.
+      Code navigator describes one view (the file tree). Source mapping describes the capability —
+      the underlying file-to-feature-to-service relationship that powers file-tree, coverage-matrix,
+      and orphan-report views. The name should reflect the general capability, not one output.
     consequences: >-
-      The feature id is usm/gen-source-mapping. Reference page sources are
-      file-tree, coverage-matrix, orphan-report.
+      The feature id is usm/gen-source-mapping. Reference page sources are file-tree,
+      coverage-matrix, orphan-report.
     status: accepted
   - id: reference-pages-sources
     decision: >-
-      Source mapping views are reference_pages sources on system.usm,
-      rendered through the generic content-block renderer.
+      Source mapping views are reference_pages sources on system.usm, rendered through the generic
+      content-block renderer.
     rationale: >-
-      The content-block system already supports source-based reference pages
-      (detectors, schema, config). Adding file-tree, coverage-matrix, and
-      orphan-report as new sources keeps the architecture uniform — one
-      generator, one renderer, multiple sources. No bespoke generator
+      The content-block system already supports source-based reference pages (detectors, schema,
+      config). Adding file-tree, coverage-matrix, and orphan-report as new sources keeps the
+      architecture uniform — one generator, one renderer, multiple sources. No bespoke generator
       functions.
     consequences: >-
-      system.usm declares which views to generate. The referencePages
-      generator dispatches to source-specific builders.
+      system.usm declares which views to generate. The referencePages generator dispatches to
+      source-specific builders.
     status: accepted
   - id: no-new-schema-fields
     decision: >-
-      Use existing spec fields only — service modules[] and feature
-      implementation — no new schema fields.
+      Use existing spec fields only — service modules[] and feature implementation — no new schema
+      fields.
     rationale: >-
-      The data already exists. Adding schema fields would be unnecessary. The
-      generator reads service.usm modules[].paths[] for directory grouping
-      and feature.usm implementation.primary for file ownership. The
-      filesystem walk fills the gap between specs and actual files.
+      The data already exists. Adding schema fields would be unnecessary. The generator reads
+      service.usm modules[].paths[] for directory grouping and feature.usm implementation.primary
+      for file ownership. The filesystem walk fills the gap between specs and actual files.
     consequences: No v1.json changes. No migration needed. The generator is purely additive.
     status: accepted
   - id: filesystem-walk-for-completeness
     decision: >-
-      The generator walks the filesystem within service paths[] to enumerate
-      actual files, not just the files mentioned in specs.
+      The generator walks the filesystem within service paths[] to enumerate actual files, not just
+      the files mentioned in specs.
     rationale: >-
-      Specs point at implementation files but don't list every file in a
-      directory. To build a complete file tree and detect orphans, the
-      generator must walk the filesystem. Files not mentioned in any spec
-      are orphans — that's the coverage signal.
+      Specs point at implementation files but don't list every file in a directory. To build a
+      complete file tree and detect orphans, the generator must walk the filesystem. Files not
+      mentioned in any spec are orphans — that's the coverage signal.
     consequences: >-
-      The generator needs filesystem access at generation time. Exclude
-      patterns (node_modules, dist, .git) are respected.
+      The generator needs filesystem access at generation time. Exclude patterns (node_modules,
+      dist, .git) are respected.
     status: accepted
 flows:
   - id: build-source-map
     name: Build the source mapping from all specs
     description: >-
-      The generator reads all service.usm files (for modules[] and paths[])
-      and all feature.usm files (for implementation.primary,
-      implementation.test_code, routes[].file_path). It walks the
-      filesystem within each service's paths[], matching each file to: (1) a
-      module by directory, (2) a feature by implementation.primary, (3) a
-      route by routes[].file_path. Files matching nothing are orphans. The
-      result is a SourceMap data structure that all views render from.
+      The generator reads all service.usm files (for modules[] and paths[]) and all feature.usm
+      files (for implementation.primary, implementation.test_code, routes[].file_path). It walks the
+      filesystem within each service's paths[], matching each file to: (1) a module by directory,
+      (2) a feature by implementation.primary, (3) a route by routes[].file_path. Files matching
+      nothing are orphans. The result is a SourceMap data structure that all views render from.
     steps:
       - id: s1
         action: read
@@ -105,7 +94,9 @@ flows:
         target: filesystem within each service paths directory
       - id: s4
         action: match
-        target: each file to a module by directory, a feature by implementation.primary, a route by file_path
+        target: >-
+          each file to a module by directory, a feature by implementation.primary, a route by
+          file_path
       - id: s5
         action: collect
         target: files matching nothing as orphans
@@ -115,10 +106,9 @@ flows:
   - id: render-file-tree
     name: Render the file-tree view (code navigator)
     description: >-
-      Renders the source map as a directory tree with file descriptions,
-      grouped by service and module. Each file shows its module purpose and
-      the feature that owns it (if any). Files with no feature are marked as
-      unspecced. Source: file-tree on a reference_pages entry.
+      Renders the source map as a directory tree with file descriptions, grouped by service and
+      module. Each file shows its module purpose and the feature that owns it (if any). Files with
+      no feature are marked as unspecced. Source: file-tree on a reference_pages entry.
     steps:
       - id: s1
         action: read
@@ -138,26 +128,25 @@ flows:
   - id: render-coverage-matrix
     name: Render the coverage-matrix view
     description: >-
-      Renders the source map as a matrix showing which files have feature
-      specs vs which are unspecced. Useful for spotting drift — code that
-      exists but has no governing spec. Source: coverage-matrix on a
-      reference_pages entry.
+      Renders the source map as a matrix showing which files have feature specs vs which are
+      unspecced. Useful for spotting drift — code that exists but has no governing spec. Source:
+      coverage-matrix on a reference_pages entry.
     steps:
       - id: s1
         action: read
         target: SourceMap
       - id: s2
         action: build
-        target: "table with columns file, module, owning feature, spec status"
+        target: table with columns file, module, owning feature, spec status
       - id: s3
         action: render
         target: through the generic content-block renderer as a reference page
   - id: render-orphan-report
     name: Render the orphan-report view
     description: >-
-      Renders only the orphan files — files in the codebase not claimed by
-      any feature spec. This is the drift signal: code with no spec governing
-      it. Source: orphan-report on a reference_pages entry.
+      Renders only the orphan files — files in the codebase not claimed by any feature spec. This is
+      the drift signal: code with no spec governing it. Source: orphan-report on a reference_pages
+      entry.
     steps:
       - id: s1
         action: read
@@ -174,14 +163,18 @@ flows:
 contracts:
   - id: bidirectional-mapping
     description: >-
-      The generator builds a bidirectional file-to-feature-to-service-to-module
-      mapping from existing spec data.
+      The generator builds a bidirectional file-to-feature-to-service-to-module mapping from
+      existing spec data.
     must_have:
       - Reads service.usm modules name, purpose, and paths for directory-level grouping
-      - Reads feature.usm implementation.primary and implementation.test_code for file-level ownership
+      - >-
+        Reads feature.usm implementation.primary and implementation.test_code for file-level
+        ownership
       - Reads feature.usm routes file_path for route source files
       - Walks the filesystem within each service paths directory to enumerate actual files
-      - Matches each file to a module by directory, a feature by implementation.primary, and a route by file_path
+      - >-
+        Matches each file to a module by directory, a feature by implementation.primary, and a route
+        by file_path
   - id: multiple-views-one-mapping
     description: Multiple views render from one SourceMap data structure, each as a reference_pages source.
     must_have:
@@ -194,14 +187,20 @@ contracts:
     must_have:
       - No USM-specific content baked into the generator
       - Reads the project's service and feature specs, not hardcoded file lists
-      - A project with no reference_pages source-mapping entries produces no output (backward compatible)
+      - >-
+        A project with no reference_pages source-mapping entries produces no output (backward
+        compatible)
       - File descriptions come from module purpose and feature summary, not from the generator
   - id: backward-compatible
     description: Existing projects without source-mapping reference_pages entries are unaffected.
     must_have:
-      - No reference_pages entries with file-tree/coverage-matrix/orphan-report sources means no output
+      - >-
+        No reference_pages entries with file-tree/coverage-matrix/orphan-report sources means no
+        output
       - All existing tests pass without modification
-      - No new schema fields required — uses existing modules, implementation.primary, routes file_path
+      - >-
+        No new schema fields required — uses existing modules, implementation.primary, routes
+        file_path
   - id: orphan-detection
     description: Files in the codebase not claimed by any feature spec are identified as orphans.
     must_have:
@@ -250,9 +249,9 @@ tests:
     expect:
       - assertion: files in node_modules are not listed as orphans
 implementation:
-  primary: ""
-  test_code: ""
-  test_code_status: none
+  primary: src/generators/sourceMapping.ts
+  test_code: tests/sourceMapping.test.ts
+  test_code_status: manual
 see_also:
   - usm/gen-content-blocks
   - usm/cli-generate

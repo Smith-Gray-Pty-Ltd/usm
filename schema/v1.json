@@ -1588,7 +1588,7 @@
         },
         "source": {
           "type": "string",
-          "enum": ["detectors", "schema", "config"],
+          "enum": ["detectors", "schema", "config", "file-tree", "coverage-matrix", "orphan-report"],
           "description": "Runtime source for generated content. detectors renders from the detector registry; schema from v1.json; config from usmconfig-v1.json. Mutually exclusive with content."
         },
         "content": {
