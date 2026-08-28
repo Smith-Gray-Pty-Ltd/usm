@@ -2,22 +2,28 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-multi-lang-scan
 $type: feature
 $version: 1
-$last_updated: "2026-06-30"
-status: planned
-summary: |
-  Multi-language scanner support — extend usm scan to detect services, routes, and data models from 10+ languages and 30+ frameworks. The .usm format and all generators are already language-agnostic; only the scanner needs extending.
-
+$last_updated: "2026-08-28"
+status: built
+summary: >-
+  Multi-language scanner support, extended with a detector plugin system. usm scan detects services,
+  frameworks, routes, data models, and infrastructure from 12+ languages and 30+ frameworks via
+  built-in detectors. Users and agents extend detection through two declarative surfaces — a
+  detection section in usmconfig.json and auto-discovered .usm/detectors/*.yaml files — with a
+  script escape hatch for convention-based frameworks. The scanner is generalized: service detection
+  is driven by detector manifests, removing the package.json hardcode, so non-JS/TS stacks (Go, Zig,
+  etc.) are first-class. Existing Node.js/TypeScript scanning is unchanged.
 $system: usm/system
 $service: usm/cli
-intent: |
-  The .usm format, MCP tools, generators, and validator are all language-agnostic.
-  But the scanner only detects Node.js/TypeScript projects (package.json, Next.js
-  routes, Prisma schemas). A Python team using FastAPI, a Java team using Spring
-  Boot, a C# team using ASP.NET, or a Ruby team using Rails can't run 'usm scan'
-  — they have to hand-write .usm files. This feature extends the scanner to
-  detect services and routes from common frameworks across all major programming
-  languages, making USM truly language-agnostic end-to-end.
-
+intent: >-
+  The .usm format, MCP tools, generators, and validator are all language-agnostic, but the scanner
+  only detects Node.js/TypeScript projects (package.json, Next.js routes, Prisma schemas) plus
+  hardcoded Python/Docker/Prisma/Terraform special-cases. This feature extends the scanner to detect
+  services and routes from common frameworks across all major programming languages AND makes the
+  detection itself extensible without an upstream PR — users drop a .usm/detectors/zig.yaml file or
+  add a detection entry to usmconfig.json, and usm scan picks it up. A script escape hatch handles
+  convention-based frameworks (Next.js file-routing) that regex cannot express. The generalized
+  orchestrator replaces the package.json hardcode so any detector manifest (go.mod, build.zig.zon,
+  etc.) drives service detection.
 decisions:
   - id: manifest-based-detection
     decision: Detect services by language manifest files
@@ -25,7 +31,7 @@ decisions:
       Every language ecosystem has a standard manifest file. Detecting these
       files is reliable, language-specific, and doesn't require parsing source
       code. The manifest also tells us dependencies (framework detection).
-    consequences: "Scanner needs a manifest-to-language map. New languages added by adding a manifest entry."
+    consequences: Scanner needs a manifest-to-language map. New languages added by adding a manifest entry.
     status: accepted
   - id: framework-specific-route-detection
     decision: Detect routes per-framework, not per-language
@@ -36,10 +42,10 @@ decisions:
       Each framework needs its own route extractor.
     alternatives:
       - option: Generic AST parsing per language
-        rejected_because: "Too complex, requires language-specific parsers, fragile"
+        rejected_because: Too complex, requires language-specific parsers, fragile
       - option: File-pattern matching only (no framework awareness)
-        rejected_because: "Misses decorator/annotation-based routes (FastAPI, Spring, ASP.NET)"
-    consequences: "Route detection is framework-by-framework. New frameworks need a route extractor."
+        rejected_because: Misses decorator/annotation-based routes (FastAPI, Spring, ASP.NET)
+    consequences: Route detection is framework-by-framework. New frameworks need a route extractor.
     status: accepted
   - id: configurable-in-usmconfig
     decision: Language/framework detection rules are configurable in usmconfig.json
@@ -47,7 +53,7 @@ decisions:
       Users can add custom manifest patterns, route patterns, and data model
       patterns for frameworks we don't support out of the box. Defaults cover
       common frameworks; advanced users can extend.
-    consequences: "usmconfig.json gains a 'detection' section with language/framework rules"
+    consequences: usmconfig.json gains a 'detection' section with language/framework rules
     status: accepted
   - id: all-languages-from-start
     decision: Support all major languages from the initial implementation
@@ -56,9 +62,80 @@ decisions:
       Kotlin, C#, Ruby, PHP, Elixir, Swift, Scala, C/C++) from the start. The
       manifest detection is simple (file pattern matching) and route detection
       is regex-based per framework. The complexity is manageable.
-    consequences: "Larger initial implementation but no phased rollout complexity"
+    consequences: Larger initial implementation but no phased rollout complexity
     status: accepted
-
+  - id: detectors-directory
+    decision: >-
+      Add .usm/detectors/*.yaml as a second auto-discovered extension surface alongside
+      usmconfig.json detection
+    rationale: >-
+      usmconfig.json describes a single repo's shape and is per-project. Detector files are
+      shareable across repos, versioned with the .usm source of truth, validatable like other USM
+      artifacts, and agent-writable via MCP tools. Two surfaces with the same field shapes give
+      users the cheap path (drop a file) and the config path (inline rules) without forcing one or
+      the other.
+    alternatives:
+      - option: usmconfig.json detection only (original accepted decision)
+        rejected_because: >-
+          Config is per-project and not shareable; cannot express convention-based frameworks that
+          need code
+      - option: .usm/detectors/ only, drop the config section
+        rejected_because: Reverses an accepted decision and removes the inline config ergonomics for small overrides
+    consequences: >-
+      Two surfaces to keep in sync; precedence rules must be deterministic. Built-in detectors
+      migrate to the same shape as user detectors.
+    status: accepted
+  - id: script-escape-hatch
+    decision: >-
+      Allow routes.script in a detector to point at a .ts/.js file exporting
+      extractRoutes(sourceDir, framework) for convention-based frameworks
+    rationale: >-
+      Regex cannot capture Next.js app/page.tsx convention routing, Remix, or SvelteKit file-based
+      routes. These need real logic. A script field keeps the declarative detector file as the entry
+      point but delegates extraction to code when needed. The script lives in the user's repo (not
+      auto-loaded from third parties), bounding the trust surface.
+    consequences: >-
+      Detector files can reference local code; USM dynamically imports it. Only opt-in per detector;
+      declarative regex remains the default.
+    status: accepted
+  - id: generalized-orchestrator
+    decision: >-
+      Generalize structural.ts service detection so any detector manifest drives it, removing the
+      package.json hardcode
+    rationale: >-
+      Today a service directory without package.json is warned and skipped, making non-JS/TS stacks
+      second-class. The whole point of multi-language scan is that a Go app (go.mod) or Zig app
+      (build.zig.zon) is detected as a service without package.json. The orchestrator must ask
+      detectors 'does your manifest match this directory' instead of assuming package.json.
+    consequences: >-
+      The Python pyproject.toml and Docker docker-compose special-case passes become built-in
+      detectors. structural.ts shrinks to an orchestrator that iterates detectors.
+    status: accepted
+  - id: infrastructure-as-detector
+    decision: >-
+      Treat infrastructure (Terraform today) as a detector kind rather than a hardcoded separate
+      subcommand
+    rationale: >-
+      infrastructure.ts only parses Terraform. Users with CloudFormation, Pulumi, or CDK get
+      nothing. An infrastructure detector kind with the same manifest+pattern shape as other
+      detectors makes IaC extensible without code, consistent with the rest of the plugin system.
+    consequences: >-
+      usm scan infrastructure subcommand continues to work (backed by the built-in Terraform
+      detector); new formats add via detector files or detection.infrastructure in config.
+    status: accepted
+  - id: precedence-order
+    decision: >-
+      Detector precedence is built-in defaults < .usm/detectors/ files < usmconfig.json detection
+      (last wins)
+    rationale: >-
+      Built-ins provide sane defaults out of the box. Detector files are project-level
+      customizations shared across the team. usmconfig.json is the highest precedence so a user can
+      override a detector file from config without editing the file (useful for one-off overrides).
+      Deterministic order prevents merge ambiguity.
+    consequences: >-
+      Documented precedence; overrides by $id for detectors and by manifest pattern for config
+      arrays.
+    status: accepted
 flows:
   - id: detect-multi-lang-services
     name: Detect services from multiple language manifests
@@ -69,20 +146,19 @@ flows:
     steps:
       - id: s1
         action: read
-        target: "usmconfig.json detection.manifests (or defaults)"
+        target: usmconfig.json detection.manifests (or defaults)
       - id: s2
         action: scan
-        target: "directories for all manifest files"
+        target: directories for all manifest files
       - id: s3
         action: parse
-        target: "each manifest for framework dependencies"
+        target: each manifest for framework dependencies
       - id: s4
         action: classify
-        target: "service type (web-app, api, worker) from framework"
+        target: service type (web-app, api, worker) from framework
       - id: s5
         action: generate
-        target: ".usm/services/<name>.usm with detected language, runtime, framework"
-
+        target: .usm/services/<name>.usm with detected language, runtime, framework
   - id: detect-python-routes
     name: Detect Python routes (FastAPI, Flask, Django)
     description: |
@@ -91,17 +167,18 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".py files in service directory"
+        target: .py files in service directory
       - id: s2
         action: match
-        target: "FastAPI: @app.(get|post|put|delete|patch), @router.(get|post|...); Flask: @app.route; Django: path('', views)"
+        target: >-
+          FastAPI: @app.(get|post|put|delete|patch), @router.(get|post|...); Flask: @app.route;
+          Django: path('', views)
       - id: s3
         action: extract
-        target: "path and HTTP method from decorator/pattern"
+        target: path and HTTP method from decorator/pattern
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-go-routes
     name: Detect Go routes (chi, gin, echo, net/http)
     description: |
@@ -110,17 +187,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".go files in service directory"
+        target: .go files in service directory
       - id: s2
         action: match
-        target: "(r|router|mux)\\.(GET|POST|PUT|DELETE|PATCH|HandleFunc|Handle)"
+        target: (r|router|mux)\.(GET|POST|PUT|DELETE|PATCH|HandleFunc|Handle)
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-rust-routes
     name: Detect Rust routes (Axum, Actix, Rocket)
     description: |
@@ -129,17 +205,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".rs files in service directory"
+        target: .rs files in service directory
       - id: s2
         action: match
         target: ".route(), .service(), #[get(...)], #[post(...)], #[route(GET, \"/path\")]"
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-java-routes
     name: Detect Java/Kotlin routes (Spring Boot, Javalin, Quarkus)
     description: |
@@ -149,17 +224,18 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".java and .kt files in service directory"
+        target: .java and .kt files in service directory
       - id: s2
         action: match
-        target: "Spring: @GetMapping/@PostMapping/@RequestMapping; Javalin: app.get/post; Quarkus: @GET/@POST + @Path"
+        target: >-
+          Spring: @GetMapping/@PostMapping/@RequestMapping; Javalin: app.get/post; Quarkus:
+          @GET/@POST + @Path
       - id: s3
         action: extract
-        target: "path and HTTP method from annotation"
+        target: path and HTTP method from annotation
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-csharp-routes
     name: Detect C# routes (ASP.NET Core, Minimal APIs)
     description: |
@@ -168,17 +244,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".cs files in service directory"
+        target: .cs files in service directory
       - id: s2
         action: match
         target: "[HttpGet], [HttpPost], [Route(\"path\")], app.MapGet, app.MapPost"
       - id: s3
         action: extract
-        target: "path and HTTP method from attribute"
+        target: path and HTTP method from attribute
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-ruby-routes
     name: Detect Ruby routes (Rails, Sinatra)
     description: |
@@ -187,17 +262,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: "config/routes.rb and .rb files in service directory"
+        target: config/routes.rb and .rb files in service directory
       - id: s2
         action: match
         target: "Rails: get/post/resources/namespace; Sinatra: get '/path' do, post '/path' do"
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-php-routes
     name: Detect PHP routes (Laravel, Symfony, Slim)
     description: |
@@ -206,17 +280,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: "routes/web.php, routes/api.php, and .php files"
+        target: routes/web.php, routes/api.php, and .php files
       - id: s2
         action: match
         target: "Laravel: Route::get/post; Symfony: #[Route]; Slim: $app->get/post"
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-elixir-routes
     name: Detect Elixir routes (Phoenix)
     description: |
@@ -224,17 +297,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: "lib/*_web/router.ex files"
+        target: lib/*_web/router.ex files
       - id: s2
         action: match
-        target: "get/post/put/patch/delete within scope blocks"
+        target: get/post/put/patch/delete within scope blocks
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-swift-routes
     name: Detect Swift routes (Vapor)
     description: |
@@ -243,17 +315,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".swift files in service directory"
+        target: .swift files in service directory
       - id: s2
         action: match
-        target: "routes.get/post/put/delete, app.get/post"
+        target: routes.get/post/put/delete, app.get/post
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-scala-routes
     name: Detect Scala routes (Akka HTTP, Play, Tapir)
     description: |
@@ -262,17 +333,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".scala files and conf/routes files"
+        target: .scala files and conf/routes files
       - id: s2
         action: match
         target: "Akka: path/endpoints; Play: GET /path; Tapir: endpoint.get/post"
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-cpp-routes
     name: Detect C++ routes (Crow, Drogon, Pistache)
     description: |
@@ -282,17 +352,16 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: ".cpp and .h files in service directory"
+        target: .cpp and .h files in service directory
       - id: s2
         action: match
         target: "Crow: CROW_ROUTE; Drogon: registerHandler; Pistache: router.get/post"
       - id: s3
         action: extract
-        target: "path and HTTP method"
+        target: path and HTTP method
       - id: s4
         action: generate
-        target: "routes[] in feature .usm files"
-
+        target: routes[] in feature .usm files
   - id: detect-multi-lang-data-models
     name: Detect data models from multiple ORMs across languages
     description: |
@@ -301,31 +370,127 @@ flows:
     steps:
       - id: s1
         action: scan
-        target: "known ORM schema files per language"
+        target: known ORM schema files per language
       - id: s2
         action: parse
-        target: "model definitions (class-based, struct-based, macro-based, annotation-based)"
+        target: model definitions (class-based, struct-based, macro-based, annotation-based)
       - id: s3
         action: generate
-        target: ".usm/data/<name>.usm with models and fields"
-
+        target: .usm/data/<name>.usm with models and fields
+  - id: discover-detector-files
+    name: Discover and load detector files
+    description: >-
+      At scan start, the orchestrator reads .usm/detectors/*.yaml (if present), validates each
+      against detector-v1.json, and merges them with built-in defaults and the usmconfig.json
+      detection section. Precedence: built-in defaults < .usm/detectors/ files < usmconfig.json
+      detection (last wins).
+    steps:
+      - id: s1
+        action: read
+        target: .usm/detectors/*.yaml if directory exists
+      - id: s2
+        action: validate
+        target: each detector file against detector-v1.json schema
+      - id: s3
+        action: merge
+        target: built-in defaults + detector files + usmconfig.json detection (config overrides files)
+      - id: s4
+        action: warn
+        target: on invalid detector files (skip, do not abort scan)
+  - id: detect-service-via-detector
+    name: Detect a service from any language manifest
+    description: >-
+      Replaces the hardcoded package.json read. For each directory matched by a services rule, the
+      orchestrator finds the detector whose manifest glob matches a file in that directory and reads
+      that manifest (not always package.json). A Go app with go.mod is detected via the Go detector;
+      a Zig app with build.zig.zon via the Zig detector. No package.json is required.
+    steps:
+      - id: s1
+        action: match
+        target: directory against usmconfig.json services rules
+      - id: s2
+        action: find
+        target: detector whose manifest glob matches a file in the directory
+      - id: s3
+        action: parse
+        target: that manifest file (package.json, go.mod, build.zig.zon, etc.)
+      - id: s4
+        action: classify
+        target: language, runtime, framework from manifest contents
+      - id: s5
+        action: generate
+        target: .usm/apps/<name>/service.usm
+  - id: extract-routes-via-script
+    name: Extract routes for convention-based frameworks via script
+    description: >-
+      Frameworks whose routes come from file conventions (Next.js app/page.tsx, Remix, SvelteKit)
+      rather than declarations cannot be captured by regex. A detector declares routes.script
+      pointing at a .ts file exporting extractRoutes(sourceDir, framework). The orchestrator imports
+      and runs it. Declarative regex patterns remain the default; script is opt-in per detector.
+    steps:
+      - id: s1
+        action: read
+        target: detector routes.script path
+      - id: s2
+        action: import
+        target: the script module dynamically
+      - id: s3
+        action: call
+        target: extractRoutes(sourceDir, framework)
+      - id: s4
+        action: generate
+        target: routes[] in feature .usm files
+  - id: detect-infrastructure-via-detector
+    name: Detect infrastructure from IaC files via detectors
+    description: >-
+      Generalizes the Terraform-only infrastructure scan. An infrastructure detector declares a
+      manifest glob (infrastructure/**/*.tf, **/cloudformation.yaml, **/*.pulumi.ts) and resource
+      extraction patterns. Built-in Terraform detector preserves current behaviour; users add
+      CloudFormation/Pulumi/CDK via detector files or usmconfig.json detection.infrastructure.
+    steps:
+      - id: s1
+        action: match
+        target: infrastructure detector manifest globs
+      - id: s2
+        action: parse
+        target: matched IaC files for resources
+      - id: s3
+        action: emit
+        target: infrastructure YAML block per service
+  - id: detect-data-schema-via-detector
+    name: Detect data models from any ORM via detectors
+    description: >-
+      Generalizes the Prisma-only data scan. A data-schema detector declares a manifest glob and
+      model extraction patterns. Built-in Prisma detector preserves current behaviour; users add
+      SQLAlchemy, Diesel, GORM, Entity Framework via detector files or usmconfig.json
+      detection.data_models.
+    steps:
+      - id: s1
+        action: match
+        target: data-schema detector manifest globs
+      - id: s2
+        action: parse
+        target: model definitions (class, struct, macro, annotation)
+      - id: s3
+        action: generate
+        target: .usm/packages/<pkg>/<orm>.usm with models[]
 contracts:
   - id: manifest-detection-coverage
     description: Scanner detects services from all supported language manifests
     must_have:
-      - "package.json → Node.js/TypeScript/JavaScript"
-      - "pyproject.toml or requirements.txt → Python"
-      - "Cargo.toml → Rust"
-      - "go.mod → Go"
-      - "pom.xml or build.gradle → Java/Kotlin"
-      - ".csproj or .sln → C#/.NET"
-      - "Gemfile → Ruby"
-      - "composer.json → PHP"
-      - "mix.exs → Elixir"
-      - "Package.swift → Swift"
-      - "build.sbt → Scala"
-      - "CMakeLists.txt or Makefile → C/C++"
-      - "Framework detected from dependencies in manifest"
+      - package.json → Node.js/TypeScript/JavaScript
+      - pyproject.toml or requirements.txt → Python
+      - Cargo.toml → Rust
+      - go.mod → Go
+      - pom.xml or build.gradle → Java/Kotlin
+      - .csproj or .sln → C#/.NET
+      - Gemfile → Ruby
+      - composer.json → PHP
+      - mix.exs → Elixir
+      - Package.swift → Swift
+      - build.sbt → Scala
+      - CMakeLists.txt or Makefile → C/C++
+      - Framework detected from dependencies in manifest
   - id: route-detection-coverage
     description: Scanner detects routes from 30+ frameworks across all languages
     must_have:
@@ -373,16 +538,89 @@ contracts:
   - id: config-extensible
     description: Detection rules are configurable in usmconfig.json
     must_have:
-      - "detection.manifests array with {pattern, language, frameworks?} objects"
-      - "detection.routes array with {framework, pattern, method_group, path_group} objects"
-      - "detection.data_models array with {orm, pattern, model_pattern?} objects"
-      - "Defaults cover all supported frameworks; users can add custom patterns"
+      - detection.manifests array with {pattern, language, frameworks?} objects
+      - detection.routes array with {framework, pattern, method_group, path_group} objects
+      - detection.data_models array with {orm, pattern, model_pattern?} objects
+      - Defaults cover all supported frameworks; users can add custom patterns
   - id: backward-compatible
     description: Existing Node.js/TypeScript scanning unchanged
     must_have:
-      - "usm scan on a Node.js project produces same results as before"
-      - "usmconfig.json without detection section uses defaults"
-
+      - usm scan on a Node.js project produces same results as before
+      - usmconfig.json without detection section uses defaults
+  - id: detector-file-format
+    description: >-
+      Detector files in .usm/detectors/*.yaml are validated against a detector-v1.json schema before
+      use
+    must_have:
+      - >-
+        Each detector declares $id, kind (service|framework|routes|data-schema|infrastructure),
+        manifest glob, language, runtime
+      - Framework detectors declare frameworks[] with name + string-contains detect rule
+      - >-
+        Route detectors declare routes.extensions + routes.patterns[] (regex, methodGroup,
+        pathGroup) OR routes.script (mutually exclusive)
+      - Invalid detector files are skipped with a warning, not an abort
+  - id: dual-extension-surfaces
+    description: >-
+      Users can extend detection through either usmconfig.json or .usm/detectors/ files, with the
+      same expressiveness
+    must_have:
+      - >-
+        usmconfig.json detection.manifests / detection.routes / detection.data_models /
+        detection.infrastructure arrays (existing accepted decision, unchanged)
+      - .usm/detectors/*.yaml files as a second, auto-discovered source
+      - >-
+        Both surfaces accept the same field shapes (manifest, frameworks, routes patterns, data
+        model patterns)
+      - >-
+        Detector files support routes.script for convention-based frameworks; usmconfig.json
+        detection.routes supports script too
+  - id: orchestrator-generalized
+    description: >-
+      Service detection is driven by detector manifests, removing the package.json hardcode in
+      structural.ts
+    must_have:
+      - >-
+        A service directory is detected if ANY detector manifest glob matches a file in it (not only
+        package.json)
+      - >-
+        A Go app with go.mod and no package.json produces a service.usm (no 'No package.json found'
+        warning)
+      - A Zig app with build.zig.zon and no package.json produces a service.usm
+      - >-
+        The existing Python pyproject.toml and Docker docker-compose passes become built-in
+        detectors, not special-case code
+  - id: infrastructure-extensible
+    description: Infrastructure detection is extensible beyond Terraform via detectors
+    must_have:
+      - Built-in Terraform detector preserves usm scan infrastructure output exactly
+      - detection.infrastructure array in usmconfig.json (new, mirrors detection.manifests shape)
+      - Infrastructure detector files accepted in .usm/detectors/
+      - CloudFormation, Pulumi, CDK detectable via user-supplied detectors without code change
+  - id: precedence-and-override
+    description: Detector sources merge with a deterministic precedence so users can override built-ins
+    must_have:
+      - >-
+        Built-in detectors are the lowest precedence (seeded from current
+        MANIFESTS/ROUTE_PATTERNS/Prisma/Terraform tables)
+      - .usm/detectors/ files override built-ins by detector $id
+      - >-
+        usmconfig.json detection section is highest precedence (overrides both built-ins and
+        detector files)
+      - >-
+        A usmconfig.json with no detection section and no .usm/detectors/ dir produces identical
+        results to the current scanner (backward compatible)
+  - id: backward-compatible-existing-implementations
+    description: Existing USM projects with usmconfig.json and .usm files continue to scan identically
+    must_have:
+      - >-
+        usm scan on a Node.js/Next.js project with no detection section and no detectors dir
+        produces the same .usm output as before this feature
+      - Existing PRESERVE_FIELDS / UPDATE_FIELDS smart-merge behaviour unchanged
+      - Existing CLI flags (--force, --routes, --merge) unchanged in name and default
+      - >-
+        The existing manifest-detection-coverage and route-detection-coverage contracts from the
+        original spec remain satisfied by the migrated built-in detectors
 tests:
   - id: detect-python-service
     setup:
@@ -454,48 +692,92 @@ tests:
     setup:
       python_file_with_decorators: true
     expect:
-      - assertion: "routes[] extracted with correct paths and methods"
+      - assertion: routes[] extracted with correct paths and methods
   - id: extract-spring-routes
     setup:
       java_file_with_annotations: true
     expect:
-      - assertion: "routes[] extracted from @GetMapping/@PostMapping"
+      - assertion: routes[] extracted from @GetMapping/@PostMapping
   - id: extract-aspnet-routes
     setup:
       cs_file_with_attributes: true
     expect:
-      - assertion: "routes[] extracted from [HttpGet]/[HttpPost]"
+      - assertion: routes[] extracted from [HttpGet]/[HttpPost]
   - id: extract-rails-routes
     setup:
       routes_rb_with_get_post: true
     expect:
-      - assertion: "routes[] extracted from get/post/resources"
+      - assertion: routes[] extracted from get/post/resources
   - id: extract-laravel-routes
     setup:
       web_php_with_route_get: true
     expect:
-      - assertion: "routes[] extracted from Route::get/post"
+      - assertion: routes[] extracted from Route::get/post
   - id: extract-phoenix-routes
     setup:
       router_ex_with_get_post: true
     expect:
-      - assertion: "routes[] extracted from get/post in scope blocks"
+      - assertion: routes[] extracted from get/post in scope blocks
   - id: backward-compatible-node
     setup:
       package_json_with_nextjs: true
     expect:
-      - assertion: "same results as before this feature"
+      - assertion: same results as before this feature
   - id: custom-detection-rules
     setup:
       usmconfig_with_custom_manifest: true
     expect:
-      - assertion: "custom manifest pattern detected"
-
+      - assertion: custom manifest pattern detected
+  - id: detector-file-zig-detected
+    setup:
+      usm_detectors_zig_yaml: declares manifest build.zig.zon, framework zap, route regex
+      apps_zig_api_build_zig_zon_with_zap: true
+    expect:
+      - assertion: ".usm/apps/zig-api/service.usm created with runtime: zig, framework: zap"
+      - assertion: no 'No package.json found' warning
+      - assertion: routes[] extracted from .zig source files
+  - id: infrastructure-detector-cloudformation
+    setup:
+      usm_detectors_cloudformation_yaml: declares manifest **/cloudformation.yaml, resource extraction pattern
+      infrastructure_cloudformation_yaml_with_resources: true
+    expect:
+      - assertion: infrastructure YAML block emitted for CloudFormation resources
+  - id: script-route-extraction-nextjs
+    setup:
+      usm_detectors_nextjs_yaml: "declares routes.script: ./detectors/nextjs.ts"
+      apps_web_app_page_tsx: true
+    expect:
+      - assertion: routes[] extracted by the script, matching the current Next.js route extraction output
+  - id: config-overrides-detector-file
+    setup:
+      usm_detectors_go_yaml: declares framework gin detect 'gin'
+      usmconfig_detection_manifests: overrides go framework detect to 'echo'
+    expect:
+      - assertion: scan uses the usmconfig.json detection rule (echo), not the detector file (gin)
+  - id: no-package-json-service-detected
+    setup:
+      apps_go_api_go_mod_with_gin: true
+      no_package_json: true
+    expect:
+      - assertion: ".usm/apps/go-api/service.usm created with runtime: go, framework: gin"
+      - assertion: no warning emitted
+  - id: backward-compatible-no-detectors-dir
+    setup:
+      package_json_with_nextjs: true
+      no_usm_detectors_dir: true
+      usmconfig_without_detection_section: true
+    expect:
+      - assertion: scan output identical to pre-feature scanner (same services, routes, features)
+  - id: invalid-detector-file-skipped
+    setup:
+      usm_detectors_bad_yaml: malformed YAML or missing required fields
+    expect:
+      - assertion: scan continues, warning emitted naming the invalid file
+      - assertion: other detectors still load and run
 implementation:
-  primary: src/scan/structural.ts
-  test_code: ""
-  test_code_status: none
-
+  primary: src/scan/detectors.ts
+  test_code: tests/detectors.test.ts
+  test_code_status: manual
 see_also:
-  - "usm/cli-scan"
-  - "usm/cli-init"
+  - usm/cli-scan
+  - usm/cli-init

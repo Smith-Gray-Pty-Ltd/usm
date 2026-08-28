@@ -123,6 +123,48 @@ export interface UsmConfig {
   generation?: UsmConfigGeneration;
   llm?: UsmConfigLlm;
   enrichment?: EnrichmentConfigSection;
+  /**
+   * Declarative detection overrides — the highest-precedence extension
+   * surface for usm scan. Entries here override built-in detectors and
+   * .usm/detectors/ files. See the usm/cli-multi-lang-scan feature spec
+   * and detector-v1.json schema.
+   */
+  detection?: UsmConfigDetection;
+}
+
+// ─── usmconfig detection section types ────────────────────────────────────────
+
+export interface UsmConfigDetectionManifest {
+  id?: string;
+  pattern: string;
+  language: string;
+  runtime?: string;
+  frameworks?: Array<{ name: string; detect: string }>;
+}
+
+export interface UsmConfigDetectionRoute {
+  framework: string;
+  extensions?: string[];
+  patterns?: Array<{ regex: string; method_group: number; path_group: number }>;
+  script?: string;
+}
+
+export interface UsmConfigDetectionDataModel {
+  orm: string;
+  pattern: string;
+  model_pattern?: string;
+}
+
+export interface UsmConfigDetectionInfrastructure {
+  pattern: string;
+  resource_pattern?: string;
+}
+
+export interface UsmConfigDetection {
+  manifests?: UsmConfigDetectionManifest[];
+  routes?: UsmConfigDetectionRoute[];
+  data_models?: UsmConfigDetectionDataModel[];
+  infrastructure?: UsmConfigDetectionInfrastructure[];
 }
 
 // ─── enrichment config types ─────────────────────────────────────────────────

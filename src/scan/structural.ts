@@ -29,6 +29,8 @@ import {
 } from "./utils.js";
 import { extractRoutes, groupRoutesIntoFeatures } from "./routes.js";
 import { smartMerge } from "./merge.js";
+import { resolveDetectors, getDetectors, detectFramework } from "./detectors.js";
+import type { Detector } from "./detectors.js";
 import type { RouteFinding } from "./types.js";
 
 /**
@@ -58,11 +60,31 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
     },
   };
 
+  // 3a. Resolve detectors — built-in defaults < .usm/detectors/ files < usmconfig.json detection
+  // Per the usm/cli-multi-lang-scan feature spec. Invalid detector files are
+  // skipped with a warning (the scan does not abort).
+  const detectorResult = resolveDetectors(usmSourceDir, config.detection);
+  for (const f of detectorResult.failed) {
+    result.warnings?.push(
+      `Detector file "${f.file}" skipped: ${f.errors.join("; ")}`,
+    );
+  }
+
   // Skip service/package/data detection if --routes flag
   if (!options.routesOnly) {
     // 4. Scan services (from apps/* directories)
+    //
+    // GENERALIZED: previously this pass hardcoded package.json — a directory
+    // without package.json was warned and skipped. Now the orchestrator
+    // iterates service-kind detectors and matches each detector's manifest
+    // glob against files in the matched directory. A Go app with go.mod and
+    // no package.json is detected via the built-in "go" detector; a Zig app
+    // with build.zig.zon via a user "zig" detector. The JS/TS detector's
+    // manifest is **/package.json, so existing Node projects behave
+    // identically (backward compatible).
     const serviceRules = config.services || [];
     const excludePatterns = config.sources?.exclude || ["**/node_modules/**", "**/dist/**"];
+    const serviceDetectors = getDetectors("service");
 
     for (const rule of serviceRules) {
       const matchedDirs = fg.sync([rule.match], {
@@ -73,22 +95,32 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
       });
 
       for (const dir of matchedDirs) {
-        const pkgJsonPath = path.join(dir, "package.json");
-        if (!fs.existsSync(pkgJsonPath)) {
-          result.warnings?.push(`No package.json found at ${dir}`);
+        // Find a detector whose manifest glob matches a file in this directory.
+        // The detector's manifest is relative to repo root; we glob within
+        // the matched directory using the manifest's basename pattern.
+        const match = matchServiceDetector(dir, root, serviceDetectors, excludePatterns);
+
+        if (!match) {
+          // No detector matched this directory — skip silently (unlike the old
+          // package.json warning, which was JS-centric). A directory with no
+          // known manifest is simply not a service USM recognizes.
           continue;
         }
 
-        const pkgJson = readPackageJson(pkgJsonPath);
-        if (!pkgJson) continue;
-
+        const { detector, manifestFile } = match;
+        const manifestContent = fs.readFileSync(manifestFile, "utf-8");
+        const framework = detectFramework(manifestContent, detector);
         const relativePath = path.relative(root, dir);
         // Directory name takes precedence over package name — the .usm
-        // path must mirror the repo directory, not the npm package name
-        // (e.g. apps/agency-website/ has package name @smith-gray/marketing;
-        // the .usm file should be apps/agency-website/service.usm, not
-        // apps/marketing/service.usm which creates a phantom directory)
-        const name = shortNameFromPath(relativePath) || shortNameFromPackageJson(pkgJson.name);
+        // path must mirror the repo directory, not the npm package name.
+        const name = shortNameFromPath(relativePath) || path.basename(dir);
+
+        // JS/TS path: read package.json for runtime/port/deps derivation.
+        // Non-JS path: use detector-declared language/runtime; pkgJson is
+        // a best-effort (may be null) and the generator falls back to
+        // detector fields when package.json is absent.
+        const pkgJsonPath = path.join(dir, "package.json");
+        const pkgJson = fs.existsSync(pkgJsonPath) ? readPackageJson(pkgJsonPath) : null;
 
         const writeOutcome = generateServiceUsm({
           root,
@@ -101,9 +133,17 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
           force: options.force,
           mergeStrategy: options.mergeStrategy,
           existingSummary: rule.summary,
+          detector,            // ← new: detector carries language/runtime/framework
+          framework,           // ← new: detected framework name
         });
 
-        recordFileOutcome(result, `.usm/apps/${name}/service.usm`, "service", "package.json", writeOutcome);
+        recordFileOutcome(
+          result,
+          `.usm/apps/${name}/service.usm`,
+          "service",
+          detector.$id === "typescript" ? "package.json" : detector.manifest || "detector",
+          writeOutcome,
+        );
         result.stats!.services_found!++;
       }
     }
@@ -383,6 +423,45 @@ function recordFileOutcome(
 }
 
 /**
+ * Find the service-kind detector whose manifest glob matches a file in the
+ * given directory. Returns the detector and the matched manifest file path,
+ * or null if no detector matches.
+ *
+ * The detector manifest is a repo-root-relative glob (e.g. go.mod or
+ * package.json manifests). We glob within the matched service directory
+ * using the manifest pattern so a Go app with go.mod and no package.json is
+ * detected via the "go" detector. Built-in detectors are tried in
+ * declaration order; user detectors from .usm/detectors and
+ * usmconfig.json detection override built-ins by id (handled by
+ * resolveDetectors earlier in the scan).
+ */
+function matchServiceDetector(
+  dir: string,
+  root: string,
+  serviceDetectors: Detector[],
+  excludePatterns: string[],
+): { detector: Detector; manifestFile: string } | null {
+  for (const detector of serviceDetectors) {
+    if (!detector.manifest) continue;
+    // Glob within the service directory. The detector manifest is a
+    // repo-root glob like "**/go.mod"; fast-glob matches it against the
+    // directory tree rooted at `dir`.
+    const matched = fg.sync([detector.manifest], {
+      cwd: dir,
+      absolute: true,
+      ignore: excludePatterns,
+    });
+    // Filter to files that actually live in this directory (not deeper),
+    // so a detector doesn't claim a nested app's manifest.
+    const inThisDir = matched.filter((f) => path.dirname(f) === dir);
+    if (inThisDir.length > 0) {
+      return { detector, manifestFile: inThisDir[0] };
+    }
+  }
+  return null;
+}
+
+/**
  * Read and parse usmconfig.json.
  */
 function readConfig(configPath: string): UsmConfig {
@@ -470,22 +549,28 @@ interface ServiceUsmParams {
   usmSourceDir: string;
   name: string;
   relativePath: string;
-  pkgJson: PackageJsonInfo;
+  pkgJson: PackageJsonInfo | null;
   kind: ServiceRuleKind;
   systemName: string;
   force: boolean;
   mergeStrategy: MergeStrategy;
   existingSummary?: string;
+  /** The detector that matched this directory (carries language/runtime/framework). */
+  detector?: Detector;
+  /** The framework detected from the manifest contents, or null. */
+  framework?: string | null;
 }
 
 function generateServiceUsm(params: ServiceUsmParams): WriteOutcome {
-  const { usmSourceDir, name, relativePath, pkgJson, kind, systemName, force, mergeStrategy, existingSummary } = params;
+  const { usmSourceDir, name, relativePath, pkgJson, kind, systemName, force, mergeStrategy, existingSummary, detector, framework } = params;
   // Mirror the repo: apps/{name}/service.usm instead of services/{name}.usm
   const outputPath = path.join(usmSourceDir, "apps", name, "service.usm");
 
-  const runtime = detectRuntime(pkgJson);
-  const port = detectPort(pkgJson);
-  const deps = extractSmithGrayDependencies(pkgJson);
+  // JS/TS path: derive runtime/port/deps from package.json.
+  // Non-JS path: use the detector's declared language/runtime/framework.
+  const runtime = pkgJson ? detectRuntime(pkgJson) : (detector?.runtime || "unknown");
+  const port = pkgJson ? detectPort(pkgJson) : undefined;
+  const deps = pkgJson ? extractSmithGrayDependencies(pkgJson) : [];
   const summary = existingSummary || `TODO: describe the ${name} service`;
 
   const usmObj: Record<string, unknown> = {
@@ -496,22 +581,32 @@ function generateServiceUsm(params: ServiceUsmParams): WriteOutcome {
     "$last_updated": todayDate(),
     "summary": summary,
     "$system": `${systemName}/system`,
-    "type": mapServiceKindToUsmType(kind),
+    "type": detector?.service_type || mapServiceKindToUsmType(kind),
     "runtime": runtime,
     "paths": [relativePath],
     "depends_on": deps,
   };
+
+  // When a detector identified the language/framework, record it so the
+  // generated service.usm reflects the stack (and the agent knows the
+  // framework for route extraction on re-scan).
+  if (detector?.language && detector.language !== "n/a") {
+    usmObj["language"] = detector.language;
+  }
+  if (framework) {
+    usmObj["framework"] = framework;
+  }
 
   if (port) {
     usmObj["port"] = port;
   }
 
   // Dev config
-  const devCommand = pkgJson.scripts?.dev || "";
+  const devCommand = pkgJson?.scripts?.dev || "";
   const devUrl = port ? `http://localhost:${port}` : undefined;
 
   usmObj["dev"] = {
-    command: devCommand || "npm run dev",
+    command: devCommand || (detector?.runtime ? `${detector.runtime} run dev` : "npm run dev"),
     ...(devUrl ? { url: devUrl } : {}),
     env: {},
   };

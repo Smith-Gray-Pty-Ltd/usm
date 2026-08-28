@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://usm.dev/schema/detector-v1.json",
+  "title": "usm detector v1",
+  "description": "Schema for .usm/detectors/*.yaml files — declarative detector plugins that extend usm scan. A detector describes how to identify a service/framework from a manifest file, how to extract routes from source, how to parse a data schema, or how to extract infrastructure from IaC files. Built-in detectors use the same shape as user-authored ones.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://usm.dev/schema/detector-v1.json",
+      "description": "Schema reference URI"
+    },
+    "$id": {
+      "type": "string",
+      "description": "Unique detector identifier (e.g. 'zig', 'go', 'prisma', 'terraform'). Used for override precedence: built-in < .usm/detectors/ files < usmconfig.json detection. A user detector with the same $id as a built-in overrides it.",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["service", "framework", "routes", "data-schema", "infrastructure"],
+      "description": "Which scan pass invokes this detector. 'service' detects a service from a manifest file (replaces the package.json hardcode). 'framework' identifies the framework from manifest contents (usually combined with 'service'). 'routes' extracts HTTP routes from source files. 'data-schema' extracts data models (ORM schemas). 'infrastructure' extracts cloud resources from IaC files."
+    },
+    "language": {
+      "type": "string",
+      "description": "Language label emitted in the generated service.usm (e.g. 'zig', 'go', 'python', 'typescript'). Use 'n/a' for non-language detectors (data-schema, infrastructure)."
+    },
+    "runtime": {
+      "type": "string",
+      "description": "Runtime label emitted in the generated service.usm (e.g. 'bun', 'node', 'python', 'go', 'rust', 'prisma', 'terraform', 'docker', 'shared-library')."
+    },
+    "manifest": {
+      "type": "string",
+      "description": "Glob pattern (relative to repo root) for the manifest file that identifies this detector's target. For 'service'/'framework' kinds this is the language manifest (package.json, go.mod, build.zig.zon). For 'data-schema' it is the schema file glob (prisma/schema.prisma). For 'infrastructure' it is the IaC file glob (infrastructure/**/*.tf). Not required for 'routes' kind when the detector is combined with a 'service' detector that already matched the directory."
+    },
+    "frameworks": {
+      "type": "array",
+      "description": "Framework detection rules — string-contains checks against the manifest file contents. The first matching framework wins. If none match, framework is null (service still detected, no routes extracted).",
+      "items": {
+        "$ref": "#/$defs/frameworkRule"
+      }
+    },
+    "routes": {
+      "$ref": "#/$defs/routesConfig",
+      "description": "Route extraction configuration. Declarative regex patterns by default; a script escape hatch handles convention-based frameworks. patterns and script are mutually exclusive."
+    },
+    "extract": {
+      "description": "Extraction configuration for 'data-schema' and 'infrastructure' kinds. Shape depends on kind — see $defs/dataExtract and $defs/infrastructureExtract.",
+      "oneOf": [
+        { "$ref": "#/$defs/dataExtract" },
+        { "$ref": "#/$defs/infrastructureExtract" }
+      ]
+    },
+    "service_type": {
+      "type": "string",
+      "enum": ["web-app", "api", "worker", "database", "cache", "queue", "idp", "llm-gateway", "agent-flows", "shared-library"],
+      "description": "Optional override for the generated service.usm $type field. If omitted, the service rule's kind in usmconfig.json drives the type (as today)."
+    }
+  },
+  "required": ["$id", "kind"],
+
+  "$defs": {
+    "frameworkRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Framework identifier emitted in the generated service.usm (e.g. 'gin', 'fastapi', 'nextjs', 'zap').",
+          "minLength": 1
+        },
+        "detect": {
+          "type": "string",
+          "description": "Substring to search for in the manifest file contents. Case-sensitive. If this string is present, the framework is identified. For package.json this matches against the raw JSON (so '\"express\"' matches the dependency key).",
+          "minLength": 1
+        }
+      },
+      "required": ["name", "detect"]
+    },
+
+    "routePattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regex": {
+          "type": "string",
+          "description": "JavaScript regex (string form) matched against source file contents. Capture groups identified by methodGroup and pathGroup extract the HTTP method and path. Uses the 'gi' flags (global, case-insensitive) by default.",
+          "minLength": 1
+        },
+        "methodGroup": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "1-based capture group index for the HTTP method. Use 0 when the method is not captured (defaults to GET)."
+        },
+        "pathGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based capture group index for the route path."
+        }
+      },
+      "required": ["regex", "pathGroup"]
+    },
+
+    "routesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Source file extensions to scan (e.g. ['.ts', '.js'], ['.go'], ['.py']). Required when using patterns; ignored when using script.",
+          "minItems": 1
+        },
+        "patterns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/routePattern" },
+          "description": "Declarative route extraction regexes. Mutually exclusive with script. At least one pattern required if script is absent.",
+          "minItems": 1
+        },
+        "script": {
+          "type": "string",
+          "description": "Path (relative to repo root) to a .ts/.js module exporting extractRoutes(sourceDir: string, framework: string | null): DetectedRoute[]. Mutually exclusive with patterns. Used for convention-based frameworks (Next.js app/page.tsx) that regex cannot express. The module is dynamically imported at scan time."
+        }
+      },
+      "description": "Exactly one of 'patterns' or 'script' must be present."
+    },
+
+    "modelPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regex": {
+          "type": "string",
+          "description": "JavaScript regex (string form) matched against schema file contents. Captures model/entity names.",
+          "minLength": 1
+        },
+        "nameGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based capture group index for the model name."
+        }
+      },
+      "required": ["regex", "nameGroup"]
+    },
+
+    "dataExtract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "models": {
+          "$ref": "#/$defs/modelPattern",
+          "description": "Regex to extract model/entity names from the schema file."
+        },
+        "relations": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to attempt relation extraction (future — not implemented in v1)."
+        },
+        "enums": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to extract enum definitions (future — not implemented in v1)."
+        }
+      },
+      "required": ["models"]
+    },
+
+    "resourcePattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regex": {
+          "type": "string",
+          "description": "JavaScript regex (string form) matched against IaC file contents. Captures resource type and name.",
+          "minLength": 1
+        },
+        "typeGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based capture group index for the resource type (e.g. 'aws_instance', 'google_compute_instance')."
+        },
+        "nameGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based capture group index for the resource name."
+        }
+      },
+      "required": ["regex", "typeGroup", "nameGroup"]
+    },
+
+    "infrastructureExtract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/resourcePattern" },
+          "description": "Regexes to extract infrastructure resources from IaC files.",
+          "minItems": 1
+        }
+      },
+      "required": ["resources"]
+    }
+  }
+}
