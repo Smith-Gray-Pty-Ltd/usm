@@ -23,6 +23,7 @@ import type {
 import { findUsmFiles, findAllUsmFiles, parseUsmFile, isServiceFile, isFeatureFile, findAllUsmDirs } from "../index.js";
 import { generateSequenceDiagrams } from "./mermaid.js";
 import { USM_UPSTREAM_TRACKER } from "./rulesFiles.js";
+import { renderFeatureReferenceBlock, type FeatureReferenceBlock } from "./contentBlocks.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -362,6 +363,16 @@ function generateFeatureMarkdown(
       lines.push(`- ${ref}`);
     }
     lines.push("");
+  }
+
+  // Reference blocks (user-facing content that survives the help filter)
+  // Rendered after all standard sections. Per the usm/gen-content-blocks spec.
+  const refBlocks = (file as FeatureUsm & { reference?: FeatureReferenceBlock[] }).reference;
+  if (refBlocks && refBlocks.length > 0) {
+    for (const ref of refBlocks) {
+      lines.push(renderFeatureReferenceBlock(ref));
+      lines.push("");
+    }
   }
 
   // Output path: determine which app this feature belongs to

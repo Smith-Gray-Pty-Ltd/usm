@@ -522,6 +522,11 @@
             }
           },
           "additionalProperties": false
+        },
+        "reference_pages": {
+          "type": "array",
+          "description": "Reference pages declared on system.usm — rendered by the generic content-block renderer. Replaces bespoke hardcoded generator functions.",
+          "items": { "$ref": "#/$defs/referencePage" }
         }
       },
       "required": [
@@ -1360,6 +1365,11 @@
         "command": {
           "type": "string",
           "description": "The user-facing name shown in reference docs, decoupled from the internal $id grouping. For CLI features this is the command as typed (e.g. 'init', 'scan', without the 'usm' prefix). For MCP features this is the tool name (e.g. 'usm_read', 'usm_report_feedback'). Optional — generators fall back to the $id's last segment when absent."
+        },
+        "reference": {
+          "type": "array",
+          "description": "User-facing reference blocks — rendered after standard feature doc sections. Unlike contracts, reference blocks with audience: public survive the help-doc filter.",
+          "items": { "$ref": "#/$defs/referenceBlock" }
         }
       },
       "required": [
@@ -1453,6 +1463,164 @@
         "status",
         "reported_by"
       ],
+      "additionalProperties": false
+    },
+    "contentBlock": {
+      "type": "object",
+      "description": "A structured content block for declarative VitePress-rich documentation. Each block has a type and type-specific properties. Used in reference_pages on system.usm and reference blocks on feature specs.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["heading", "paragraph", "code", "mermaid", "tabs", "callout", "table", "steps", "cards", "badge", "divider"],
+          "description": "The block type — determines which VitePress element is rendered."
+        },
+        "audience": {
+          "type": "string",
+          "enum": ["public", "internal"],
+          "description": "Controls help-doc inclusion. public survives the help filter; internal is stripped. Default: public."
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Heading level (for type: heading)."
+        },
+        "text": {
+          "type": "string",
+          "description": "Text content (for type: heading, paragraph, badge)."
+        },
+        "source": {
+          "type": "string",
+          "description": "Code source text (for type: code, mermaid)."
+        },
+        "language": {
+          "type": "string",
+          "description": "Code language for syntax highlighting (for type: code). E.g. bash, typescript, python, json, yaml."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional title for code blocks (VitePress code-group label)."
+        },
+        "highlight": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lines to highlight in code blocks (VitePress highlight option)."
+        },
+        "diagram": {
+          "type": "string",
+          "description": "Mermaid diagram source (for type: mermaid)."
+        },
+        "tabs": {
+          "type": "array",
+          "description": "Tab entries (for type: tabs).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "content": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/contentBlock" }
+              }
+            },
+            "required": ["label", "content"],
+            "additionalProperties": false
+          }
+        },
+        "variant": {
+          "type": "string",
+          "enum": ["info", "tip", "warning", "danger"],
+          "description": "Callout type (for type: callout). Maps to VitePress containers."
+        },
+        "content": {
+          "type": "array",
+          "description": "Nested content blocks (for type: callout, tabs).",
+          "items": { "$ref": "#/$defs/contentBlock" }
+        },
+        "headers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Table column headers (for type: table)."
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "description": "Table rows, each an array of cell strings (for type: table)."
+        },
+        "items": {
+          "type": "array",
+          "description": "Ordered step items (for type: steps) or card items (for type: cards).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string", "description": "Step text (for steps) or card title (for cards)." },
+              "code": { "type": "string", "description": "Inline code for a step (optional)." },
+              "description": { "type": "string", "description": "Card description (for cards)." },
+              "icon": { "type": "string", "description": "Card icon name (for cards, optional)." },
+              "link": { "type": "string", "description": "Card link URL (for cards, optional)." }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "referencePage": {
+      "type": "object",
+      "description": "A reference page declared on system.usm — rendered by the generic content-block renderer. Replaces bespoke hardcoded generator functions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Page identifier — used as the output filename (e.g. language-support -> language-support.md)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Page title (rendered as the H1)."
+        },
+        "audience": {
+          "type": "string",
+          "enum": ["public", "internal"],
+          "default": "internal",
+          "description": "public appears in help docs; internal only in developer docs."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["detectors", "schema", "config"],
+          "description": "Runtime source for generated content. detectors renders from the detector registry; schema from v1.json; config from usmconfig-v1.json. Mutually exclusive with content."
+        },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" },
+          "description": "Inline content blocks. Mutually exclusive with source."
+        }
+      },
+      "required": ["id", "title"],
+      "additionalProperties": false
+    },
+    "referenceBlock": {
+      "type": "object",
+      "description": "A user-facing reference block on a feature spec — rendered after standard sections. Unlike contracts, reference blocks with audience: public survive the help-doc filter.",
+      "properties": {
+        "heading": {
+          "type": "string",
+          "description": "Section heading for this reference block."
+        },
+        "audience": {
+          "type": "string",
+          "enum": ["public", "internal"],
+          "default": "internal",
+          "description": "public survives the help filter; internal is stripped from help docs."
+        },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" },
+          "description": "Content blocks for this reference section."
+        }
+      },
+      "required": ["heading", "content"],
       "additionalProperties": false
     }
   }

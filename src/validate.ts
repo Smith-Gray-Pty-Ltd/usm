@@ -71,7 +71,14 @@ export function validateUsm(file: UsmFile): ValidationResult {
     };
   }
 
-  const validate = ajv.compile(branchSchema);
+  // Inject the full $defs into the branch so $ref: "#/$defs/..." references
+  // resolve correctly when ajv compiles the branch in isolation.
+  const branchWithDefs = {
+    ...branchSchema,
+    $defs: defs,
+  };
+
+  const validate = ajv.compile(branchWithDefs);
   const valid = validate(file);
 
   if (!valid) {

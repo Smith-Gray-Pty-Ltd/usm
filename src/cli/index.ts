@@ -42,6 +42,7 @@ import {
   generatePerAppUiMap,
   generatePerAppTestSpecs,
 } from "../generators/markdown.js";
+import { generateReferencePages } from "../generators/referencePages.js";
 import {
   generateAllAppAgentsMd,
   generateRootAgentsMd,
@@ -1066,6 +1067,7 @@ program
         { name: "mcp-reference", target: "docs", fn: () => generateMcpReference(root) },
         { name: "language-support", target: "docs", fn: () => generateLanguageSupportDoc(root) },
         { name: "agent-setup-guide", target: "docs", fn: () => generateAgentSetupGuide(root) },
+        { name: "reference-pages", target: "docs", fn: () => generateReferencePages(systemFile, root) },
         { name: "feedback", target: "docs", fn: () => generateFeedbackPage(systemFile, root) },
         { name: "shared-services-index", target: "docs", fn: () => generateSharedServicesIndex(serviceFiles, root) },
         { name: "packages-index", target: "docs", fn: () => generatePackagesIndex(serviceFiles, root) },
