@@ -111,6 +111,76 @@ export interface SystemUsm extends UsmCommon {
   auth_schemes?: AuthScheme[];
   local_development?: LocalDevelopment;
   feedback?: FeedbackPolicy;
+  // ─── Technical Design Document fields ───────────────────────────────────
+  stakeholders?: Stakeholder[];
+  assumptions?: string[];
+  non_functional?: NonFunctionalRequirements;
+  testing_strategy?: TestingStrategy;
+  error_tracking?: ErrorTracking;
+  backup_recovery?: BackupRecovery;
+  security_stack?: SecurityStack;
+  design_pages?: DesignPage[];
+}
+
+/** Stakeholder — a person or group involved with or impacted by the project. */
+export interface Stakeholder {
+  name: string;
+  role: string;
+  contact?: string;
+}
+
+/** Non-functional requirements by category. */
+export interface NonFunctionalRequirements {
+  performance?: NonFunctionalRequirement;
+  scalability?: NonFunctionalRequirement;
+  security?: NonFunctionalRequirement;
+  reliability?: NonFunctionalRequirement;
+  maintainability?: NonFunctionalRequirement;
+}
+
+/** A single non-functional requirement with a target and description. */
+export interface NonFunctionalRequirement {
+  target: string;
+  description?: string;
+}
+
+/** Project-level testing strategy beyond per-service config. */
+export interface TestingStrategy {
+  performance_testing?: string;
+  security_testing?: string;
+  automated_testing?: string;
+  ci_integration?: string;
+}
+
+/** Error tracking tool and configuration. */
+export interface ErrorTracking {
+  tool: string;
+  config_ref?: string;
+  dsn?: string;
+}
+
+/** System-level backup and disaster recovery. */
+export interface BackupRecovery {
+  backup_strategy?: string;
+  disaster_recovery?: string;
+  rto_minutes?: number;
+  rpo_minutes?: number;
+}
+
+/** Defense-in-depth security stack. */
+export interface SecurityStack {
+  first_line?: string;
+  last_line?: string;
+  notes?: string;
+}
+
+/** Design section page with inline content blocks — enriches the tech design generator. */
+export interface DesignPage {
+  id: string;
+  title?: string;
+  audience?: string;
+  content?: unknown[]; // ContentBlock[] — typed loosely to avoid circular import
+  source?: string;
 }
 
 /**

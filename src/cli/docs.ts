@@ -2,8 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
 import { spawn, execSync } from "node:child_process";
-import { parseUsmFile, isFeatureFile } from "../parse.js";
-import type { SystemUsm, FeatureUsm } from "../types.js";
+import { parseUsmFile, isFeatureFile, findAllUsmFiles } from "../parse.js";
+import type { SystemUsm, FeatureUsm, ServiceUsm, DataUsm } from "../types.js";
+import { getDesignSections, DESIGN_SECTION_LABELS } from "../generators/technicalDesign.js";
 
 type Audience = "developer" | "help";
 
@@ -535,18 +536,20 @@ const STATUS_ORDER: Record<string, number> = {
  * Generate a VitePress sidebar from the system.usm index and feature files.
  * Only includes links to files that actually exist in the docs directory.
  *
- * Help audience uses the public-facing group order:
- *   Getting Started · Core Concepts · Workflows · Schema Reference ·
- *   Generated Outputs · Roadmap · Contributing
- * Developer audience keeps deeper technical groups (Architecture, Deployment).
+ * Five-group template (applies to any project):
+ *   1. Getting Started — Home, Getting Started
+ *   2. Design — 13 section pages (only rendered ones)
+ *   3. Project Management — Roadmap, Features (grouped by area), Decision Register
+ *   4. Developers — Source Map, Test Coverage, Spec Coverage, API Reference, CLI Reference, Configuration
+ *   5. Exports — TOGAF Phases, ArchiMate Model (collapsed)
+ *
+ * Groups and pages only appear when their data exists.
  */
 function generateSidebar(root: string, docsRoot: string, audience: Audience = "developer"): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
   const featuresRoot = path.join(docsRoot, "features");
   const sidebar: SidebarGroup[] = [];
 
-  // A doc "exists" as either `<relPath>.md` (flat file) or `<relPath>/index.md`
-  // (consolidated feature directory) — both are valid VitePress routes.
   function docExists(relPath: string): boolean {
     return (
       fs.existsSync(path.join(docsRoot, relPath + ".md")) ||
@@ -554,24 +557,18 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     );
   }
 
-  // Normalised link (no trailing slash) → already covered by the sidebar
-  const coveredLinks = new Set<string>();
-  const coverLink = (link: string): void => {
-    coveredLinks.add(link.replace(/\/+$/, ""));
-  };
-
   function pushIfAny(text: string, items: SidebarItem[], collapsed = false): void {
     if (items.length === 0) return;
     sidebar.push(collapsed ? { text, collapsed: true, items } : { text, items });
   }
 
-  // ── Getting Started ────────────────────────────────────────────────────────
+  // ── 1. Getting Started ──────────────────────────────────────────────────────
   const gettingStarted: SidebarItem[] = [];
   gettingStarted.push({ text: "Home", link: "/" });
   if (docExists("getting-started")) {
     gettingStarted.push({ text: "Getting Started", link: "/getting-started" });
   }
-  if (docExists("agent-setup-guide")) {
+  if (audience === "developer" && docExists("agent-setup-guide")) {
     gettingStarted.push({ text: "Agent Setup Guide", link: "/agent-setup-guide" });
   }
   pushIfAny("Getting Started", gettingStarted);
@@ -579,59 +576,43 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
   if (!fs.existsSync(systemPath)) return sidebar;
   const system = parseUsmFile(systemPath) as SystemUsm;
 
-  // ── Core Concepts ──────────────────────────────────────────────────────────
-  const coreConcepts: SidebarItem[] = [];
-  if (docExists("schema-reference")) {
-    coreConcepts.push({ text: "Schema Reference", link: "/schema-reference" });
-  }
-  if (docExists("language-support")) {
-    coreConcepts.push({ text: "Language Support", link: "/language-support" });
-  }
-  // Services (shared) as concept overviews
-  if (system.services) {
-    for (const svc of system.services) {
-      const relPath = `shared-services/${svc.id}/overview`;
-      if (docExists(relPath)) {
-        coreConcepts.push({ text: svc.name || svc.id, link: `/${relPath}` });
-      }
-    }
-  }
-  pushIfAny("Core Concepts", coreConcepts, true);
-
-  // ── Code Map (source mapping views) ──────────────────────────────────────────
-  const codeMap: SidebarItem[] = [];
-  if (docExists("code-navigator")) {
-    codeMap.push({ text: "Code Navigator", link: "/code-navigator" });
-  }
-  if (docExists("spec-coverage")) {
-    codeMap.push({ text: "Spec Coverage", link: "/spec-coverage" });
-  }
-  if (docExists("orphan-files")) {
-    codeMap.push({ text: "Unspecced Files", link: "/orphan-files" });
-  }
-  pushIfAny("Code Map", codeMap, true);
-
-  // ── Workflows ──────────────────────────────────────────────────────────────
-  const workflows: SidebarItem[] = [];
-  if (docExists("cli-reference")) {
-    workflows.push({ text: "CLI Reference", link: "/cli-reference" });
-  }
-  if (docExists("mcp-reference")) {
-    workflows.push({ text: "MCP Tools", link: "/mcp-reference" });
-  }
-  if (docExists("config-reference")) {
-    workflows.push({ text: "Configuration", link: "/config-reference" });
-  }
-  pushIfAny("Workflows", workflows);
-
-  // ── Schema Reference (promoted for help docs) ──────────────────────────────
-  // Already linked under Core Concepts; for help audience also surface as its own group
-  // when schema-reference is the primary destination.
-  if (audience === "help" && docExists("schema-reference")) {
-    // Keep a short dedicated entry group only if not already obvious — skip duplicate
+  // Parse all .usm files for design section detection
+  const allUsmPaths = findAllUsmFiles(root);
+  const serviceFiles: ServiceUsm[] = [];
+  const featureFiles: FeatureUsm[] = [];
+  const dataFiles: DataUsm[] = [];
+  for (const p of allUsmPaths) {
+    try {
+      const parsed = parseUsmFile(p);
+      if (parsed.$type === "service") serviceFiles.push(parsed as ServiceUsm);
+      else if (parsed.$type === "feature") featureFiles.push(parsed as FeatureUsm);
+      else if (parsed.$type === "data") dataFiles.push(parsed as DataUsm);
+    } catch { /* ignore */ }
   }
 
-  // ── Generated Outputs (features by area) ───────────────────────────────────
+  // ── 2. Design (13 section pages, only rendered ones) ───────────────────────
+  const designSections = getDesignSections(system, serviceFiles, featureFiles, dataFiles);
+  const designItems: SidebarItem[] = [];
+  for (const sectionId of designSections) {
+    const label = DESIGN_SECTION_LABELS[sectionId] || sectionId;
+    designItems.push({ text: label, link: `/design/${sectionId}` });
+  }
+  pushIfAny("Design", designItems);
+
+  // ── 3. Project Management ──────────────────────────────────────────────────
+  const pmItems: (SidebarItem | SidebarGroup)[] = [];
+
+  // Roadmap
+  if (docExists("roadmap")) {
+    pmItems.push({ text: "Roadmap", link: "/roadmap" });
+  }
+
+  // Features (grouped by service/area)
+  const coveredLinks = new Set<string>();
+  const coverLink = (link: string): void => {
+    coveredLinks.add(link.replace(/\/+$/, ""));
+  };
+
   const featuresByArea = new Map<string, SidebarItem[]>();
   const flatFeatures: SidebarItem[] = [];
   if (system.index) {
@@ -643,10 +624,7 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
       const areaDisplay = areaDisplayName(area);
       const relPath = `features/${area}/${slug}`;
       if (!docExists(relPath)) continue;
-
       if (!featuresByArea.has(areaDisplay)) featuresByArea.set(areaDisplay, []);
-
-      // Help docs already filter non-built features; still badge planned if present
       const statusBadge = feat.status === "planned" ? " [planned]"
         : feat.status === "deprecated" ? " [deprecated]"
         : feat.status === "in-progress" ? " [in-progress]"
@@ -659,42 +637,28 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     }
   }
 
-  // ── Feature docs on disk not covered by system.index ──────────────────────
-  // system.index only lists NESTED feature refs (.usm/features/<area>/<slug>.usm).
-  // Flat feature specs (.usm/features/<slug>.usm → docs/features/<slug>/index.md)
-  // and any index gaps would leave generated docs unreachable from the sidebar
-  // (issue #11). Enumerate the docs/features directory as a fallback so every
-  // generated feature doc is wired into navigation exactly once.
+  // Feature docs on disk not covered by system.index
   if (fs.existsSync(featuresRoot)) {
     const diskFeaturesByArea = new Map<string, SidebarItem[]>();
-
     const titleFromSlug = (slug: string): string =>
-      slug
-        .split(/[-_/]/)
-        .map((w) => AREA_ACRONYMS[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-
+      slug.split(/[-_/]/).map((w) => AREA_ACRONYMS[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     const addDiskFeature = (areaDisplay: string | null, slug: string, link: string): void => {
       if (coveredLinks.has(link.replace(/\/+$/, ""))) return;
       const item = { text: titleFromSlug(slug), link };
-      if (areaDisplay === null) {
-        flatFeatures.push(item);
-      } else {
+      if (areaDisplay === null) flatFeatures.push(item);
+      else {
         if (!diskFeaturesByArea.has(areaDisplay)) diskFeaturesByArea.set(areaDisplay, []);
         diskFeaturesByArea.get(areaDisplay)!.push(item);
       }
       coverLink(link);
     };
-
     const featureEntries = fs.readdirSync(featuresRoot, { withFileTypes: true });
     for (const entry of featureEntries) {
       if (entry.isDirectory()) {
         const indexPath = path.join(featuresRoot, entry.name, "index.md");
         if (fs.existsSync(indexPath)) {
-          // Flat feature: docs/features/<slug>/index.md
           addDiskFeature(null, entry.name, `/features/${entry.name}/`);
         } else {
-          // Nested features under an area dir: docs/features/<area>/<slug>.md
           const areaDisplay = areaDisplayName(entry.name);
           const areaDir = path.join(featuresRoot, entry.name);
           for (const md of fs.readdirSync(areaDir)) {
@@ -705,11 +669,9 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
           }
         }
       } else if (entry.name.endsWith(".md") && entry.name !== "index.md") {
-        // Flat feature written as a bare .md file
         addDiskFeature(null, entry.name.replace(/\.md$/, ""), `/features/${entry.name.replace(/\.md$/, "")}`);
       }
     }
-
     for (const [areaDisplay, items] of [...diskFeaturesByArea.entries()].sort()) {
       items.sort((a, b) => a.text.localeCompare(b.text));
       featuresByArea.set(areaDisplay, [...(featuresByArea.get(areaDisplay) || []), ...items]);
@@ -733,81 +695,94 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
       });
       featureSubGroups.push({ text: area, collapsed: true, items });
     }
-
-    // Flat feature docs (no area grouping) sit directly under the group —
-    // VitePress sidebars accept mixed link items and nested groups.
     flatFeatures.sort((a, b) => a.text.localeCompare(b.text));
     featureSubGroups.unshift(...flatFeatures);
-
-    sidebar.push({
-      text: audience === "help" ? "Generated Outputs" : "Features",
-      collapsed: false,
-      items: featureSubGroups,
-    });
+    pmItems.push({ text: "Features", collapsed: true, items: featureSubGroups });
   }
 
-  // ── Developer-only: Architecture (TOGAF detailed design) + Deployment ──────
-  if (audience === "developer") {
-    const archItems: SidebarItem[] = [];
-    if (docExists("architecture/architecture")) {
-      archItems.push({ text: "System Architecture", link: "/architecture/architecture" });
-    }
+  // Decision Register
+  if (docExists("design/decision-register")) {
+    pmItems.push({ text: "Decision Register", link: "/design/decision-register" });
+  }
 
-    // TOGAF ADM Phase deliverables — the real detailed design content
+  if (pmItems.length > 0) {
+    sidebar.push({ text: "Project Management", items: pmItems });
+  }
+
+  // ── 4. Developers ──────────────────────────────────────────────────────────
+  const devItems: SidebarItem[] = [];
+
+  // Source Map / Test Coverage / Spec Coverage
+  if (docExists("code-navigator")) devItems.push({ text: "Source Map", link: "/code-navigator" });
+  if (docExists("spec-coverage")) devItems.push({ text: "Spec Coverage", link: "/spec-coverage" });
+  if (docExists("orphan-files")) devItems.push({ text: "Orphan Files", link: "/orphan-files" });
+
+  // Reference pages (only if data exists)
+  if (audience === "developer" && docExists("schema-reference")) {
+    devItems.push({ text: "Schema Reference", link: "/schema-reference" });
+  }
+  if (docExists("cli-reference")) devItems.push({ text: "CLI Reference", link: "/cli-reference" });
+  if (docExists("config-reference")) devItems.push({ text: "Configuration", link: "/config-reference" });
+  if (docExists("mcp-reference")) devItems.push({ text: "MCP Tools", link: "/mcp-reference" });
+
+  // Per-app API reference
+  const apiRefDirs = fs.readdirSync(docsRoot, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(docsRoot, e.name, "api-reference.md")));
+  for (const dir of apiRefDirs) {
+    devItems.push({ text: `${areaDisplayName(dir.name)} API`, link: `/${dir.name}/api-reference` });
+  }
+
+  pushIfAny("Developers", devItems, true);
+
+  // ── 5. Exports (collapsed) ──────────────────────────────────────────────────
+  if (audience === "developer") {
+    const exportItems: (SidebarItem | SidebarGroup)[] = [];
+
+    // TOGAF Phases
+    const togafGroup: SidebarItem[] = [];
+    if (docExists("architecture/architecture")) {
+      togafGroup.push({ text: "Overview", link: "/architecture/architecture" });
+    }
     const togafPages: Array<{ file: string; label: string }> = [
-      { file: "architecture/A-architecture-vision", label: "Architecture Vision" },
-      { file: "architecture/B-business-architecture", label: "Business Architecture" },
-      { file: "architecture/C1-data-architecture", label: "Data Architecture" },
-      { file: "architecture/C2-application-architecture", label: "Application Architecture" },
-      { file: "architecture/D-technology-architecture", label: "Technology Architecture" },
-      { file: "architecture/E-opportunities-and-solutions", label: "Opportunities & Solutions" },
-      { file: "architecture/G-implementation-governance", label: "Implementation Governance" },
-      { file: "architecture/H-architecture-change-management", label: "Change Management" },
+      { file: "architecture/A-architecture-vision", label: "Phase A — Vision" },
+      { file: "architecture/B-business-architecture", label: "Phase B — Business" },
+      { file: "architecture/C1-data-architecture", label: "Phase C1 — Data" },
+      { file: "architecture/C2-application-architecture", label: "Phase C2 — Application" },
+      { file: "architecture/D-technology-architecture", label: "Phase D — Technology" },
+      { file: "architecture/E-opportunities-and-solutions", label: "Phase E — Solutions" },
+      { file: "architecture/G-implementation-governance", label: "Phase G — Governance" },
+      { file: "architecture/H-architecture-change-management", label: "Phase H — Change Mgmt" },
     ];
     for (const page of togafPages) {
-      if (docExists(page.file)) {
-        archItems.push({ text: page.label, link: `/${page.file}` });
-      }
+      if (docExists(page.file)) togafGroup.push({ text: page.label, link: `/${page.file}` });
     }
 
-    if (docExists("data/models")) {
-      archItems.push({ text: "Data Models", link: "/data/models" });
+    // ArchiMate
+    const archiGroup: SidebarItem[] = [];
+    if (docExists("architecture/archimate")) {
+      archiGroup.push({ text: "ArchiMate Model", link: "/architecture/archimate" });
     }
-    pushIfAny("Architecture", archItems, true);
 
-    const deployItems: SidebarItem[] = [];
-    if (docExists("deployment")) {
-      deployItems.push({ text: "Deployment", link: "/deployment" });
+    if (togafGroup.length > 0) exportItems.push({ text: "TOGAF Phases", collapsed: true, items: togafGroup });
+    if (archiGroup.length > 0) exportItems.push({ text: "ArchiMate", collapsed: true, items: archiGroup });
+
+    // Risks (if not already in Design)
+    if (docExists("risks")) {
+      exportItems.push({ text: "Risks", link: "/risks" });
     }
-    pushIfAny("Deployment", deployItems, true);
+
+    if (exportItems.length > 0) {
+      sidebar.push({ text: "Exports", collapsed: true, items: exportItems });
+    }
   }
 
-  // ── Roadmap ────────────────────────────────────────────────────────────────
-  const roadmapItems: SidebarItem[] = [];
-  if (docExists("roadmap")) {
-    roadmapItems.push({ text: "Roadmap", link: "/roadmap" });
+  // ── Help audience extras ────────────────────────────────────────────────────
+  if (audience === "help") {
+    const helpExtras: SidebarItem[] = [];
+    if (docExists("language-support")) helpExtras.push({ text: "Language Support", link: "/language-support" });
+    if (docExists("feedback")) helpExtras.push({ text: "Report Issue", link: "/feedback" });
+    pushIfAny("Help", helpExtras, true);
   }
-  if (audience === "developer" && docExists("risks")) {
-    roadmapItems.push({ text: "Risks", link: "/risks" });
-  }
-  pushIfAny("Roadmap", roadmapItems);
-
-  // ── Contributing ───────────────────────────────────────────────────────────
-  const contributing: SidebarItem[] = [];
-  if (docExists("agent-setup-guide")) {
-    contributing.push({ text: "Agent Setup", link: "/agent-setup-guide" });
-  }
-  if (docExists("feedback")) {
-    contributing.push({ text: "Report Issue", link: "/feedback" });
-  }
-  if (system.identity?.repository) {
-    // External link style not supported as sidebar item link to external in all themes;
-    // keep internal pages only. Repo link lives in socialLinks / homepage CTAs.
-  }
-  if (docExists("cli-reference")) {
-    contributing.push({ text: "CLI for contributors", link: "/cli-reference" });
-  }
-  pushIfAny("Contributing", contributing, true);
 
   return sidebar;
 }
@@ -1225,20 +1200,28 @@ function startWatchMode(root: string, docsRoot: string, audience: Audience): () 
     changedCount = 0;
 
     try {
-      // Run generate in-process via a subprocess call to usm generate --only docs
+      // Run generate in-process via a subprocess call to the built CLI
       const { execSync } = await import("node:child_process");
-      execSync("npx tsx src/cli/index.ts generate --only docs", {
-        cwd: root,
-        stdio: "pipe",
-        timeout: 30000,
-      });
+      const cliPath = path.join(root, "dist", "cli", "index.js");
+      const fallbackPath = path.join(root, "src", "cli", "index.ts");
+      let cmd: string;
+      if (fs.existsSync(cliPath)) {
+        cmd = `node "${cliPath}" generate --only docs`;
+      } else if (fs.existsSync(fallbackPath)) {
+        cmd = `npx tsx "${fallbackPath}" generate --only docs`;
+      } else {
+        throw new Error("Could not find CLI entrypoint (dist or src)");
+      }
+      execSync(cmd, { cwd: root, stdio: "pipe", timeout: 30000 });
       console.log(`Regenerated docs (${count} file${count !== 1 ? "s" : ""} changed)`);
     } catch (err) {
       console.error("Watch regeneration failed:", (err as Error).message);
     }
   };
 
-  // Watch .usm/ recursively
+  // Watch .usm/ recursively — walk all subdirectories and watch each
+  const watchedWatchers: fs.FSWatcher[] = [];
+
   const watchDir = (dir: string) => {
     try {
       const watcher = fs.watch(dir, { recursive: false }, (_event, filename) => {
@@ -1248,17 +1231,33 @@ function startWatchMode(root: string, docsRoot: string, audience: Audience): () 
           debounceTimer = setTimeout(regenerate, 500);
         }
       });
-      return watcher;
+      watchedWatchers.push(watcher);
     } catch {
-      return null;
+      // ignore — directory may have been removed
     }
   };
 
-  const watcher = watchDir(usmDir);
-  console.log("Watching .usm/ for changes...");
+  // Watch the root .usm/ dir and all subdirectories recursively
+  const walkAndWatch = (dir: string) => {
+    watchDir(dir);
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          walkAndWatch(path.join(dir, entry.name));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  walkAndWatch(usmDir);
+  console.log(`Watching .usm/ for changes (recursive, ${watchedWatchers.length} directories)...`);
 
   return () => {
-    if (watcher) watcher.close();
+    for (const w of watchedWatchers) {
+      try { w.close(); } catch { /* ignore */ }
+    }
     if (debounceTimer) clearTimeout(debounceTimer);
   };
 }

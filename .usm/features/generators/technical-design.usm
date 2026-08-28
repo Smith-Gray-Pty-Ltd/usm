@@ -1,0 +1,687 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-technical-design
+$type: feature
+$version: 1
+$last_updated: "2026-08-28"
+summary: >-
+  Technical Design Document generator — renders a 13-section detailed design document from .usm
+  specs. The universal "how is this system designed end-to-end" reading path. Each section is its
+  own page, rendered only when data exists. Adapts to any project type (CLI tool, SaaS platform,
+  library, monorepo). Adds new schema fields for stakeholders, assumptions, personas, non-functional
+  requirements, testing strategy, and backup/recovery. Restructures the generated sidebar into five
+  groups: Getting Started, Design (13 pages), Project Management (roadmap, features, decisions),
+  Developers (source map, coverage, references), Exports (TOGAF, ArchiMate).
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Every engineering team needs a detailed design document that ties the whole system together —
+  project overview, requirements, architecture, modules, database, API, security, deployment,
+  testing, maintenance, backup, risks, and future plans. USM specs already contain most of this
+  data, but it's scattered across feature docs, TOGAF phases, and service pages. This generator
+  assembles it into one coherent reading path that works for any project type. It follows the first
+  principle that generators are renderers, not authors — structured data from specs drives every
+  section, with optional content-block enrichment from system.usm for prose that doesn't fit
+  structured fields.
+status: built
+flows:
+  - id: gen-design-doc
+    name: Generate the 13-section technical design document
+    description: >-
+      usm generate runs the technical-design generator. It reads all .usm files (system, services,
+      features, data) and renders up to 13 pages under .usm-workspace/docs/design/. Each page is
+      only rendered if its data source exists. The generator then updates the sidebar config with
+      the Design group containing only the rendered pages.
+    steps:
+      - id: s1
+        action: parse
+        target: system.usm + all service, feature, and data .usm files
+      - id: s2
+        action: determine
+        target: which of the 13 sections have data
+      - id: s3
+        action: generate
+        target: one markdown page per section that has data, to .usm-workspace/docs/design/
+      - id: s4
+        action: enrich
+        target: sections with inline content blocks declared on system.usm (if any)
+      - id: s5
+        action: update
+        target: sidebar config with Design group containing only rendered pages
+  - id: render-project-overview
+    name: Render Project Overview page
+    description: >-
+      Section 1. Reads system.identity (name, domain, repository), system.summary, system.roles (as
+      stakeholders/personas), new system.stakeholders[], new system.assumptions[], and system.index
+      (features as use-cases). Renders project name, description, stakeholders table, assumptions
+      list, and core use-cases summary.
+    steps:
+      - id: s1
+        action: read
+        target: system.identity for name, domain, repository
+      - id: s2
+        action: read
+        target: system.summary for project description
+      - id: s3
+        action: read
+        target: system.roles and system.stakeholders for stakeholder table
+      - id: s4
+        action: read
+        target: system.assumptions for assumptions list
+      - id: s5
+        action: read
+        target: system.index to summarise core features as use-cases
+      - id: s6
+        action: render
+        target: markdown page with escaped prose, tables, and content-block enrichment
+  - id: render-requirements
+    name: Render Requirements page
+    description: >-
+      Section 2. Functional requirements from features (summary + intent). Non-functional
+      requirements from new system.non_functional{} object with sub-fields for performance,
+      scalability, security, reliability, maintainability. Renders two sub-sections with feature
+      table and NFR table.
+    steps:
+      - id: s1
+        action: read
+        target: all feature .usm files for functional requirements (summary, intent, status)
+      - id: s2
+        action: read
+        target: system.non_functional for NFRs
+      - id: s3
+        action: render
+        target: Functional Requirements as a table of features with descriptions
+      - id: s4
+        action: render
+        target: Non-Functional Requirements as a table with category, requirement, target
+  - id: render-system-architecture
+    name: Render System Architecture page
+    description: >-
+      Section 3. High-level diagram from Mermaid (services + dependencies). Technology stack from
+      service.tech_stack across all services. System components from system.services + system.apis.
+      Renders diagram, tech stack table, and component list.
+    steps:
+      - id: s1
+        action: generate
+        target: high-level Mermaid diagram from system.services and depends_on
+      - id: s2
+        action: collect
+        target: tech_stack from all services, merged by layer
+      - id: s3
+        action: read
+        target: system.services for component list with types and ports
+      - id: s4
+        action: read
+        target: system.apis for third-party service dependencies
+      - id: s5
+        action: render
+        target: diagram, tech stack table, components table
+  - id: render-module-design
+    name: Render Module Design page
+    description: >-
+      Section 4. Per-module breakdown from service.modules[]. For each module: name, purpose,
+      inputs, outputs, dependencies, and a flow description (from features whose
+      implementation.primary is in the module). Renders one sub-section per module.
+    steps:
+      - id: s1
+        action: read
+        target: all service .usm files for modules[]
+      - id: s2
+        action: match
+        target: features to modules via implementation.primary path
+      - id: s3
+        action: render
+        target: per-module sub-section with name, purpose, inputs, outputs, dependencies, flow
+  - id: render-database-design
+    name: Render Database Design page
+    description: >-
+      Section 5. ER diagram from data .usm files or detected ORM schema. Schema design from data.usm
+      models. Indexes from data.usm index definitions. Transactions from data.usm transaction
+      strategies. Renders ER diagram, schema tables, index list, transaction notes. Only rendered if
+      data .usm files or a detected ORM schema exist.
+    steps:
+      - id: s1
+        action: read
+        target: data .usm files for models, indexes, transactions
+      - id: s2
+        action: read
+        target: system.data for data references
+      - id: s3
+        action: generate
+        target: ER diagram (Mermaid) from data models
+      - id: s4
+        action: render
+        target: schema design tables, index list, transaction notes
+  - id: render-api-design
+    name: Render API Design page
+    description: >-
+      Section 6. Endpoints from feature.routes[]. HTTP method, URL, request/response structure.
+      Authentication from system.auth_schemes and service.security. Authorization from service.rbac
+      (roles, resources, permissions). Rate limiting from route-level or service-level config. Error
+      handling conventions. Renders endpoint table, auth summary, authz matrix, rate limiting notes,
+      error format. Only rendered if any feature has routes.
+    steps:
+      - id: s1
+        action: collect
+        target: all feature routes[] across all services
+      - id: s2
+        action: read
+        target: system.auth_schemes for authentication methods
+      - id: s3
+        action: read
+        target: service.rbac for authorization model
+      - id: s4
+        action: read
+        target: route-level or service-level rate limiting config
+      - id: s5
+        action: render
+        target: endpoint table, auth summary, RBAC matrix, rate limits, error format
+  - id: render-security-design
+    name: Render Security Design page
+    description: >-
+      Section 7. Authentication/authorization from system.auth_schemes and service.rbac. Data
+      encryption from service.security and infrastructure TLS config. Security auditing from
+      system.operations and service.infrastructure.monitoring. Vulnerabilities from system.risks
+      where severity is high/critical. Security stack from new system.security_stack{} field (first
+      line, last line of defense). Renders auth summary, encryption table, audit notes,
+      vulnerability list, security stack.
+    steps:
+      - id: s1
+        action: read
+        target: system.auth_schemes and service.security for auth/encryption
+      - id: s2
+        action: read
+        target: service.rbac for RBAC model
+      - id: s3
+        action: read
+        target: service.infrastructure for TLS, secrets, monitoring
+      - id: s4
+        action: read
+        target: system.risks filtered by severity for vulnerabilities
+      - id: s5
+        action: read
+        target: system.security_stack for defense-in-depth layers
+      - id: s6
+        action: render
+        target: auth summary, encryption table, audit notes, vulnerability list, security stack
+  - id: render-deployment-architecture
+    name: Render Deployment Architecture page
+    description: >-
+      Section 8. Deployment diagram (Mermaid) from system.infrastructure and service.infrastructure.
+      Environment setup from system.deployment.environments (development, staging, production).
+      Scaling strategy from service.infrastructure.scaling and system.infrastructure. Monitoring
+      stack from system.operations and service.infrastructure.monitoring. Renders diagram,
+      environment table, scaling notes, monitoring stack. Only rendered if deployment or
+      infrastructure data exists.
+    steps:
+      - id: s1
+        action: generate
+        target: deployment Mermaid diagram from infrastructure data
+      - id: s2
+        action: read
+        target: system.deployment.environments for environment table
+      - id: s3
+        action: read
+        target: service.infrastructure.scaling for scaling strategy
+      - id: s4
+        action: read
+        target: system.operations and service.infrastructure.monitoring for monitoring stack
+      - id: s5
+        action: render
+        target: diagram, environment table, scaling notes, monitoring stack
+  - id: render-testing-strategy
+    name: Render Testing Strategy page
+    description: >-
+      Section 9. Unit testing from service.testing (framework, command, coverage target).
+      Integration testing from service.testing_details. Acceptance testing from feature.tests[].
+      Performance testing and security testing from new system.testing_strategy{} field. Automated
+      testing from CI integration notes in system.testing_strategy. Renders per-layer testing table
+      with framework, command, and notes.
+    steps:
+      - id: s1
+        action: read
+        target: service.testing and service.testing_details for unit/integration
+      - id: s2
+        action: read
+        target: feature.tests[] for acceptance test count and coverage
+      - id: s3
+        action: read
+        target: system.testing_strategy for performance, security, automated testing policies
+      - id: s4
+        action: render
+        target: >-
+          testing strategy table per layer (unit, integration, acceptance, performance, security,
+          automated)
+  - id: render-maintenance-monitoring
+    name: Render Maintenance & Monitoring page
+    description: >-
+      Section 10. Logging from system.operations and service.infrastructure.monitoring.logs.
+      Alerting from system.operations.alerts. System health monitoring from
+      service.infrastructure.monitoring.metrics. Error tracking from new system.error_tracking{}
+      field. Renders logging strategy, alerting config, health metrics, error tracking tool.
+    steps:
+      - id: s1
+        action: read
+        target: system.operations for monitoring, alerts, on-call
+      - id: s2
+        action: read
+        target: service.infrastructure.monitoring for logs, metrics, alarms
+      - id: s3
+        action: read
+        target: system.error_tracking for error tracking tool and config
+      - id: s4
+        action: render
+        target: logging strategy, alerting config, health metrics table, error tracking notes
+  - id: render-backup-recovery
+    name: Render Backup & Recovery page
+    description: >-
+      Section 11. Backup strategy from service.infrastructure.data.backup_retention_days and new
+      system.backup_recovery{} field. Disaster recovery from
+      service.infrastructure.disaster_recovery (rto_minutes, rpo_minutes) and
+      system.backup_recovery. Renders backup schedule table, RTO/RPO targets, disaster recovery
+      plan. Only rendered if backup or DR data exists.
+    steps:
+      - id: s1
+        action: read
+        target: service.infrastructure.data for backup_retention_days
+      - id: s2
+        action: read
+        target: service.infrastructure.disaster_recovery for rto/rpo
+      - id: s3
+        action: read
+        target: system.backup_recovery for backup strategy and DR plan
+      - id: s4
+        action: render
+        target: backup schedule table, RTO/RPO targets, DR plan summary
+  - id: render-risks-mitigation
+    name: Render Risks & Mitigation page
+    description: >-
+      Section 12. Technical risks from system.risks[] (all items). Mitigation strategies from each
+      risk's mitigation field. Also includes service-level risks from service.risks[]. Renders risk
+      table with ID, title, severity, status, mitigation, and a severity summary chart.
+    steps:
+      - id: s1
+        action: read
+        target: system.risks for system-level risks
+      - id: s2
+        action: read
+        target: service.risks for service-level risks
+      - id: s3
+        action: render
+        target: risk table with ID, title, severity, status, mitigation
+      - id: s4
+        action: render
+        target: severity summary grouped by severity level
+  - id: render-future-enhancements
+    name: Render Future Enhancements page
+    description: >-
+      Section 13. Roadmap from system.roadmap[] (planned and in-progress items). Scalability
+      considerations from service.infrastructure.scaling and service.future[] items. Renders roadmap
+      table with status badges, target dates, and future items list grouped by service.
+    steps:
+      - id: s1
+        action: read
+        target: system.roadmap for roadmap items
+      - id: s2
+        action: read
+        target: service.future for per-service future items
+      - id: s3
+        action: read
+        target: service.infrastructure.scaling for scalability considerations
+      - id: s4
+        action: render
+        target: roadmap table with status, target date, and feature link
+      - id: s5
+        action: render
+        target: future items grouped by service, scalability notes
+  - id: render-decision-register
+    name: Render Decision Register page
+    description: >-
+      Consolidates all decisions[] from features, services, and system.principles into one page.
+      Each decision shows ID, decision text, status, rationale, alternatives considered,
+      consequences, date, and source. Renders a table view and a detailed view.
+    steps:
+      - id: s1
+        action: collect
+        target: decisions[] from all feature .usm files
+      - id: s2
+        action: collect
+        target: decisions[] from all service .usm files
+      - id: s3
+        action: collect
+        target: system.principles as architecture decisions
+      - id: s4
+        action: render
+        target: summary table (ID, decision, status, source) and detailed per-decision breakdown
+  - id: restructure-sidebar
+    name: Restructure sidebar into five groups
+    description: >-
+      The docs sidebar generator is updated to produce five top-level groups: Getting Started (Home,
+      Getting Started), Design (13 pages, only rendered ones), Project Management (Roadmap, Features
+      grouped by area, Decision Register), Developers (Source Map, Test Coverage, Spec Coverage, API
+      Reference, CLI Reference, Configuration), Exports (TOGAF Phases, ArchiMate Model). Groups and
+      pages only appear if data exists. The existing Core Concepts, Workflows, Architecture,
+      Deployment, and Contributing groups are replaced by this structure.
+    steps:
+      - id: s1
+        action: determine
+        target: which Design pages have data (same logic as gen-design-doc)
+      - id: s2
+        action: build
+        target: Getting Started group from index + getting-started page
+      - id: s3
+        action: build
+        target: Design group with only rendered section pages
+      - id: s4
+        action: build
+        target: Project Management group with roadmap, features (grouped), decision register
+      - id: s5
+        action: build
+        target: Developers group with source-map pages and reference pages that have data
+      - id: s6
+        action: build
+        target: Exports group with TOGAF and ArchiMate (collapsed)
+contracts:
+  - id: adapt-to-project-type
+    description: >-
+      The generator must adapt to any project type — a CLI tool with no database, a library with no
+      deployment, a monorepo with multiple services. Sections with no data are suppressed entirely,
+      not rendered as empty stubs.
+    must_have:
+      - Each of the 13 pages is only rendered if its data source exists
+      - The sidebar only includes links to rendered pages
+      - A CLI-only project produces no Database Design, API Design, or Deployment Architecture pages
+      - No page contains an empty section with no content
+  - id: one-source-many-views
+    description: >-
+      The technical design document is a view of the same .usm data as TOGAF, feature docs, and
+      source mapping. It must not duplicate or hardcode content — it renders from specs.
+    must_have:
+      - All content is derived from .usm files, schema, or declared content blocks
+      - No USM-specific content hardcoded in the generator
+      - >-
+        No content duplicated from TOGAF or feature docs — both read from the same specs
+        independently
+  - id: content-block-enrichment
+    description: >-
+      system.usm can declare inline content blocks for any Design section via a new design_pages[]
+      field (parallel to reference_pages[]). These enrich the structured data with prose that
+      doesn't fit schema fields.
+    must_have:
+      - >-
+        design_pages[] entries have id, title, audience, and either content[] (content blocks) or
+        source (structured data)
+      - Inline content blocks render AFTER structured data on the same page
+      - Sections without design_pages entries still render from structured data alone
+  - id: prose-escaping
+    description: >-
+      All prose from specs must be escaped via escapeProse before rendering to prevent VitePress Vue
+      template compilation errors from unescaped angle brackets.
+    must_have:
+      - All spec-authored prose passed through escapeProse
+      - All table cell content passed through escapeTableCell or escCell
+      - Mermaid diagram blocks are exempt (they use their own escaping)
+  - id: sidebar-data-driven
+    description: >-
+      The sidebar structure is generated from data availability, not hardcoded. Groups and pages
+      appear only when their underlying data exists.
+    must_have:
+      - Design group only includes pages that were rendered
+      - Project Management group only appears if roadmap, features, or decisions exist
+      - Developers group only includes reference pages that have data
+      - Exports group only appears if TOGAF or ArchiMate outputs exist
+  - id: decision-register
+    description: >-
+      The Decision Register consolidates all decisions from features, services, and system
+      principles into one page — the single source of truth for what was decided and why.
+    must_have:
+      - All feature decisions[] included with source feature $id
+      - All service decisions[] included with source service $id
+      - System principles[] rendered as architecture decisions
+      - Each decision shows ID, decision, status, rationale, alternatives, consequences
+  - id: nav-template-structure
+    description: |-
+      The generated sidebar follows a fixed five-group template structure that applies to any
+      project. The template defines which groups exist, which pages go in each group, and which
+      content sections each Design page contains. Groups and pages are suppressed when their data
+      source doesn't exist, but the structure itself is the standard template.
+    must_have:
+      - "Getting Started group: Home, Getting Started"
+      - >-
+        Design group: 13 section pages (Project Overview, Requirements, System Architecture, Module
+        Design, Database Design, API Design, Security Design, Deployment Architecture, Testing
+        Strategy, Maintenance & Monitoring, Backup & Recovery, Risks & Mitigation, Future
+        Enhancements) — only rendered pages appear
+      - "Project Management group: Roadmap, Features (grouped by service/area), Decision Register"
+      - >-
+        Developers group: Source Map, Test Coverage, Spec Coverage, API Reference, CLI Reference,
+        Configuration (only pages with data appear)
+      - "Exports group: TOGAF Phases, ArchiMate Model (collapsed)"
+      - >-
+        Each Design page has a defined set of content sections (3rd-level outline) that the
+        generator renders — these are the page's TOC, not separate sidebar links
+tests:
+  - id: design-full-system
+    setup:
+      system_with_services_features_data: true
+    expect:
+      - assertion: 13 design pages generated when all data sources present
+      - assertion: Each page has frontmatter with title and generated date
+      - assertion: All prose is escaped (no raw < or > outside code fences and Mermaid blocks)
+      - assertion: Sidebar Design group contains links to all 13 rendered pages
+  - id: design-cli-only
+    setup:
+      system_with_cli_service_only: true
+    expect:
+      - assertion: No Database Design page generated (no data .usm files)
+      - assertion: No Deployment Architecture page generated (no infrastructure data)
+      - assertion: Sidebar Design group only includes pages that were rendered
+      - assertion: No empty stub pages with zero content
+  - id: design-content-block-enrichment
+    setup:
+      system_with_design_pages_content_blocks: true
+    expect:
+      - assertion: Inline content blocks render after structured data on the same page
+      - assertion: Sections without design_pages entries still render from structured data
+      - assertion: Content blocks use the same content-block renderer as reference_pages
+  - id: decision-register
+    setup:
+      features_and_services_with_decisions: true
+    expect:
+      - assertion: All feature decisions included with source $id
+      - assertion: All service decisions included with source $id
+      - assertion: System principles rendered as architecture decisions
+      - assertion: Each decision shows ID, decision, status, rationale
+  - id: sidebar-data-driven
+    setup:
+      system_with_partial_data: true
+    expect:
+      - assertion: Sidebar groups only appear when their data exists
+      - assertion: Design group pages match exactly what was rendered
+      - assertion: No dead links to pages that don't exist
+  - id: nav-template-conformance
+    setup:
+      system_with_all_data_sources: true
+    expect:
+      - assertion: >-
+          Sidebar has exactly five groups in order (Getting Started, Design, Project Management,
+          Developers, Exports)
+      - assertion: Design group contains all 13 section pages when all data present
+      - assertion: Project Management group contains Roadmap, Features, Decision Register
+      - assertion: >-
+          Developers group contains Source Map, Test Coverage, Spec Coverage, API Reference, CLI
+          Reference, Configuration
+      - assertion: Exports group is collapsed and contains TOGAF Phases, ArchiMate Model
+  - id: prose-escaping
+    setup:
+      spec_with_angle_brackets_in_descriptions: true
+    expect:
+      - assertion: All prose escaped via escapeProse — no raw < or > outside code/Mermaid
+      - assertion: Table cells escaped via escapeTableCell — no raw < or > or unescaped pipes
+      - assertion: VitePress build succeeds without template compilation errors
+decisions:
+  - id: generator-not-author
+    decision: >-
+      The technical design document is a generator (structured renderer), not an authored doc. All
+      content comes from .usm specs, schema, or declared content blocks.
+    rationale: >-
+      Follows the first principle established by gen-content-blocks: generators are renderers, not
+      authors. The mapping from USM data to the 13 sections is deterministic.
+  - id: design-pages-parallel-to-reference-pages
+    decision: >-
+      system.usm gains a design_pages[] field parallel to reference_pages[]. Each entry can declare
+      inline content blocks for a section, enriching the structured data.
+    rationale: >-
+      Some sections need prose that doesn't fit structured fields (e.g. disaster recovery narrative,
+      testing philosophy). Content blocks provide that escape hatch while keeping the generator as
+      the primary renderer.
+  - id: suppress-empty-sections
+    decision: >-
+      Sections with no data are suppressed entirely — no empty stub pages, no sidebar links to pages
+      that don't exist.
+    rationale: >-
+      Follows the docs-experience principle: a CLI tool shouldn't have a Database Design page. The
+      template adapts to the project.
+  - id: five-group-sidebar
+    decision: >-
+      The sidebar is restructured into five groups: Getting Started, Design, Project Management,
+      Developers, Exports. This replaces the current fragmented groups (Core Concepts, Workflows,
+      Architecture, Deployment, Contributing).
+    rationale: >-
+      The current sidebar mixes concerns — architecture phases next to reference pages next to
+      feature groups. Five clean groups by audience and purpose: onboarding, holistic design,
+      project governance, developer reference, alternative framework exports.
+  - id: nav-template-definition
+    decision: |-
+      The nav template structure is the standard for all generated technical docs. It defines five
+      top-level groups and the pages within each. The template is fixed in structure but adaptive in
+      rendering — groups and pages only appear when data exists.
+
+      ```
+      Getting Started
+        Home
+        Getting Started
+
+      Design
+        Project Overview
+          Project Name
+          Project Description
+          Stakeholders
+          Assumptions
+          Use-cases
+        Requirements
+          Functional Requirements
+          Non-Functional Requirements
+            Performance
+            Scalability
+            Security
+            Reliability
+            Maintainability
+        System Architecture
+          High-Level Diagram
+          Technology Stack
+            Frontend
+            Backend
+            Database
+            Infrastructure
+          System Components
+        Module Design
+          Module Name
+          Purpose
+          Inputs
+          Outputs
+          Dependencies
+          Flow
+        Database Design
+          ER Diagram
+          Schema Design
+          Indexes
+          Transactions
+        API Design
+          Endpoints
+            HTTP Method (GET/POST/PUT/DELETE)
+            URL Schemas / naming conventions
+          Request/Response structure
+          Authentication
+          Authorization (roles, resources, permissions)
+          Rate Limiting
+          Error Handling
+        Security Design
+          Authentication / Authorization
+          Data Encryption
+          Security Auditing
+          Vulnerabilities
+          Security Stack
+        Deployment Architecture
+          Deployment Diagram
+          Environment Setup
+            Development
+            Staging
+            Production
+          Scaling Strategy
+          Monitoring Stack
+        Testing Strategy
+          Unit Testing
+          Integration Testing
+          Acceptance Testing
+          Performance Testing
+          Security Testing
+          Automated Testing
+        Maintenance & Monitoring
+          Logging
+          Alerting
+          System Health Monitoring
+          Error Tracking
+        Backup & Recovery
+          Backup Strategy
+          Disaster Recovery
+        Risks & Mitigation
+          Technical Risks
+          Mitigation Strategies
+        Future Enhancements
+          Roadmap
+          Scalability Considerations
+
+      Project Management
+        Roadmap
+        Features (grouped by service/area)
+        Decision Register
+
+      Developers
+        Source Map
+        Test Coverage
+        Spec Coverage
+        API Reference
+        CLI Reference
+        Configuration
+
+      Exports (collapsed)
+        TOGAF Phases
+        ArchiMate Model
+      ```
+
+      Level 1 = sidebar group. Level 2 = sidebar page link. Level 3+ = page content
+      sections (rendered as the page outline/TOC, not sidebar links). The sidebar is 2
+      levels deep (group > page). Groups and pages only appear when their data source
+      exists — the template adapts to the project type.
+    rationale: >-
+      Capturing the full template structure as a decision ensures the generator has a single
+      authoritative reference for what to render. The template is universal — it applies to any
+      project type — but adapts by suppressing sections without data.
+  - id: decision-register-consolidated
+    decision: >-
+      A Decision Register page consolidates all decisions from features, services, and system
+      principles into one page under Project Management.
+    rationale: >-
+      Decisions are currently scattered across feature docs and TOGAF Phase H. A single register is
+      the project governance view — what was decided, why, and what alternatives were rejected.
+  - id: features-as-project-management
+    decision: >-
+      Features are grouped under Project Management, not Design. Features with
+      flows/contracts/tests/status are work records, not design prose.
+    rationale: >-
+      Separating how the system is designed from how the project is managed is cleaner. Design is
+      the system; Project Management is the work.
+implementation:
+  primary: src/generators/technicalDesign.ts
+  test_code: tests/technicalDesign.test.ts
+  test_code_status: manual

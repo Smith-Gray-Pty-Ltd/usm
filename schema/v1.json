@@ -527,6 +527,85 @@
           "type": "array",
           "description": "Reference pages declared on system.usm — rendered by the generic content-block renderer. Replaces bespoke hardcoded generator functions.",
           "items": { "$ref": "#/$defs/referencePage" }
+        },
+        "design_pages": {
+          "type": "array",
+          "description": "Design section pages with inline content blocks — enriches the technical design document generator's structured data with prose that doesn't fit schema fields. Parallel to reference_pages[].",
+          "items": { "$ref": "#/$defs/designPage" }
+        },
+        "stakeholders": {
+          "type": "array",
+          "description": "Key stakeholders — clients, developers, business owners involved with or impacted by the project.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Stakeholder name" },
+              "role": { "type": "string", "description": "Role or relationship to the project (e.g. Product Owner, Tech Lead)" },
+              "contact": { "type": "string", "description": "Contact reference (email, handle, team)" }
+            },
+            "required": ["name", "role"],
+            "additionalProperties": false
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "description": "Key assumptions related to the project (e.g. timelines, milestones, external dependencies).",
+          "items": { "type": "string" }
+        },
+        "non_functional": {
+          "type": "object",
+          "description": "Non-functional requirements — performance, scalability, security, reliability, maintainability targets.",
+          "properties": {
+            "performance": { "$ref": "#/$defs/nonFunctionalRequirement" },
+            "scalability": { "$ref": "#/$defs/nonFunctionalRequirement" },
+            "security": { "$ref": "#/$defs/nonFunctionalRequirement" },
+            "reliability": { "$ref": "#/$defs/nonFunctionalRequirement" },
+            "maintainability": { "$ref": "#/$defs/nonFunctionalRequirement" }
+          },
+          "additionalProperties": false
+        },
+        "testing_strategy": {
+          "type": "object",
+          "description": "Project-level testing strategy — performance, security, and automated testing policies beyond per-service testing config.",
+          "properties": {
+            "performance_testing": { "type": "string", "description": "Load and stress testing approach (e.g. tool, target throughput)" },
+            "security_testing": { "type": "string", "description": "Penetration testing, vulnerability scanning approach" },
+            "automated_testing": { "type": "string", "description": "CI integration for automated test suites" },
+            "ci_integration": { "type": "string", "description": "CI pipeline configuration reference or description" }
+          },
+          "additionalProperties": false
+        },
+        "error_tracking": {
+          "type": "object",
+          "description": "Error tracking tool and configuration for capturing and handling application errors.",
+          "properties": {
+            "tool": { "type": "string", "description": "Error tracking tool (e.g. Sentry, Bugsnag)" },
+            "config_ref": { "type": "string", "description": "Configuration file or documentation reference" },
+            "dsn": { "type": "string", "description": "Data source name for the error tracking service" }
+          },
+          "required": ["tool"],
+          "additionalProperties": false
+        },
+        "backup_recovery": {
+          "type": "object",
+          "description": "System-level backup and disaster recovery strategy.",
+          "properties": {
+            "backup_strategy": { "type": "string", "description": "How and when backups are taken" },
+            "disaster_recovery": { "type": "string", "description": "Plan for system failures or data loss" },
+            "rto_minutes": { "type": "integer", "description": "Recovery Time Objective in minutes" },
+            "rpo_minutes": { "type": "integer", "description": "Recovery Point Objective in minutes" }
+          },
+          "additionalProperties": false
+        },
+        "security_stack": {
+          "type": "object",
+          "description": "Defense-in-depth security stack — first line and last line of defense.",
+          "properties": {
+            "first_line": { "type": "string", "description": "First line of defense (e.g. WAF, API gateway)" },
+            "last_line": { "type": "string", "description": "Last line of defense (e.g. data encryption at rest)" },
+            "notes": { "type": "string", "description": "Additional security stack notes" }
+          },
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1621,6 +1700,53 @@
         }
       },
       "required": ["heading", "content"],
+      "additionalProperties": false
+    },
+    "designPage": {
+      "type": "object",
+      "description": "A design section page declared on system.usm — enriches the technical design generator's structured data with inline content blocks. The id must match a design section (e.g. project-overview, requirements).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Section identifier — must match one of the 13 design sections (project-overview, requirements, system-architecture, module-design, database-design, api-design, security-design, deployment-architecture, testing-strategy, maintenance-monitoring, backup-recovery, risks-mitigation, future-enhancements)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Override title for the section (optional — the generator uses a default title)."
+        },
+        "audience": {
+          "type": "string",
+          "enum": ["public", "internal"],
+          "default": "internal",
+          "description": "public appears in help docs; internal only in developer docs."
+        },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" },
+          "description": "Inline content blocks rendered after the structured data on the section page."
+        },
+        "source": {
+          "type": "string",
+          "description": "Reserved for future runtime sources. Currently unused — use content blocks."
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "nonFunctionalRequirement": {
+      "type": "object",
+      "description": "A non-functional requirement with a target and optional description.",
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "The target or constraint (e.g. '< 200ms response time', '99.9% uptime')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Additional context or explanation of the requirement."
+        }
+      },
+      "required": ["target"],
       "additionalProperties": false
     }
   }

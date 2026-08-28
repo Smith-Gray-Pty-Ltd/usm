@@ -3460,22 +3460,33 @@ function renderDecisions(lines: string[], decisions: Decision[]): void {
     const statusBadge = d.status ? ` [${d.status}]` : "";
     lines.push(`### ${d.id}${statusBadge}`);
     lines.push("");
-    lines.push(`**Decision**: ${d.decision}`);
+    // Decision text — may contain newlines (e.g. structured template
+    // definitions, nested lists). Preserve blank lines so markdown renders
+    // lists and paragraphs correctly.
+    const decisionLines = escapeProse(d.decision).split("\n");
+    lines.push(`**Decision**: ${decisionLines[0]}`);
+    for (let i = 1; i < decisionLines.length; i++) {
+      lines.push(decisionLines[i]);
+    }
     lines.push("");
-    lines.push(`**Rationale**: ${d.rationale}`);
+    const rationaleLines = escapeProse(d.rationale).split("\n");
+    lines.push(`**Rationale**: ${rationaleLines[0]}`);
+    for (let i = 1; i < rationaleLines.length; i++) {
+      lines.push(rationaleLines[i]);
+    }
     lines.push("");
 
     if (d.alternatives && d.alternatives.length > 0) {
       lines.push("**Alternatives considered**:");
       lines.push("");
       for (const alt of d.alternatives) {
-        lines.push(`- ${alt.option} — *rejected*: ${alt.rejected_because}`);
+        lines.push(`- ${escapeProse(alt.option)} — *rejected*: ${escapeProse(alt.rejected_because)}`);
       }
       lines.push("");
     }
 
     if (d.consequences) {
-      lines.push(`**Consequences**: ${d.consequences}`);
+      lines.push(`**Consequences**: ${escapeProse(d.consequences)}`);
       lines.push("");
     }
 
@@ -3492,7 +3503,7 @@ function renderDecisionsTable(lines: string[], decisions: Decision[]): void {
   for (const d of decisions) {
     const status = d.status || "accepted";
     const date = d.date || "—";
-    lines.push(`| ${d.id} | ${d.decision} | ${status} | ${date} |`);
+    lines.push(`| ${d.id} | ${escapeTableCell(d.decision)} | ${status} | ${date} |`);
   }
   lines.push("");
 }
@@ -3501,14 +3512,14 @@ function renderFlow(lines: string[], flow: Flow): void {
   lines.push(`### ${flow.name} (\`${flow.id}\`)`);
   lines.push("");
   if (flow.description) {
-    lines.push(flow.description);
+    lines.push(escapeProse(flow.description));
     lines.push("");
   }
   flow.steps.forEach((step, i) => {
     const action = step.action
       ? step.action.charAt(0).toUpperCase() + step.action.slice(1)
       : `Step ${i + 1}`;
-    const target = step.target ? ` — ${step.target}` : "";
+    const target = step.target ? ` — ${escapeProse(step.target)}` : "";
     lines.push(`${i + 1}. **${action}**${target}`);
     if (step.expect && step.expect.length > 0) {
       for (const exp of step.expect) {
@@ -3552,7 +3563,7 @@ function renderInterface(lines: string[], iface: Interface): void {
 function renderContract(lines: string[], contract: Contract): void {
   lines.push(`### \`${contract.id}\``);
   lines.push("");
-  lines.push(contract.description);
+  lines.push(escapeProse(contract.description));
   lines.push("");
 
   if (contract.applies_after && contract.applies_after.length > 0) {
@@ -3608,7 +3619,7 @@ function renderTest(lines: string[], test: FeatureTest): void {
   lines.push("");
   for (const exp of test.expect) {
     const entries = Object.entries(exp);
-    lines.push(`- ${entries.map(([k, v]) => `${k}: ${v}`).join(", ")}`);
+    lines.push(`- ${entries.map(([k, v]) => `${k}: ${escapeProse(String(v))}`).join(", ")}`);
   }
   lines.push("");
 
@@ -3637,7 +3648,7 @@ function buildRbacDoc(file: ServiceUsm): string {
   lines.push("");
 
   if (file.rbac?.description) {
-    lines.push(file.rbac.description);
+    lines.push(escapeProse(file.rbac.description));
     lines.push("");
   }
 
@@ -3733,13 +3744,13 @@ function buildPatternsDoc(file: ServiceUsm): string {
     for (const pattern of file.patterns) {
       lines.push(`## ${pattern.name} (\`${pattern.id}\`)`);
       lines.push("");
-      lines.push(pattern.description);
+      lines.push(escapeProse(pattern.description));
       lines.push("");
 
       if (pattern.implementation) {
         lines.push("### Implementation");
         lines.push("");
-        lines.push(pattern.implementation);
+        lines.push(escapeProse(pattern.implementation));
         lines.push("");
       }
 

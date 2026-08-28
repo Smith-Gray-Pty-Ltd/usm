@@ -61,6 +61,9 @@ import {
   generateAllTogafDeliverables,
 } from "../generators/togaf.js";
 import {
+  generateTechnicalDesign,
+} from "../generators/technicalDesign.js";
+import {
   generateArchiMateModel,
 } from "../generators/archimate.js";
 import {
@@ -1062,6 +1065,7 @@ program
         { name: "schema-reference", target: "docs", fn: () => generateSchemaReference(root) },
         { name: "mcp-reference", target: "docs", fn: () => generateMcpReference(root) },
         { name: "reference-pages", target: "docs", fn: () => generateReferencePages(systemFile, root, serviceFiles, featureFiles) },
+        { name: "technical-design", target: "docs", fn: () => generateTechnicalDesign(systemFile, root, serviceFiles, featureFiles, dataFiles) },
         { name: "feedback", target: "docs", fn: () => generateFeedbackPage(systemFile, root) },
         { name: "shared-services-index", target: "docs", fn: () => generateSharedServicesIndex(serviceFiles, root) },
         { name: "packages-index", target: "docs", fn: () => generatePackagesIndex(serviceFiles, root) },

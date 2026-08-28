@@ -10,6 +10,7 @@ import type {
   Decision,
 } from "../types.js";
 import { findAllUsmFiles, parseUsmFile, isSystemFile, isServiceFile, isFeatureFile } from "../parse.js";
+import { escapeProse } from "./markdown.js";
 
 /**
  * Generate all TOGAF ADM phase deliverables.
@@ -71,6 +72,11 @@ function frontmatter(title: string, phase: string): string {
   return `---\ntitle: "${title}"\nphase: ${phase}\ngenerated: 2026-06-19\n---\n\n`;
 }
 
+/** Escape table cell content — angle brackets and pipes. */
+function escCell(text: string): string {
+  return (text || "").replace(/\|/g, "\\|").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // ─── Phase A: Architecture Vision ───────────────────────────────────────────────
 
 function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult {
@@ -84,10 +90,10 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
     lines.push("## System Identity\n\n");
     lines.push("| Field | Value |");
     lines.push("|-------|-------|");
-    lines.push(`| Name | ${system.identity.name} |`);
-    lines.push(`| Domain | ${system.identity.domain} |`);
+    lines.push(`| Name | ${escCell(system.identity.name)} |`);
+    lines.push(`| Domain | ${escCell(system.identity.domain)} |`);
     if (system.identity.contact) {
-      lines.push(`| Contact | ${system.identity.contact} |`);
+      lines.push(`| Contact | ${escCell(system.identity.contact)} |`);
     }
     lines.push("");
   }
@@ -95,7 +101,7 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
   // Summary
   if (system.summary) {
     lines.push("## Summary\n\n");
-    lines.push(`${system.summary}\n\n`);
+    lines.push(`${escapeProse(system.summary)}\n\n`);
   }
 
   // Architecture Principles
@@ -103,12 +109,12 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
     lines.push("## Architecture Principles\n\n");
     for (const p of system.principles) {
       lines.push(`### ${p.name} (\`${p.key}\`)\n\n`);
-      lines.push(`**Statement**: ${p.statement}\n\n`);
-      lines.push(`**Rationale**: ${p.rationale}\n\n`);
+      lines.push(`**Statement**: ${escapeProse(p.statement)}\n\n`);
+      lines.push(`**Rationale**: ${escapeProse(p.rationale)}\n\n`);
       if (p.implications && p.implications.length > 0) {
         lines.push("**Implications**:\n\n");
         for (const impl of p.implications) {
-          lines.push(`- ${impl}\n`);
+          lines.push(`- ${escapeProse(impl)}\n`);
         }
         lines.push("\n");
       }
@@ -121,7 +127,7 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
     lines.push("| ID | Title | Status | Target Date |");
     lines.push("|----|-------|--------|-------------|");
     for (const r of system.roadmap) {
-      lines.push(`| ${r.id} | ${r.title} | ${r.status || "—"} | ${r.target_date || "—"} |`);
+      lines.push(`| ${r.id} | ${escCell(r.title)} | ${r.status || "—"} | ${r.target_date || "—"} |`);
     }
     lines.push("\n");
   }
@@ -133,7 +139,7 @@ function generatePhaseAVision(system: SystemUsm, root: string): GenerationResult
     lines.push("|----|------|--------|------|");
     for (const i of system.index) {
       const tags = (i.tags || []).join(", ");
-      lines.push(`| ${i.id} | ${i.name} | ${i.status || "—"} | ${tags} |`);
+      lines.push(`| ${i.id} | ${escCell(i.name)} | ${i.status || "—"} | ${tags} |`);
     }
     lines.push("\n");
   }
@@ -224,7 +230,7 @@ function generatePhaseBBusiness(system: SystemUsm, features: FeatureUsm[], root:
       const flowCount = f.flows?.length || 0;
       const contractCount = f.contracts?.length || 0;
       const status = f.status || "—";
-      const summary = f.summary.substring(0, 80).replace(/\n/g, " ").trim();
+      const summary = escCell(f.summary.substring(0, 80).replace(/\n/g, " ").trim());
       lines.push(`| ${f.$id} | ${summary} | ${status} | ${flowCount} | ${contractCount} |`);
     }
     lines.push("\n");
@@ -236,11 +242,11 @@ function generatePhaseBBusiness(system: SystemUsm, features: FeatureUsm[], root:
     lines.push("## User Flows\n\n");
     for (const f of featuresWithFlows) {
       lines.push(`### ${f.$id}\n\n`);
-      for (const flow of f.flows!) {
-        lines.push(`- **${flow.name}** (${flow.steps.length} steps)`);
-        if (flow.description) lines.push(`  — ${flow.description}`);
-        lines.push("\n");
-      }
+    for (const flow of f.flows!) {
+      lines.push(`- **${flow.name}** (${flow.steps.length} steps)`);
+      if (flow.description) lines.push(`  — ${escapeProse(flow.description)}`);
+      lines.push("\n");
+    }
     }
   }
 
@@ -303,7 +309,7 @@ function generatePhaseC1Data(system: SystemUsm, dataFiles: DataUsm[], root: stri
     lines.push("|----|---------|------|---------|--------|");
     for (const d of dataFiles) {
       const models = (d.models || []).join(", ") || "—";
-      const summary = d.summary.substring(0, 60).replace(/\n/g, " ").trim();
+      const summary = escCell(d.summary.substring(0, 60).replace(/\n/g, " ").trim());
       lines.push(`| ${d.$id} | ${summary} | ${d.type || "—"} | ${d.runtime || "—"} | ${models} |`);
     }
     lines.push("\n");
@@ -316,7 +322,7 @@ function generatePhaseC1Data(system: SystemUsm, dataFiles: DataUsm[], root: stri
     lines.push("| ID | Name | Source |");
     lines.push("|----|------|--------|");
     for (const d of system.data) {
-      lines.push(`| ${d.id} | ${d.name} | ${d.ref} |`);
+      lines.push(`| ${d.id} | ${escCell(d.name)} | ${escCell(d.ref)} |`);
     }
     lines.push("\n");
   }
@@ -422,11 +428,11 @@ function generatePhaseC2Application(system: SystemUsm, services: ServiceUsm[], f
   for (const s of services) {
     const slug = s.$id.split("/").pop() || s.$id;
     lines.push(`### ${s.name || slug}\n\n`);
-    lines.push(`- **Type**: ${s.type}`);
-    lines.push(`- **Runtime**: ${s.runtime}`);
+    lines.push(`- **Type**: ${escapeProse(s.type)}`);
+    lines.push(`- **Runtime**: ${escapeProse(s.runtime)}`);
     if (s.port) lines.push(`- **Port**: ${s.port}`);
     if (s.depends_on && s.depends_on.length > 0) {
-      lines.push(`- **Depends on**: ${s.depends_on.join(", ")}`);
+      lines.push(`- **Depends on**: ${escapeProse(s.depends_on.join(", "))}`);
     }
     const svcFeatures = features.filter(f => {
       const svcSlug = f.$service.split("/").pop() || "";
@@ -456,11 +462,11 @@ function generatePhaseDTechnology(system: SystemUsm, services: ServiceUsm[], roo
     lines.push("## System Infrastructure\n\n");
     lines.push("| Field | Value |");
     lines.push("|------|-------|");
-    lines.push(`| Cloud | ${system.infrastructure.cloud || "—"} |`);
-    lines.push(`| Region | ${system.infrastructure.region || "—"} |`);
-    lines.push(`| Terraform | ${system.infrastructure.terraform_ref || "—"} |`);
-    lines.push(`| DNS | ${system.infrastructure.dns || "—"} |`);
-    lines.push(`| SSL | ${system.infrastructure.ssl || "—"} |`);
+    lines.push(`| Cloud | ${escCell(system.infrastructure.cloud || "—")} |`);
+    lines.push(`| Region | ${escCell(system.infrastructure.region || "—")} |`);
+    lines.push(`| Terraform | ${escCell(system.infrastructure.terraform_ref || "—")} |`);
+    lines.push(`| DNS | ${escCell(system.infrastructure.dns || "—")} |`);
+    lines.push(`| SSL | ${escCell(system.infrastructure.ssl || "—")} |`);
     lines.push("");
   }
 
@@ -470,7 +476,7 @@ function generatePhaseDTechnology(system: SystemUsm, services: ServiceUsm[], roo
     lines.push("| Name | URL | Type | Notes |");
     lines.push("|------|-----|------|-------|");
     for (const env of system.deployment.environments) {
-      lines.push(`| ${env.name} | ${env.url || "—"} | ${env.type || "—"} | ${env.notes || "—"} |`);
+      lines.push(`| ${escCell(env.name)} | ${escCell(env.url || "—")} | ${escCell(env.type || "—")} | ${escCell(env.notes || "—")} |`);
     }
     lines.push("\n");
   }
@@ -480,9 +486,9 @@ function generatePhaseDTechnology(system: SystemUsm, services: ServiceUsm[], roo
     lines.push("## Operations\n\n");
     lines.push("| Field | Value |");
     lines.push("|------|-------|");
-    if (system.operations.monitoring) lines.push(`| Monitoring | ${system.operations.monitoring} |`);
-    if (system.operations.alerts) lines.push(`| Alerts | ${system.operations.alerts} |`);
-    if (system.operations.on_call) lines.push(`| On-Call | ${system.operations.on_call} |`);
+    if (system.operations.monitoring) lines.push(`| Monitoring | ${escCell(system.operations.monitoring)} |`);
+    if (system.operations.alerts) lines.push(`| Alerts | ${escCell(system.operations.alerts)} |`);
+    if (system.operations.on_call) lines.push(`| On-Call | ${escCell(system.operations.on_call)} |`);
     lines.push("");
   }
 
@@ -497,20 +503,20 @@ function generatePhaseDTechnology(system: SystemUsm, services: ServiceUsm[], roo
 
       lines.push("| Property | Value |");
       lines.push("|----------|-------|");
-      lines.push(`| Provider | ${infra.provider || "—"} |`);
-      if (infra.region) lines.push(`| Region | ${infra.region} |`);
+      lines.push(`| Provider | ${escCell(infra.provider || "—")} |`);
+      if (infra.region) lines.push(`| Region | ${escCell(infra.region)} |`);
 
       if (infra.compute) {
-        lines.push(`| Compute Type | ${infra.compute.type || "—"} |`);
+        lines.push(`| Compute Type | ${escCell(infra.compute.type || "—")} |`);
         if (infra.compute.cpu) lines.push(`| CPU | ${infra.compute.cpu} units |`);
         if (infra.compute.memory_mb) lines.push(`| Memory | ${infra.compute.memory_mb} MB |`);
         if (infra.compute.desired_count) lines.push(`| Desired Count | ${infra.compute.desired_count} |`);
       }
       if (infra.networking) {
         if (infra.networking.port) lines.push(`| Port | ${infra.networking.port} |`);
-        if (infra.networking.protocol) lines.push(`| Protocol | ${infra.networking.protocol} |`);
-        if (infra.networking.tls_termination) lines.push(`| TLS Termination | ${infra.networking.tls_termination} |`);
-        if (infra.networking.hostnames) lines.push(`| Hostnames | ${infra.networking.hostnames.join(", ")} |`);
+        if (infra.networking.protocol) lines.push(`| Protocol | ${escCell(infra.networking.protocol)} |`);
+        if (infra.networking.tls_termination) lines.push(`| TLS Termination | ${escCell(String(infra.networking.tls_termination))} |`);
+        if (infra.networking.hostnames) lines.push(`| Hostnames | ${escCell(infra.networking.hostnames.join(", "))} |`);
       }
       if (infra.cost?.monthly_estimate_usd !== undefined) {
         lines.push(`| Monthly Cost | $${infra.cost.monthly_estimate_usd.toFixed(2)} |`);
@@ -574,7 +580,7 @@ function generatePhaseESolutions(system: SystemUsm, root: string): GenerationRes
       lines.push(`### ${r.title}\n\n`);
       lines.push(`- **ID**: ${r.id}`);
       lines.push(`- **Status**: ${r.status || "—"}`);
-      lines.push(`- **Description**: ${r.description}`);
+      lines.push(`- **Description**: ${escapeProse(r.description)}`);
       if (r.target_date) lines.push(`- **Target Date**: ${r.target_date}`);
       lines.push("\n");
     }
@@ -584,7 +590,7 @@ function generatePhaseESolutions(system: SystemUsm, root: string): GenerationRes
   if (system.principles && system.principles.length > 0) {
     lines.push("## Architecture Decisions (from Principles)\n\n");
     for (const p of system.principles) {
-      lines.push(`- **${p.name}**: ${p.statement}`);
+      lines.push(`- **${p.name}**: ${escapeProse(p.statement)}`);
     }
     lines.push("\n");
   }
@@ -638,7 +644,7 @@ function generatePhaseGGovernance(system: SystemUsm, features: FeatureUsm[], roo
     for (const c of allContracts) {
       const appliesAfter = (c.applies_after || []).join(", ") || "—";
       const mustHave = (c.must_have || []).map(m => typeof m === "string" ? m : JSON.stringify(m)).join("; ") || "—";
-      lines.push(`| ${c._featureId} | ${c.id} | ${c.description} | ${appliesAfter} | ${mustHave} |`);
+      lines.push(`| ${c._featureId} | ${c.id} | ${escCell(c.description)} | ${appliesAfter} | ${escCell(mustHave)} |`);
     }
     lines.push("\n");
   } else {
@@ -652,7 +658,7 @@ function generatePhaseGGovernance(system: SystemUsm, features: FeatureUsm[], roo
     lines.push("| ID | Title | Severity | Status | Mitigation |");
     lines.push("|----|-------|----------|--------|------------|");
     for (const r of system.risks) {
-      lines.push(`| ${r.id} | ${r.title} | ${r.severity || "—"} | ${r.status || "—"} | ${r.mitigation || "—"} |`);
+      lines.push(`| ${r.id} | ${escCell(r.title)} | ${r.severity || "—"} | ${r.status || "—"} | ${escCell(r.mitigation || "—")} |`);
     }
     lines.push("\n");
   }
@@ -709,7 +715,7 @@ function generatePhaseHChange(system: SystemUsm, services: ServiceUsm[], feature
     lines.push("| ID | Decision | Status | Source |");
     lines.push("|----|----------|--------|--------|");
     for (const d of allDecisions) {
-      lines.push(`| ${d.id} | ${d.decision} | ${d.status || "—"} | ${d._source} |`);
+      lines.push(`| ${d.id} | ${escCell(d.decision)} | ${d.status || "—"} | ${d._source} |`);
     }
     lines.push("\n");
   } else {
@@ -723,7 +729,7 @@ function generatePhaseHChange(system: SystemUsm, services: ServiceUsm[], feature
     lines.push("| ID | Title | Severity | Status | Mitigation |");
     lines.push("|----|-------|----------|--------|------------|");
     for (const r of system.risks) {
-      lines.push(`| ${r.id} | ${r.title} | ${r.severity || "—"} | ${r.status || "—"} | ${r.mitigation || "—"} |`);
+      lines.push(`| ${r.id} | ${escCell(r.title)} | ${r.severity || "—"} | ${r.status || "—"} | ${escCell(r.mitigation || "—")} |`);
     }
     lines.push("\n");
   }
@@ -743,7 +749,7 @@ function generatePhaseHChange(system: SystemUsm, services: ServiceUsm[], feature
     lines.push("| Item | Source |");
     lines.push("|------|--------|");
     for (const f of allFutureItems) {
-      lines.push(`| ${f.item} | ${f.source} |`);
+      lines.push(`| ${escCell(f.item)} | ${f.source} |`);
     }
     lines.push("\n");
   }
@@ -752,7 +758,7 @@ function generatePhaseHChange(system: SystemUsm, services: ServiceUsm[], feature
   if (system.principles && system.principles.length > 0) {
     lines.push("## Change Governance Principles\n\n");
     for (const p of system.principles) {
-      lines.push(`- **${p.name}**: ${p.statement}`);
+      lines.push(`- **${p.name}**: ${escapeProse(p.statement)}`);
     }
     lines.push("\n");
   }
