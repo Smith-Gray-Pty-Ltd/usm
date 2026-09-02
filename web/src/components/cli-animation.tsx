@@ -406,12 +406,21 @@ const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", 
 // ─── Component ──────────────────────────────────────────────────────────────
 export function CliAnimation() {
   const [sceneIdx, setSceneIdx] = useState(0);
+  const scene = scenes[sceneIdx];
+
+  return (
+    <ScenePlayer
+      key={sceneIdx}
+      scene={scene}
+      onAdvance={() => setSceneIdx((prev) => (prev + 1) % scenes.length)}
+    />
+  );
+}
+
+function ScenePlayer({ scene, onAdvance }: { scene: Scene; onAdvance: () => void }) {
   const [visibleLines, setVisibleLines] = useState(0);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const scene = scenes[sceneIdx];
 
   // Clear all pending timers
   function clearTimers() {
@@ -421,9 +430,6 @@ export function CliAnimation() {
 
   // Play a scene: reveal lines by their delay, then advance after holdAfter
   useEffect(() => {
-    clearTimers();
-    setVisibleLines(0);
-
     const maxDelay = Math.max(...scene.lines.map((l) => l.delay));
 
     // Schedule each line reveal
@@ -433,13 +439,11 @@ export function CliAnimation() {
     });
 
     // Schedule scene advance
-    const advance = setTimeout(() => {
-      setSceneIdx((prev) => (prev + 1) % scenes.length);
-    }, maxDelay + scene.holdAfter);
+    const advance = setTimeout(onAdvance, maxDelay + scene.holdAfter);
     timersRef.current.push(advance);
 
     return clearTimers;
-  }, [sceneIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scene, onAdvance]);
 
   // Spinner animation: only tick when a spinner line is the latest visible line
   const latestLine = scene.lines[visibleLines - 1];
@@ -455,7 +459,6 @@ export function CliAnimation() {
 
   return (
     <div
-      ref={containerRef}
       className="bg-card border border-border rounded-lg overflow-hidden shadow-2xl flex flex-col h-[380px]"
     >
       {/* Title bar */}
@@ -481,7 +484,7 @@ export function CliAnimation() {
             : line.spans;
 
           return (
-            <div key={`${sceneIdx}-${i}`} className="leading-relaxed">
+            <div key={i} className="leading-relaxed">
               {spans.map((span, j) => (
                 <span key={j} className={COLOR[span.kind]}>
                   {span.text || "\u00A0"}

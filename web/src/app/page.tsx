@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,10 +58,7 @@ const useCases = [
   { icon: Building2, title: "Enterprise & compliance", desc: "Generate ArchiMate, TOGAF, and OpenAPI from the same source. Audit-ready architecture artifacts." },
 ];
 
-const tools = [
-  "Cursor", "Claude Code", "Claude Desktop", "Codex", "GitHub Copilot",
-  "Grok Code", "OpenCode", "Windsurf", "Continue.dev", "Zed",
-];
+// Editor tools are rendered by ToolLogos; this list is kept for reference only.
 
 function useInView<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -111,10 +109,10 @@ export default function Home() {
       {/* Nav */}
       <nav className="border-b sticky top-0 bg-background/95 backdrop-blur z-50">
         <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/usm-logo.svg" alt="USM" className="h-[40px] w-auto" />
-          </a>
+          </Link>
 
           {/* Desktop nav links */}
           <div className="hidden md:flex items-center gap-5 text-sm">
@@ -125,7 +123,9 @@ export default function Home() {
               GitHub
             </a>
             <a href="https://www.npmjs.com/package/@smithgray/usm" target="_blank" rel="noopener noreferrer" className="flex items-center transition-opacity hover:opacity-80">
+              {/* eslint-disable-next-line @next/next/no-img-element -- external shield badges, static export */}
               <img src="https://img.shields.io/npm/v/@smithgray/usm?label=npm&style=flat&color=525252" alt="npm version" className="h-5" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- external shield badges, static export */}
               <img src="https://img.shields.io/npm/dt/@smithgray/usm?label=installs&style=flat&color=525252" alt="npm total installs" className="h-5 ml-1.5" />
             </a>
             <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm" })}>Get Started</a>
@@ -191,6 +191,7 @@ export default function Home() {
                 <Package className="w-4 h-4" />
                 <span className="flex items-center gap-1.5">
                   npm
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external shield badge, static export */}
                   <img src="https://img.shields.io/npm/v/@smithgray/usm?style=flat&color=525252" alt="" className="h-4" />
                 </span>
               </a>
@@ -339,7 +340,7 @@ export default function Home() {
               <h3 className="text-xl font-semibold">Onboard an existing codebase</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {onboardSteps.map((step, i) => {
+              {onboardSteps.map((step) => {
                 const Icon = step.icon;
                 return (
                   <Card key={step.num} className="h-full hover:border-foreground/30 transition-colors duration-200">

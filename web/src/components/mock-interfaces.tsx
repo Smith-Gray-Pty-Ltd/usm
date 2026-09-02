@@ -119,22 +119,6 @@ const chatScenes: ChatScene[] = [
 // ─── File explorer tree (synced with chat file-write actions) ───────────────
 interface FileNode { name: string; path: string; children?: FileNode[]; isNew?: boolean; }
 
-// Base tree (always present)
-const baseTree: FileNode[] = [
-  { name: ".usm", path: ".usm", children: [
-    { name: "system.usm", path: ".usm/system.usm" },
-    { name: "features", path: ".usm/features", children: [
-      { name: "cli", path: ".usm/features/cli", children: [
-        { name: "scan.usm", path: ".usm/features/cli/scan.usm" },
-      ]},
-    ]},
-  ]},
-  { name: "src", path: "src", children: [
-    { name: "auth", path: "src/auth" },
-    { name: "index.ts", path: "src/index.ts" },
-  ]},
-];
-
 // Scene 1 adds: .usm/features/auth/login.usm + src/auth/login.ts
 // Scene 2 adds: .usm-workspace/docs/features/login.md + .usm-workspace/openapi.yaml
 function getTreeForScene(sceneIdx: number): FileNode[] {
@@ -251,11 +235,31 @@ const SENT_PAUSE_MS = 600;
 // ─── MockChat component (IDE with file explorer + chat) ────────────────────
 function MockChat() {
   const [sceneIdx, setSceneIdx] = useState(0);
+  const scene = chatScenes[sceneIdx];
+
+  return (
+    <ChatScenePlayer
+      key={sceneIdx}
+      sceneIdx={sceneIdx}
+      scene={scene}
+      onAdvance={() => setSceneIdx((prev) => (prev + 1) % chatScenes.length)}
+    />
+  );
+}
+
+function ChatScenePlayer({
+  sceneIdx,
+  scene,
+  onAdvance,
+}: {
+  sceneIdx: number;
+  scene: (typeof chatScenes)[number];
+  onAdvance: () => void;
+}) {
   const [phase, setPhase] = useState<"typing" | "sent" | "agent" | "hold">("typing");
   const [typedChars, setTypedChars] = useState(0);
   const [visibleAgentBlocks, setVisibleAgentBlocks] = useState(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const scene = chatScenes[sceneIdx];
 
   const userMessage = scene.messages[0];
   const agentMessage = scene.messages[1];
@@ -270,12 +274,6 @@ function MockChat() {
   }
 
   useEffect(() => {
-    clearTimers();
-    setPhase("typing");
-    setTypedChars(0);
-    setVisibleAgentBlocks(0);
-    setWrittenFiles(new Set());
-
     for (let i = 1; i <= fullPrompt.length; i++) {
       const t = setTimeout(() => setTypedChars(i), i * TYPE_SPEED_MS);
       timersRef.current.push(t);
@@ -299,12 +297,10 @@ function MockChat() {
     });
 
     const lastBlockAt = agentStartAt + agentMessage.message.blocks.length * 600;
-    const advance = setTimeout(() => {
-      setSceneIdx((prev) => (prev + 1) % chatScenes.length);
-    }, lastBlockAt + scene.holdAfter);
+    const advance = setTimeout(onAdvance, lastBlockAt + scene.holdAfter);
     timersRef.current.push(advance);
     return clearTimers;
-  }, [sceneIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scene, fullPrompt, agentMessage, scene.holdAfter, onAdvance]);
 
   const inputText = phase === "typing" ? fullPrompt.slice(0, typedChars) : "";
   const tree = getTreeForScene(sceneIdx);
@@ -443,10 +439,27 @@ function MockChat() {
 // ─── MockBrowser component (VitePress-style docs) ───────────────────────────
 function MockBrowser() {
   const [sceneIdx, setSceneIdx] = useState(0);
-  const [visibleBlocks, setVisibleBlocks] = useState(0);
-  const [currentUrl, setCurrentUrl] = useState("");
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const scene = browserScenes[sceneIdx];
+
+  return (
+    <BrowserScenePlayer
+      key={sceneIdx}
+      scene={scene}
+      onAdvance={() => setSceneIdx((prev) => (prev + 1) % browserScenes.length)}
+    />
+  );
+}
+
+function BrowserScenePlayer({
+  scene,
+  onAdvance,
+}: {
+  scene: (typeof browserScenes)[number];
+  onAdvance: () => void;
+}) {
+  const [visibleBlocks, setVisibleBlocks] = useState(0);
+  const currentUrl = scene.url;
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   function clearTimers() {
     timersRef.current.forEach(clearTimeout);
@@ -454,20 +467,15 @@ function MockBrowser() {
   }
 
   useEffect(() => {
-    clearTimers();
-    setVisibleBlocks(0);
-    setCurrentUrl(scene.url);
     scene.blocks.forEach((block, i) => {
       const t = setTimeout(() => setVisibleBlocks(i + 1), block.delay);
       timersRef.current.push(t);
     });
     const maxDelay = Math.max(...scene.blocks.map((b) => b.delay));
-    const advance = setTimeout(() => {
-      setSceneIdx((prev) => (prev + 1) % browserScenes.length);
-    }, maxDelay + scene.holdAfter);
+    const advance = setTimeout(onAdvance, maxDelay + scene.holdAfter);
     timersRef.current.push(advance);
     return clearTimers;
-  }, [sceneIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scene, onAdvance]);
 
   return (
     <div className="bg-card border border-border rounded-lg overflow-hidden shadow-2xl flex flex-col h-[380px]">
@@ -504,14 +512,14 @@ function MockBrowser() {
         <div className="flex-1 overflow-hidden p-3 text-left">
           <div className="space-y-1.5">
             {scene.blocks.slice(0, visibleBlocks).map((block, i) => {
-              if (block.kind === "spacer") return <div key={`${sceneIdx}-${i}`} className="h-1.5" />;
+              if (block.kind === "spacer") return <div key={i} className="h-1.5" />;
               if (block.kind === "h1")
-                return <div key={`${sceneIdx}-${i}`} className="text-sm font-bold text-foreground">{block.text}</div>;
+                return <div key={i} className="text-sm font-bold text-foreground">{block.text}</div>;
               if (block.kind === "h2")
-                return <div key={`${sceneIdx}-${i}`} className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mt-2">{block.text}</div>;
+                return <div key={i} className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mt-2">{block.text}</div>;
               if (block.kind === "code-block")
                 return (
-                  <div key={`${sceneIdx}-${i}`} className="bg-muted/50 border border-border rounded px-2 py-1.5 space-y-0.5">
+                  <div key={i} className="bg-muted/50 border border-border rounded px-2 py-1.5 space-y-0.5">
                     {block.lines.map((line, li) => (
                       <div key={li} className="text-[10px] font-mono text-foreground/80">{line}</div>
                     ))}
@@ -519,14 +527,14 @@ function MockBrowser() {
                 );
               if (block.kind === "step")
                 return (
-                  <div key={`${sceneIdx}-${i}`} className="text-[10px] flex gap-1.5">
+                  <div key={i} className="text-[10px] flex gap-1.5">
                     <span className="text-muted-foreground/60 font-mono">{block.num}.</span>
                     <span className="text-foreground/70">{block.text}</span>
                   </div>
                 );
               if (block.kind === "checkbox")
                 return (
-                  <div key={`${sceneIdx}-${i}`} className="text-[10px] flex gap-1.5 items-start">
+                  <div key={i} className="text-[10px] flex gap-1.5 items-start">
                     <span className={block.checked ? "text-green-400" : "text-muted-foreground/40"}>
                       {block.checked ? "☑" : "☐"}
                     </span>
