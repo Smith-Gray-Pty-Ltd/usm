@@ -16,7 +16,7 @@ import {
   Zap, Shield, FileText, Brain, MessageSquare, FileCode,
   Eye, Hammer, CheckCircle, Copy, Check, Terminal,
   GitBranch, Building2, Users, ArrowRight, Star,
-  Search, Sparkles, Wand2
+  Search, Sparkles, Wand2, Menu, X, Package
 } from "lucide-react";
 
 const benefits = [
@@ -105,6 +105,7 @@ function CopyBlock({ code }: { code: string }) {
 }
 
 export default function Home() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -114,7 +115,9 @@ export default function Home() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/usm-logo.svg" alt="USM" className="h-[40px] w-auto" />
           </a>
-          <div className="flex items-center gap-5 text-sm">
+
+          {/* Desktop nav links */}
+          <div className="hidden md:flex items-center gap-5 text-sm">
             <a href="https://docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Help Docs</a>
             <a href="https://dev-docs.usm.dev" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Technical Docs</a>
             <a href="https://github.com/Smith-Gray-Pty-Ltd/usm" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
@@ -127,7 +130,82 @@ export default function Home() {
             </a>
             <a href="https://docs.usm.dev/getting-started" target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: "sm" })}>Get Started</a>
           </div>
+
+          {/* Mobile hamburger toggle */}
+          <button
+            type="button"
+            aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileNavOpen}
+            aria-controls="mobile-nav"
+            onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
+
+        {/* Mobile dropdown panel */}
+        {mobileNavOpen && (
+          <div
+            id="mobile-nav"
+            className="md:hidden border-t bg-background"
+          >
+            <div className="mx-auto max-w-6xl px-6 py-4 flex flex-col gap-1 text-sm">
+              <a
+                href="https://docs.usm.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex items-center gap-2 py-2.5 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Help Docs
+              </a>
+              <a
+                href="https://dev-docs.usm.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex items-center gap-2 py-2.5 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <FileCode className="w-4 h-4" />
+                Technical Docs
+              </a>
+              <a
+                href="https://github.com/Smith-Gray-Pty-Ltd/usm"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex items-center gap-2 py-2.5 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Star className="w-4 h-4" />
+                GitHub
+              </a>
+              <a
+                href="https://www.npmjs.com/package/@smithgray/usm"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+                className="flex items-center gap-2 py-2.5 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <Package className="w-4 h-4" />
+                <span className="flex items-center gap-1.5">
+                  npm
+                  <img src="https://img.shields.io/npm/v/@smithgray/usm?style=flat&color=525252" alt="" className="h-4" />
+                </span>
+              </a>
+              <a
+                href="https://docs.usm.dev/getting-started"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileNavOpen(false)}
+                className={`${buttonVariants({ size: "sm" })} mt-2 w-full`}
+              >
+                Get Started
+              </a>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero */}

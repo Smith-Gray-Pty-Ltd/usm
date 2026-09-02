@@ -12,19 +12,32 @@
       <stop offset="0%" stop-color="#3b82f6"/>
       <stop offset="100%" stop-color="#a855f7"/>
     </linearGradient>
+    <!-- Pin/marker shape path (from usm-logo.svg, scaled to fit a 56x56 box) -->
+    <path id="pin-mark" d="M28 2C12.5 2 0 14.4 0 29.8c0 7.7 3.1 14.7 8.2 19.7L28 69.3l19.8-19.8C52.9 44.5 56 37.5 56 29.8 56 14.4 43.5 2 28 2Zm0 50c-11.9 0-21.6-9.6-21.6-21.5S16.1 9 28 9s21.6 9.6 21.6 21.5S39.9 52 28 52Z"/>
+    <!-- Sparkle small -->
+    <path id="spark-sm" d="M15.5 11.5c.07.006.21.017.28.023.11 2.24.72 4.67 2.55 6.18 1.53 1.27 3.58 1.59 5.52 1.75.13.29-.35.19-.51.24-2.02.04-4.09.73-5.51 2.16-1.15 1.16-1.74 2.74-1.98 4.31-.1.48-.04 1-.26 1.46-.23-.23-.19-.55-.22-.83-.16-1.79-.77-3.61-2.06-4.93-1.11-1.12-2.62-1.81-4.19-2.04-.66-.11-1.34-.1-2-.18.03-.05.08-.15.11-.2 2.07-.09 4.26-.52 5.82-1.93 1.71-1.52 2.27-3.84 2.44-6Z"/>
+    <!-- Sparkle tiny -->
+    <path id="spark-tiny" d="M8.5 5.5c.04.005.13.005.17.01.08 1.35.43 2.83 1.54 3.75.91.78 2.15 1.05 3.34 1.12.06.12.02.12-.13.15-1.27.02-2.57.47-3.47 1.41-.71.75-1.02 1.79-1.13 2.81-.06.29-.03.61-.13.89-.14-.14-.08-.33-.1-.5-.11-.81-.3-1.64-.62-2.33-.5-1.01-1.47-1.78-2.61-2.07-.59-.18-1.2-.19-1.81-.28.08-.16.05-.12.2-.14 1.22-.07 2.51-.43 3.33-1.34.89-.93 1.14-2.24 1.22-3.56Z"/>
   </defs>
   <rect width="1200" height="630" fill="url(#grad)"/>
 
-  <!-- USM logo mark (boxes icon) -->
-  <g transform="translate(100, 90)">
-    <rect x="0" y="0" width="44" height="44" rx="8" fill="url(#accent)" opacity="0.9"/>
-    <rect x="12" y="12" width="20" height="20" rx="3" fill="#0a0a0a"/>
-    <text x="62" y="32" font-family="Helvetica Neue, Arial, sans-serif" font-size="28" font-weight="700" fill="#fafafa" letter-spacing="0.5">USM</text>
+  <!-- USM logo: pin mark + sparkles + wordmark -->
+  <g transform="translate(100, 80)">
+    <!-- Pin mark with accent gradient -->
+    <g transform="translate(0, 0)">
+      <use href="#pin-mark" fill="url(#accent)" opacity="0.95" transform="scale(0.85)"/>
+      <!-- Inner dark cutout ring effect via second smaller pin -->
+      <use href="#pin-mark" fill="#0a0a0a" transform="scale(0.62) translate(3.4, 3.4)"/>
+      <!-- Sparkles in white inside the pin -->
+      <use href="#spark-sm" fill="#ffffff" transform="translate(14, 16) scale(0.55)"/>
+      <use href="#spark-tiny" fill="#ffffff" transform="translate(9, 28) scale(0.6)"/>
+    </g>
+    <text x="70" y="42" font-family="Helvetica Neue, Arial, sans-serif" font-size="30" font-weight="800" fill="#fafafa" letter-spacing="0.5">USM</text>
   </g>
 
   <!-- Version badge -->
-  <rect x="100" y="165" width="220" height="36" rx="18" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
-  <text x="210" y="188" font-family="Helvetica Neue, Arial, sans-serif" font-size="15" font-weight="500" fill="#a1a1aa" text-anchor="middle">v0.5.1 — Free &amp; open source</text>
+  <rect x="100" y="165" width="235" height="36" rx="18" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.12"/>
+  <text x="217" y="188" font-family="Helvetica Neue, Arial, sans-serif" font-size="15" font-weight="500" fill="#a1a1aa" text-anchor="middle">v0.6.0 — Free &amp; open source</text>
 
   <!-- Headline -->
   <text x="100" y="290" font-family="Helvetica Neue, Arial, sans-serif" font-size="52" font-weight="800" fill="#fafafa" letter-spacing="-1.5">
