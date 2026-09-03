@@ -57,6 +57,7 @@
     "usm": "node dist/cli/index.js",
     "clean": "rm -rf dist",
     "changeset": "changeset",
+    "sync-versions": "tsx scripts/sync-versions.ts",
     "version-packages": "changeset version",
     "release": "pnpm run build && changeset publish",
     "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test"
