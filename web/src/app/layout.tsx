@@ -18,7 +18,7 @@ const siteUrl = "https://usm.dev";
 
 export const metadata: Metadata = {
   title: "USM — The source of truth for human + AI software development",
-  description: "USM is a schema-validated source of truth for agentic software development that reduces token burn, persists structured knowledge across coding sessions, and automatically generates documentation and design artefacts in a spec-first development cycle.",
+  description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using 10-20x fewer tokens than bloated Markdown vaults. Works with any MCP-compatible editor.",
   keywords: [
     "USM",
     "Universal System Map",
@@ -73,12 +73,12 @@ export const metadata: Metadata = {
     type: "website",
     url: siteUrl,
     title: "USM — The source of truth for human + AI software development",
-    description: "USM is a schema-validated source of truth for agentic software development that reduces token burn, persists structured knowledge across coding sessions, and automatically generates documentation and design artefacts in a spec-first development cycle.",
+    description: "Write specs first. Agents build from them. Docs stay perfectly in sync — using 10-20x fewer tokens than bloated Markdown vaults. Works with any MCP-compatible editor.",
     siteName: "USM",
     locale: "en_US",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.png?v=2",
         width: 1200,
         height: 630,
         alt: "USM — The source of truth for human + AI software development",
@@ -88,8 +88,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "USM — The source of truth for human + AI software development",
-    description: "USM is a schema-validated source of truth for agentic software development that reduces token burn, persists structured knowledge across coding sessions, and automatically generates documentation and design artefacts in a spec-first development cycle.",
-    images: ["/og-image.png"],
+    description: "Write specs first. Agents build from them. Docs stay in sync — 10-20x fewer tokens. Works with any MCP-compatible editor.",
+    images: ["/og-image.png?v=2"],
   },
   robots: {
     index: true,
