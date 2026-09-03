@@ -6,11 +6,10 @@ import path from "node:path";
 import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile } from "../parse.js";
 import { validateUsm, validateUsmFile } from "../validate.js";
 import { generate } from "../generate.js";
-import { findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "../parse.js";
+import { findUsmFiles, findAllUsmFiles } from "../parse.js";
 import { runQuery, QueryParseError } from "../query/index.js";
-import type { UsmFile } from "../types.js";
 import { generateStructurizrDsl } from "../generators/structurizr.js";
-import { importStructurizrWorkspace, parseStructurizrWorkspace, planStructurizrImport } from "../import/structurizr.js";
+import { importStructurizrWorkspace, parseStructurizrWorkspace } from "../import/structurizr.js";
 import { generateReadmeFacts } from "../generators/readmeFacts.js";
 import { initConfig, writeConfig } from "../scan/init.js";
 import { promptFeedbackPolicy, applyFeedbackToSystem, resolveFeedbackPolicy, DEFAULT_FEEDBACK_POLICY } from "../scan/feedback.js";
@@ -78,7 +77,7 @@ import { startProgress } from "./progress.js";
 import { renderFileTree } from "./tree.js";
 import { printBanner } from "./banner.js";
 import { checkForUpdates } from "./updateCheck.js";
-import { setVerbosity, getLevel, logInfo, logError, logDebug } from "./verbosity.js";
+import { setVerbosity } from "./verbosity.js";
 
 const program = new Command();
 
@@ -846,7 +845,6 @@ program
     const root = path.resolve(options.root);
     const onlyTarget = options.only;
     const runAll = !onlyTarget;
-    const runDocs = runAll || onlyTarget === "docs";
 
     // Validate --only target early (before any generation)
     const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md", "structurizr", "readme-facts"];

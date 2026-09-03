@@ -7,6 +7,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 
 // Resolve package.json relative to compiled location (dist/cli/updateCheck.js
 // → ../../package.json). We use fs.readFileSync (not JSON import attribute)
@@ -29,14 +30,16 @@ const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as {
  */
 export async function checkForUpdates(): Promise<void> {
   try {
-    // Dynamic require to avoid the @types/update-notifier ESM-only type error.
-    // update-notifier v5 ships as CJS so this works at runtime.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // createRequire from __filename (CJS-safe) lets us dynamically load a CJS
+    // package without triggering @typescript-eslint/no-require-imports.
+    // update-notifier v5 ships as CJS; its @types are ESM-only which would
+    // break the CJS build if imported statically.
+    const localRequire = createRequire(__filename);
     const updateNotifier: (opts: {
       pkg: { name: string; version: string };
       updateCheckInterval: number;
     }) => { notify: (opts?: { isGlobal?: boolean }) => void } =
-      require("update-notifier");
+      localRequire("update-notifier");
 
     // 1000 * 60 * 60 * 24 = 24h cache interval.
     const notifier = updateNotifier({

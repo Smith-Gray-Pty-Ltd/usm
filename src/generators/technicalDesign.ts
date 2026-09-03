@@ -14,12 +14,8 @@ import type {
   FeatureUsm,
   DataUsm,
   GenerationResult,
-  Risk,
-  RoadmapItem,
-  Principle,
   Decision,
 } from "../types.js";
-import { findAllUsmFiles, parseUsmFile } from "../parse.js";
 import { escapeProse } from "./markdown.js";
 import {
   renderContentBlocks,
@@ -96,7 +92,7 @@ function esc(text: string | undefined | null): string {
  */
 function renderProjectOverview(
   system: SystemWithDesign,
-  features: FeatureUsm[],
+  _features: FeatureUsm[],
 ): string | null {
   const hasIdentity = !!system.identity;
   const hasSummary = !!system.summary;

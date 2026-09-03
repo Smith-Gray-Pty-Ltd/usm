@@ -12,13 +12,7 @@ import type {
   FeatureTest,
   Interface,
   Decision,
-  Risk,
-  RoadmapItem,
-  Module,
-  FeatureRoute,
-  Principle,
   ServiceInfrastructure,
-  LocalDevelopment,
 } from "../types.js";
 import { findUsmFiles, findAllUsmFiles, parseUsmFile, isServiceFile, isFeatureFile, findAllUsmDirs } from "../index.js";
 import { generateSequenceDiagrams } from "./mermaid.js";
@@ -43,21 +37,6 @@ function isSeedDataFile(file: ServiceUsm): boolean {
 }
 
 /** Service kinds that map to packages (light shape) */
-const PACKAGE_KINDS = new Set(["ui-kit", "shared-util", "auth-lib", "orm", "llm-wrapper", "config", "types"]);
-
-/**
- * Classify a service reference from system.usm services[] (lightweight —
- * only id, name, ref, port) into app, shared-service, or package.
- * Uses the service `id` and `ref` to determine classification.
- */
-function classifyServiceById(svc: { id: string; name?: string; ref?: string; port?: number }): "app" | "shared-service" | "package" {
-  // Services with refs pointing to apps/* are app services
-  if (svc.ref?.includes("apps/")) return "app";
-  // Services whose id matches known infrastructure patterns are shared services
-  if (SHARED_SERVICE_KINDS.has(svc.id)) return "shared-service";
-  // Default: treat as package
-  return "package";
-}
 
 // ─── Main Entry Point ─────────────────────────────────────────────────────────
 
@@ -110,7 +89,6 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   const lines: string[] = [];
   const name = file.identity.name;
   const tagline = (file.summary || "").split("\n")[0].trim();
-  const repo = file.identity.repository || "";
   const version = readPackageVersion();
   const generatedAt = new Date().toISOString().slice(0, 10);
 
@@ -213,7 +191,7 @@ function generateServiceMarkdown(file: ServiceUsm, root: string): GenerationResu
 
 // ─── Data → Data Model Doc ────────────────────────────────────────────────────
 
-function generateDataMarkdown(file: DataUsm, root: string): GenerationResult {
+function generateDataMarkdown(_file: DataUsm, _root: string): GenerationResult {
   // Data files generate their content into .usm-workspace/docs/data/models.md
   // This is handled by generateDataModelDoc in the aggregator pass.
   // Return empty here — the data file's output is generated in the aggregator.
@@ -2402,7 +2380,6 @@ export function generateDataModelDoc(dataFiles: DataUsm[], root: string, service
   // Also look for ServiceUsm files that are in the .usm/data/ directory
   if (serviceFiles) {
     for (const svc of serviceFiles) {
-      const slug = serviceSlug(svc);
       // Skip seed data files — they have their own generator
       if (isSeedDataFile(svc)) continue;
       // Check if this service file is in .usm/data/ by checking its $id
@@ -3029,16 +3006,6 @@ function sectionReadme(title: string, description: string): string {
   return lines.join("\n");
 }
 
-function placeholder(title: string, file: ServiceUsm): string {
-  const lines: string[] = [];
-  const serviceName = file.$id.split("/").pop() || "Service";
-  lines.push(`# ${title}`);
-  lines.push("");
-  lines.push(`_Placeholder for ${serviceName}. Populated from .usm source or hand-written._`);
-  lines.push("");
-  return lines.join("\n");
-}
-
 /**
  * Build architecture/overview.md from the service USM.
  * Includes summary, identity, depends_on, and key properties.
@@ -3338,29 +3305,6 @@ function buildOpsIncidentResponse(file: ServiceUsm, slug: string): string {
   lines.push("For runbooks and escalation procedures, see [Platform Incident Response](../../../../.usm-workspace/docs/operations/incident-response.md).");
   lines.push("");
 
-  return lines.join("\n");
-}
-
-function adrTemplate(): string {
-  const lines: string[] = [];
-  lines.push("# ADR 0001: Template");
-  lines.push("");
-  lines.push("## Status");
-  lines.push("");
-  lines.push("Proposed | Accepted | Rejected | Superseded");
-  lines.push("");
-  lines.push("## Context");
-  lines.push("");
-  lines.push("What is the issue that we're seeing that is motivating this decision or change?");
-  lines.push("");
-  lines.push("## Decision");
-  lines.push("");
-  lines.push("What is the change that we're proposing and/or doing?");
-  lines.push("");
-  lines.push("## Consequences");
-  lines.push("");
-  lines.push("What becomes easier or more difficult to do because of this change?");
-  lines.push("");
   return lines.join("\n");
 }
 
@@ -3784,122 +3728,6 @@ function buildInfrastructureDoc(file: ServiceUsm): string {
   }
 
   return lines.join("\n");
-}
-
-// ─── Local Development Renderer ────────────────────────────────────────────────
-
-function renderLocalDevelopment(lines: string[], ld: LocalDevelopment): void {
-  lines.push("## Local Development");
-  lines.push("");
-  lines.push("Source: `.usm/system.usm` → `local_development`");
-  lines.push("");
-  lines.push("> For canonical test users and seeding commands, see [Seed Users & Test Data](data/seed_users.md).");
-  lines.push("");
-
-  // Monorepo
-  if (ld.monorepo) {
-    lines.push("### Monorepo");
-    lines.push("");
-    lines.push("| Property | Value |");
-    lines.push("|----------|-------|");
-    if (ld.monorepo.package_manager) lines.push(`| Package Manager | ${ld.monorepo.package_manager} |`);
-    if (ld.monorepo.package_manager_version) lines.push(`| PM Version | ${ld.monorepo.package_manager_version} |`);
-    if (ld.monorepo.node_version) lines.push(`| Node Version | ${ld.monorepo.node_version} |`);
-    if (ld.monorepo.install_command) lines.push(`| Install Command | \`${ld.monorepo.install_command}\` |`);
-    if (ld.monorepo.workspace_pattern) lines.push(`| Workspace Pattern | ${ld.monorepo.workspace_pattern} |`);
-    lines.push("");
-  }
-
-  // Apps
-  if (ld.apps && ld.apps.length > 0) {
-    lines.push("### Apps");
-    lines.push("");
-    lines.push("| Name | Port | Dev Command | URL | Requires DB |");
-    lines.push("|------|------|-------------|-----|-------------|");
-    for (const app of ld.apps) {
-      const name = app.name || "—";
-      const port = app.port ? String(app.port) : "—";
-      const cmd = app.dev_command ? `\`${app.dev_command}\`` : "—";
-      const url = app.url_local || "—";
-      const db = app.requires_db ? "yes" : "no";
-      lines.push(`| ${name} | ${port} | ${cmd} | ${url} | ${db} |`);
-    }
-    lines.push("");
-  }
-
-  // External Services
-  if (ld.external_services && ld.external_services.length > 0) {
-    lines.push("### External Services");
-    lines.push("");
-    lines.push("| Name | Port | Purpose | Managed By |");
-    lines.push("|------|------|---------|------------|");
-    for (const svc of ld.external_services) {
-      const name = svc.name || "—";
-      const port = svc.port ? String(svc.port) : "—";
-      const purpose = svc.purpose || "—";
-      const managedBy = svc.managed_by || "—";
-      lines.push(`| ${name} | ${port} | ${purpose} | ${managedBy} |`);
-    }
-    lines.push("");
-  }
-
-  // Environment
-  if (ld.environment) {
-    lines.push("### Environment");
-    lines.push("");
-    if (ld.environment.root_env) {
-      lines.push(`- **Root .env**: \`${ld.environment.root_env}\``);
-    }
-    if (ld.environment.per_app_env && ld.environment.per_app_env.length > 0) {
-      lines.push("- **Per-app env**:");
-      for (const env of ld.environment.per_app_env) {
-        lines.push(`  - \`${env}\``);
-      }
-    }
-    if (ld.environment.required_vars && ld.environment.required_vars.length > 0) {
-      lines.push("- **Required vars**:");
-      for (const v of ld.environment.required_vars) {
-        lines.push(`  - \`${v}\``);
-      }
-    }
-    lines.push("");
-  }
-
-  // Log Locations
-  if (ld.log_locations) {
-    lines.push("### Log Locations");
-    lines.push("");
-    lines.push("| Location | Path |");
-    lines.push("|----------|------|");
-    if (ld.log_locations.dev_server) lines.push(`| Dev Server | \`${ld.log_locations.dev_server}\` |`);
-    if (ld.log_locations.build_output) lines.push(`| Build Output | \`${ld.log_locations.build_output}\` |`);
-    if (ld.log_locations.test_output) lines.push(`| Test Output | \`${ld.log_locations.test_output}\` |`);
-    lines.push("");
-  }
-
-  // Known Quirks
-  if (ld.known_quirks && ld.known_quirks.length > 0) {
-    lines.push("### Known Quirks");
-    lines.push("");
-    for (const quirk of ld.known_quirks) {
-      const id = quirk.id || "—";
-      lines.push(`#### \`${id}\` — ${quirk.title || "Untitled"}`);
-      lines.push("");
-      lines.push(quirk.description || "");
-      lines.push("");
-      if (quirk.workaround) {
-        lines.push(`> **Workaround**: ${quirk.workaround}`);
-        lines.push("");
-      }
-      const meta: string[] = [];
-      if (quirk.affected_command) meta.push(`**Affected**: \`${quirk.affected_command}\``);
-      if (quirk.fixed_in) meta.push(`**Fixed in**: ${quirk.fixed_in}`);
-      if (meta.length > 0) {
-        lines.push(meta.join(" · "));
-        lines.push("");
-      }
-    }
-  }
 }
 
 // ─── Prisma Schema Parser ────────────────────────────────────────────────────

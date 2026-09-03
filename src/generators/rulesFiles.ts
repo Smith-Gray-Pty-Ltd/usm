@@ -1,7 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { parseUsmFile } from "../parse.js";
-import { findAllUsmFiles } from "../parse.js";
 import type { SystemUsm, ServiceUsm } from "../types.js";
 import type { GenerationResult } from "../types.js";
 

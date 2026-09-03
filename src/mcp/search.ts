@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findUsmFiles, parseUsmFile } from "../index.js";
-import { resolvePath, defaultUsmDir, allUsmFilesInMonorepo } from "../mcp-utils.js";
+import { resolvePath, allUsmFilesInMonorepo } from "../mcp-utils.js";
 
 export const searchSchema = {
   query: z.string().describe("Search query string"),

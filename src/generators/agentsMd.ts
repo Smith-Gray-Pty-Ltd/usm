@@ -1,6 +1,5 @@
 import type { ServiceUsm, SystemUsm, GenerationResult } from "../types.js";
 import fs from "node:fs";
-import path from "node:path";
 import { generateFeedbackProtocol } from "./rulesFiles.js";
 
 // ─── Smart Merge ────────────────────────────────────────────────────────────

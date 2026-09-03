@@ -149,7 +149,6 @@ interface SidebarGroup {
  */
 function isVitePressInstalled(): boolean {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require.resolve("vitepress", { paths: [process.cwd()] });
     return true;
   } catch {
@@ -1184,7 +1183,7 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
  * Start watching .usm/ files and regenerate docs on changes.
  * Returns a cleanup function to stop watching.
  */
-function startWatchMode(root: string, docsRoot: string, audience: Audience): () => void {
+function startWatchMode(root: string, _docsRoot: string, _audience: Audience): () => void {
   const usmDir = path.join(root, ".usm");
   if (!fs.existsSync(usmDir)) {
     console.log("No .usm/ directory found — watch mode disabled.");

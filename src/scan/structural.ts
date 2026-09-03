@@ -277,7 +277,6 @@ export async function scanStructural(options: ScanOptions): Promise<ScanResult> 
     try {
       const pyprojectContent = fs.readFileSync(pyprojectPath, "utf-8");
       // Extract project name and Python version from pyproject.toml (simple parse)
-      const nameMatch = pyprojectContent.match(/^name\s*=\s*["']([^"']+)["']/m);
       const requiresMatch = pyprojectContent.match(/requires-python\s*=\s*["']([^"']+)["']/m);
 
       const usmObj: Record<string, unknown> = {

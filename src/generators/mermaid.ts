@@ -340,7 +340,7 @@ function formatExpectationNote(
  *
  * Output: injected into `.usm-workspace/docs/data/models.md`
  */
-export function generateERDiagram(dataFiles: DataUsm[], root: string, serviceFiles?: ServiceUsm[]): GenerationResult {
+export function generateERDiagram(dataFiles: DataUsm[], root: string, _serviceFiles?: ServiceUsm[]): GenerationResult {
   // Parse the Prisma schema for the full ER info
   const schemaPath = path.join(root, "packages", "db", "prisma", "schema.prisma");
   const prismaContent = readPrismaSchema(schemaPath);
@@ -383,7 +383,7 @@ export function generateERDiagram(dataFiles: DataUsm[], root: string, serviceFil
   }
 
   // Relationship lines
-  for (const [modelName, info] of models) {
+  for (const [_modelName, info] of models) {
     for (const rel of info.relationships) {
       lines.push(`    ${rel}`);
     }
@@ -495,7 +495,7 @@ function buildServiceDependencyDiagram(
   svc: ServiceRef,
   deps: string[],
   systemServiceMap: Map<string, ServiceRef>,
-  serviceDetails: Map<string, ServiceUsm>
+  _serviceDetails: Map<string, ServiceUsm>,
 ): string {
   const lines: string[] = [];
   lines.push("```mermaid");
@@ -715,12 +715,8 @@ function parsePrismaModelsForER(content: string): Map<string, ERModelInfo> {
       if (hasRelation) {
         // This is a "one" side relation field (e.g., organization Organization @relation(...))
         // Determine relationship cardinality
-        const relFieldsMatch = restStr.match(/fields:\s*\[(\w+)\]/);
-        const relRefsMatch = restStr.match(/references:\s*\[(\w+)\]/);
         const relNameMatch = restStr.match(/"([^"]+)"/);
 
-        const relFieldName = relFieldsMatch ? relFieldsMatch[1] : fieldName;
-        const relRefName = relRefsMatch ? relRefsMatch[1] : "id";
         const relName = relNameMatch ? relNameMatch[1] : "";
 
         // One-to-one or one-to-many from this model's perspective

@@ -3,38 +3,13 @@ import fs from "node:fs";
 import type {
   FeatureUsm,
   GenerationResult,
-  Flow,
-  FlowStep,
-  FeatureTest,
 } from "../types.js";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const KNOWN_APP_DIRS: string[] = [];
-
 // ─── Utility helpers ──────────────────────────────────────────────────────────
-
-function inferAppName(feature: FeatureUsm): string {
-  if (feature.apps && feature.apps.length > 0) return feature.apps[0];
-  if (feature.$service) {
-    const slug = feature.$service.split("/").pop() || "";
-    if (KNOWN_APP_DIRS.includes(slug)) return slug;
-  }
-  return "unknown";
-}
 
 function inferFeatureSlugFromId(featureId: string): string {
   const parts = featureId.split("/");
   return parts.slice(1).join("/");
-}
-
-function inferArea(featureId: string): string {
-  const parts = featureId.split("/");
-  const afterSystem = parts.slice(1);
-  if (afterSystem.length === 1) {
-    return afterSystem[0];
-  }
-  return afterSystem[0];
 }
 
 /** Sanitize an id string into a valid JS identifier */
@@ -76,11 +51,9 @@ export function generateTestSpec(
     return { outputs: [] };
   }
 
-  const appName = inferAppName(feature);
   const featureSlug = sourceFilePath
     ? inferSlugFromPath(sourceFilePath, root)
     : inferFeatureSlugFromId(feature.$id);
-  const area = inferArea(feature.$id);
 
   const lines: string[] = [];
 
@@ -228,7 +201,6 @@ export function generateAggregatedSpecs(
 
     const featureSlug = inferFeatureSlugFromId(feat.$id);
     const status = feat.status ? ` [${feat.status}]` : "";
-    const appName = inferAppName(feat);
 
     lines.push(`## ${feat.$id}${status}`);
     lines.push("");

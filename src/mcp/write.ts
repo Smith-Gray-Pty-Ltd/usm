@@ -2,10 +2,10 @@ import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
-import { parseUsm, parseUsmFile, isFeatureFile, isSystemFile, isServiceFile, findAllUsmFiles } from "../parse.js";
+import { parseUsm, parseUsmFile, isFeatureFile, isSystemFile, isServiceFile } from "../parse.js";
 import { validateUsm, validateUsmString } from "../validate.js";
 import { generateMarkdown } from "../generators/markdown.js";
-import { resolvePath, readFileOrNull, allUsmFilesInMonorepo } from "../mcp-utils.js";
+import { resolvePath, allUsmFilesInMonorepo } from "../mcp-utils.js";
 import type { FeatureUsm, UsmFile } from "../types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findUsmFiles, parseUsmFile } from "../index.js";
-import { resolvePath, defaultUsmDir, allUsmFilesInMonorepo } from "../mcp-utils.js";
+import { resolvePath, allUsmFilesInMonorepo } from "../mcp-utils.js";
 
 export const listSchema = {
   directory: z.string().optional().describe("Directory to search (default: all .usm dirs across monorepo)"),
