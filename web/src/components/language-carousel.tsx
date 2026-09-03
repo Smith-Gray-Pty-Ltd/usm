@@ -39,6 +39,13 @@ const languageLogos: Record<string, { name: string; path: string; color: string;
     frameworks: ["Spring Boot", "Javalin", "Quarkus"],
     code: "@GetMapping('/users')\npublic List<User> users() { ... }",
   },
+  kotlin: {
+    name: "Kotlin",
+    color: "#7F52FF",
+    path: "M1.378 0c-.339 0-.613.274-.613.613v22.774c0 .339.274.613.613.613h1.226c.339 0 .613-.274.613-.613V.613c0-.339-.274-.613-.613-.613H1.378zm14.568 0c-.213 0-.42.107-.522.291L9.418 11.014c-.06.099-.078.213-.078.331 0 .118.018.232.078.331l6.006 10.723c.102.184.309.291.522.291h2.262c.213 0 .42-.107.522-.291.102-.184.102-.42 0-.604L12.694 11.346l6.064-10.752c.102-.184.102-.42 0-.604C18.656.107 18.449 0 18.236 0h-2.29zm-7.444 6.783c-.213 0-.42.107-.522.291L4.394 12.13c-.06.099-.078.213-.078.331 0 .118.018.232.078.331l3.586 6.056c.102.184.309.291.522.291h2.262c.213 0 .42-.107.522-.291.102-.184.102-.42 0-.604L7.67 12.461l3.616-6.086c.102-.184.102-.42 0-.604C11.184 6.89 10.977 6.783 10.764 6.783H8.502z",
+    frameworks: ["Spring Boot", "Quarkus", "Javalin"],
+    code: "@GetMapping('/users')\nfun users(): List<User> { ... }",
+  },
   csharp: {
     name: "C#",
     color: "#512BD4",
@@ -90,7 +97,7 @@ const languageLogos: Record<string, { name: string; path: string; color: string;
   },
 };
 
-const languageOrder = ["typescript", "python", "go", "rust", "java", "csharp", "ruby", "php", "elixir", "swift", "scala", "cpp"];
+const languageOrder = ["typescript", "python", "go", "rust", "java", "kotlin", "csharp", "ruby", "php", "elixir", "swift", "scala", "cpp"];
 
 export function LanguageCarousel() {
   const [selected, setSelected] = useState("typescript");

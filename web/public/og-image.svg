@@ -47,8 +47,8 @@
 
   <!-- Tagline (subhead) -->
   <text x="100" y="440" font-family="Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="400" fill="#a1a1aa">
-    <tspan x="100" dy="0">Schema-validated specs. 10-20x fewer tokens.</tspan>
-    <tspan x="100" dy="30">Auto-generated docs and design artefacts.</tspan>
+    <tspan x="100" dy="0">Works with any MCP-compatible editor.</tspan>
+    <tspan x="100" dy="30">13 languages, 30+ frameworks — extensible.</tspan>
   </text>
 
   <!-- Feature chips at bottom -->

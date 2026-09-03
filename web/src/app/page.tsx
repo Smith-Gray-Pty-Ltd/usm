@@ -249,9 +249,9 @@ export default function Home() {
         <FadeIn>
           <div className="text-center mb-12">
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Step 1 — Scan &amp; Map</p>
-            <h2 className="text-3xl md:text-4xl font-semibold mb-3">Scans 12 languages, 30+ frameworks</h2>
+            <h2 className="text-3xl md:text-4xl font-semibold mb-3">13 languages, 30+ frameworks — and extensible</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Click a language to see supported frameworks and route detection patterns.
+              Ships with built-in detectors for 13 languages and 30+ frameworks. Add your own via <code className="text-xs bg-muted px-1 py-0.5 rounded">.usm/detectors/*.yaml</code> — no fork required.
             </p>
           </div>
         </FadeIn>
