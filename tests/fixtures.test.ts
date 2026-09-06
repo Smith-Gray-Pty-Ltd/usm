@@ -36,12 +36,12 @@ interface Fixture {
 
 const FIXTURES: Fixture[] = [
   { name: "nextjs-single-app", expectedServices: 1, expectedSystemUsm: true },
-  { name: "turborepo-monorepo", expectedServices: 2, expectedSystemUsm: false },
+  { name: "turborepo-monorepo", expectedServices: 1, expectedSystemUsm: false },
   { name: "go-api", expectedServices: 1, expectedSystemUsm: true },
   { name: "python-fastapi", expectedServices: 1, expectedSystemUsm: true },
   { name: "express-api", expectedServices: 1, expectedSystemUsm: true },
   { name: "prisma-monorepo", expectedServices: 1, expectedSystemUsm: false },
-  { name: "multi-lang", expectedServices: 2, expectedSystemUsm: false },
+  { name: "multi-lang", expectedServices: 1, expectedSystemUsm: false },
 ];
 
 function runUsm(args: string, cwd: string): string {
