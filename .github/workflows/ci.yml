@@ -10,7 +10,7 @@ jobs:
   build:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +38,7 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm run test
+        run: pnpm run test -- --pool=forks --poolOptions.forks.singleFork=true
 
       - name: USM check
         run: node dist/cli/index.js check
