@@ -1,0 +1,7 @@
+[project]
+name = "python-flask"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+flask = "^3.0.0"

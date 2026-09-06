@@ -1,0 +1,8 @@
+{
+  "name": "elysia-api",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "elysia": "^0.8.0"
+  }
+}

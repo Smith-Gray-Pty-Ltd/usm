@@ -1,0 +1,8 @@
+# Routes
+# This file defines all application routes
+
+GET     /api/users                   controllers.UserController.list
+POST    /api/users                   controllers.UserController.create
+GET     /api/users/:id               controllers.UserController.get(id: Long)
+DELETE  /api/users/:id               controllers.UserController.delete(id: Long)
+GET     /api/products                controllers.ProductController.list

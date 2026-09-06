@@ -35,23 +35,53 @@ interface Fixture {
 }
 
 const FIXTURES: Fixture[] = [
+  // ── Layout fixtures (test monorepo vs single-app detection) ──────────────
   { name: "nextjs-single-app", expectedServices: 1, expectedSystemUsm: true },
   { name: "turborepo-monorepo", expectedServices: 1, expectedSystemUsm: false },
-  { name: "go-api", expectedServices: 1, expectedSystemUsm: true },
-  { name: "python-fastapi", expectedServices: 1, expectedSystemUsm: true },
-  { name: "express-api", expectedServices: 1, expectedSystemUsm: true },
   { name: "prisma-monorepo", expectedServices: 1, expectedSystemUsm: false },
   { name: "multi-lang", expectedServices: 1, expectedSystemUsm: false },
+  // ── TypeScript / JavaScript frameworks ───────────────────────────────────
+  { name: "express-api", expectedServices: 1, expectedSystemUsm: true },
+  { name: "hono-api", expectedServices: 1, expectedSystemUsm: true },
+  { name: "nestjs-api", expectedServices: 1, expectedSystemUsm: true },
+  { name: "elysia-api", expectedServices: 1, expectedSystemUsm: true },
+  // ── Python frameworks ────────────────────────────────────────────────────
+  { name: "python-fastapi", expectedServices: 1, expectedSystemUsm: true },
+  { name: "python-flask", expectedServices: 1, expectedSystemUsm: true },
+  { name: "python-django", expectedServices: 1, expectedSystemUsm: true },
+  // ── Go frameworks ────────────────────────────────────────────────────────
+  { name: "go-api", expectedServices: 1, expectedSystemUsm: true },        // gin
+  { name: "go-echo", expectedServices: 1, expectedSystemUsm: true },
+  { name: "go-chi", expectedServices: 1, expectedSystemUsm: true },
+  // ── Rust frameworks ──────────────────────────────────────────────────────
   { name: "rust-axum", expectedServices: 1, expectedSystemUsm: true },
+  { name: "rust-actix", expectedServices: 1, expectedSystemUsm: true },
+  { name: "rust-rocket", expectedServices: 1, expectedSystemUsm: true },
+  // ── Java / Kotlin frameworks ─────────────────────────────────────────────
   { name: "java-spring", expectedServices: 1, expectedSystemUsm: true },
+  { name: "java-quarkus", expectedServices: 1, expectedSystemUsm: true },
   { name: "kotlin-spring", expectedServices: 1, expectedSystemUsm: true },
+  { name: "kotlin-javalin", expectedServices: 1, expectedSystemUsm: true },
+  // ── C# / .NET ────────────────────────────────────────────────────────────
   { name: "csharp-aspnet", expectedServices: 1, expectedSystemUsm: true },
+  // ── Ruby frameworks ──────────────────────────────────────────────────────
   { name: "ruby-sinatra", expectedServices: 1, expectedSystemUsm: true },
+  { name: "ruby-rails", expectedServices: 1, expectedSystemUsm: true },
+  // ── PHP frameworks ───────────────────────────────────────────────────────
   { name: "php-laravel", expectedServices: 1, expectedSystemUsm: true },
+  { name: "php-symfony", expectedServices: 1, expectedSystemUsm: true },
+  { name: "php-slim", expectedServices: 1, expectedSystemUsm: true },
+  // ── Elixir ───────────────────────────────────────────────────────────────
   { name: "elixir-phoenix", expectedServices: 1, expectedSystemUsm: true },
+  // ── Swift ────────────────────────────────────────────────────────────────
   { name: "swift-vapor", expectedServices: 1, expectedSystemUsm: true },
+  // ── Scala frameworks ─────────────────────────────────────────────────────
   { name: "scala-akka", expectedServices: 1, expectedSystemUsm: true },
+  { name: "scala-play", expectedServices: 1, expectedSystemUsm: true },
+  { name: "scala-tapir", expectedServices: 1, expectedSystemUsm: true },
+  // ── C++ frameworks ───────────────────────────────────────────────────────
   { name: "cpp-crow", expectedServices: 1, expectedSystemUsm: true },
+  { name: "cpp-drogon", expectedServices: 1, expectedSystemUsm: true },
 ];
 
 function runUsm(args: string, cwd: string): string {

@@ -1,0 +1,11 @@
+api_users_get:
+    path: /api/users
+    methods: [GET]
+
+api_users_post:
+    path: /api/users
+    methods: [POST]
+
+api_products_get:
+    path: /api/products
+    methods: [GET]

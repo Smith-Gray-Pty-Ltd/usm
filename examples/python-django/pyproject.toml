@@ -1,0 +1,7 @@
+[project]
+name = "python-django"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "^5.0.0"

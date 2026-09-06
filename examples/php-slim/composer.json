@@ -1,0 +1,7 @@
+{
+  "name": "example/php-slim",
+  "version": "0.1.0",
+  "require": {
+    "slim/slim": "^4.0"
+  }
+}

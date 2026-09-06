@@ -1,0 +1,32 @@
+$schema: https://usm.dev/schema/v1.json
+$id: cpp-drogon/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: cpp-drogon — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: cpp-drogon
+  domain: example.com
+services:
+  - id: cpp-drogon/service
+    name: Service
+    ref: apps/cpp-drogon/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []
