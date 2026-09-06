@@ -42,6 +42,16 @@ const FIXTURES: Fixture[] = [
   { name: "express-api", expectedServices: 1, expectedSystemUsm: true },
   { name: "prisma-monorepo", expectedServices: 1, expectedSystemUsm: false },
   { name: "multi-lang", expectedServices: 1, expectedSystemUsm: false },
+  { name: "rust-axum", expectedServices: 1, expectedSystemUsm: true },
+  { name: "java-spring", expectedServices: 1, expectedSystemUsm: true },
+  { name: "kotlin-spring", expectedServices: 1, expectedSystemUsm: true },
+  { name: "csharp-aspnet", expectedServices: 1, expectedSystemUsm: true },
+  { name: "ruby-sinatra", expectedServices: 1, expectedSystemUsm: true },
+  { name: "php-laravel", expectedServices: 1, expectedSystemUsm: true },
+  { name: "elixir-phoenix", expectedServices: 1, expectedSystemUsm: true },
+  { name: "swift-vapor", expectedServices: 1, expectedSystemUsm: true },
+  { name: "scala-akka", expectedServices: 1, expectedSystemUsm: true },
+  { name: "cpp-crow", expectedServices: 1, expectedSystemUsm: true },
 ];
 
 function runUsm(args: string, cwd: string): string {

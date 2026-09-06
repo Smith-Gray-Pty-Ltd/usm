@@ -1,0 +1,32 @@
+$schema: https://usm.dev/schema/v1.json
+$id: ruby-sinatra/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: ruby-sinatra — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: ruby-sinatra
+  domain: example.com
+services:
+  - id: ruby-sinatra/service
+    name: Service
+    ref: apps/ruby-sinatra/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []

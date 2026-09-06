@@ -1,0 +1,7 @@
+{
+  "name": "example/php-laravel",
+  "version": "0.1.0",
+  "require": {
+    "laravel/framework": "^10.0"
+  }
+}

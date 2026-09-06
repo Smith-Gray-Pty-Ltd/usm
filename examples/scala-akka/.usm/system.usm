@@ -1,0 +1,32 @@
+$schema: https://usm.dev/schema/v1.json
+$id: scala-akka/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: scala-akka — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: scala-akka
+  domain: example.com
+services:
+  - id: scala-akka/service
+    name: Service
+    ref: apps/scala-akka/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []

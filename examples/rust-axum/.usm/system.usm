@@ -1,0 +1,32 @@
+$schema: https://usm.dev/schema/v1.json
+$id: rust-axum/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: rust-axum — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: rust-axum
+  domain: example.com
+services:
+  - id: rust-axum/service
+    name: Service
+    ref: apps/rust-axum/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []

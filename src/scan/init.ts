@@ -64,6 +64,15 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
       const hasCargo = fs.existsSync(path.join(dir, "Cargo.toml"));
       const hasPyproject = fs.existsSync(path.join(dir, "pyproject.toml"));
       const hasRequirements = fs.existsSync(path.join(dir, "requirements.txt"));
+      const hasPomXml = fs.existsSync(path.join(dir, "pom.xml"));
+      const hasBuildGradle = fs.existsSync(path.join(dir, "build.gradle"));
+      const hasCsproj = fg.sync(["*.csproj"], { cwd: dir, onlyFiles: true }).length > 0;
+      const hasGemfile = fs.existsSync(path.join(dir, "Gemfile"));
+      const hasComposerJson = fs.existsSync(path.join(dir, "composer.json"));
+      const hasMixExs = fs.existsSync(path.join(dir, "mix.exs"));
+      const hasPackageSwift = fs.existsSync(path.join(dir, "Package.swift"));
+      const hasBuildSbt = fs.existsSync(path.join(dir, "build.sbt"));
+      const hasCMakeLists = fs.existsSync(path.join(dir, "CMakeLists.txt"));
 
       if (fs.existsSync(pkgJsonPath)) {
         const pkgJson = readPackageJson(pkgJsonPath);
@@ -71,11 +80,10 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
         const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
         const kind = detectServiceKind(pkgJson, relativePath);
         services.push({ match: relativePath, kind, summary: `${name} — ${kind} service` });
-      } else if (hasGoMod) {
-        services.push({ match: relativePath, kind: "api-server", summary: `${shortNameFromPath(relativePath)} — api-server service` });
-      } else if (hasCargo) {
-        services.push({ match: relativePath, kind: "api-server", summary: `${shortNameFromPath(relativePath)} — api-server service` });
-      } else if (hasPyproject || hasRequirements) {
+      } else if (hasGoMod || hasCargo || hasPyproject || hasRequirements ||
+                 hasPomXml || hasBuildGradle || hasCsproj || hasGemfile ||
+                 hasComposerJson || hasMixExs || hasPackageSwift || hasBuildSbt ||
+                 hasCMakeLists) {
         services.push({ match: relativePath, kind: "api-server", summary: `${shortNameFromPath(relativePath)} — api-server service` });
       }
     }
@@ -100,16 +108,29 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
     }
   } else {
     // ── Single-app layout ──────────────────────────────────────────────
-    // Detect a service at the root (package.json/go.mod/Cargo.toml/etc).
-    // Use the root directory as the service match.
+    // Detect a service at the root by checking for any known manifest file.
+    // Each language has its own manifest — see BUILTIN_DETECTORS in detectors.ts.
     const rootPkgJsonPath = path.join(root, "package.json");
     const hasRootPkg = fs.existsSync(rootPkgJsonPath);
     const hasGoMod = fs.existsSync(path.join(root, "go.mod"));
     const hasCargo = fs.existsSync(path.join(root, "Cargo.toml"));
     const hasPyproject = fs.existsSync(path.join(root, "pyproject.toml"));
     const hasRequirements = fs.existsSync(path.join(root, "requirements.txt"));
+    const hasPomXml = fs.existsSync(path.join(root, "pom.xml"));
+    const hasBuildGradle = fs.existsSync(path.join(root, "build.gradle"));
+    const hasCsproj = fg.sync(["*.csproj"], { cwd: root, onlyFiles: true }).length > 0;
+    const hasGemfile = fs.existsSync(path.join(root, "Gemfile"));
+    const hasComposerJson = fs.existsSync(path.join(root, "composer.json"));
+    const hasMixExs = fs.existsSync(path.join(root, "mix.exs"));
+    const hasPackageSwift = fs.existsSync(path.join(root, "Package.swift"));
+    const hasBuildSbt = fs.existsSync(path.join(root, "build.sbt"));
+    const hasCMakeLists = fs.existsSync(path.join(root, "CMakeLists.txt"));
 
-    if (hasRootPkg || hasGoMod || hasCargo || hasPyproject || hasRequirements) {
+    const hasAnyManifest = hasRootPkg || hasGoMod || hasCargo || hasPyproject ||
+      hasRequirements || hasPomXml || hasBuildGradle || hasCsproj || hasGemfile ||
+      hasComposerJson || hasMixExs || hasPackageSwift || hasBuildSbt || hasCMakeLists;
+
+    if (hasAnyManifest) {
       let name = path.basename(root);
       let kind: UsmConfigServiceRule["kind"] = "api-server";
 
@@ -120,7 +141,7 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
           kind = detectServiceKind(pkgJson, ".");
         }
       }
-      // Go and Rust default to api-server
+      // All other languages default to api-server
 
       services.push({
         match: ".",

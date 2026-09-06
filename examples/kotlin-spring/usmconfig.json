@@ -1,0 +1,48 @@
+{
+  "$schema": "https://usm.dev/schema/usmconfig-v1.json",
+  "version": "1",
+  "name": "kotlin-spring",
+  "sources": {
+    "root": ".",
+    "include": [
+      "src"
+    ],
+    "exclude": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/build/**"
+    ],
+    "package_manifests": [
+      "**/package.json"
+    ],
+    "code_globs": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js"
+    ]
+  },
+  "shared": [],
+  "services": [
+    {
+      "match": ".",
+      "kind": "api-server",
+      "summary": "kotlin-spring — api-server service"
+    }
+  ],
+  "data": [],
+  "outputs": {
+    "usm_source": ".usm/",
+    "design_docs": "docs/design/",
+    "help_docs": "docs/help/",
+    "api_docs": "docs/api/",
+    "agent_context": ".usm-workspace/",
+    "tests": "tests/auto-generated/",
+    "diagrams": "docs/diagrams/"
+  },
+  "generation": {
+    "merge_with_existing": "smart",
+    "preserve_comments": true,
+    "format": "github-flavored-markdown"
+  }
+}

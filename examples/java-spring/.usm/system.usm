@@ -1,0 +1,32 @@
+$schema: https://usm.dev/schema/v1.json
+$id: java-spring/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: java-spring — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: java-spring
+  domain: example.com
+services:
+  - id: java-spring/service
+    name: Service
+    ref: apps/java-spring/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []
