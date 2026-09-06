@@ -570,6 +570,10 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
   if (audience === "developer" && docExists("agent-setup-guide")) {
     gettingStarted.push({ text: "Agent Setup Guide", link: "/agent-setup-guide" });
   }
+  // Editor setup guides — available for both audiences (help + developer)
+  if (docExists("editor-setup/index")) {
+    gettingStarted.push({ text: "Editor Setup", link: "/editor-setup/" });
+  }
   pushIfAny("Getting Started", gettingStarted);
 
   if (!fs.existsSync(systemPath)) return sidebar;
