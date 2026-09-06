@@ -20,12 +20,19 @@ import {
 } from "./utils.js";
 
 /**
- * Analyze the monorepo at the given root and generate a starter usmconfig.json.
+ * Analyze the repo at the given root and generate a starter usmconfig.json.
+ *
+ * Detects two layouts:
+ *   - Monorepo: has apps/* and/or packages/* directories
+ *   - Single-app: has a package.json/go.mod/Cargo.toml/etc at the root or in src/
+ *
+ * For monorepos, each app/package gets its own service rule.
+ * For single-app repos, the root (or src/) is registered as a single service.
  */
 export async function initConfig(options: InitOptions): Promise<UsmConfig> {
   const root = path.resolve(options.root);
 
-  // 1. Detect workspaces (apps + packages)
+  // 1. Detect workspaces (apps + packages) — monorepo layout
   const appDirs = fg.sync(["apps/*"], {
     cwd: root,
     absolute: true,
@@ -40,45 +47,84 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
     ignore: ["**/node_modules/**"],
   });
 
+  const isMonorepo = appDirs.length > 0 || pkgDirs.length > 0;
+
   // 2. Read package.json for each workspace
   const services: UsmConfigServiceRule[] = [];
   const sharedPackages: UsmConfigSharedPackage[] = [];
 
-  for (const dir of appDirs) {
-    const pkgJsonPath = path.join(dir, "package.json");
-    if (!fs.existsSync(pkgJsonPath)) continue;
+  // Source include patterns — defaults to monorepo layout
+  let sourceIncludes = ["apps/*", "packages/*"];
 
-    const pkgJson = readPackageJson(pkgJsonPath);
-    if (!pkgJson) continue;
+  if (isMonorepo) {
+    for (const dir of appDirs) {
+      const pkgJsonPath = path.join(dir, "package.json");
+      if (!fs.existsSync(pkgJsonPath)) continue;
 
-    const relativePath = path.relative(root, dir);
-    const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
-    const kind = detectServiceKind(pkgJson, relativePath);
+      const pkgJson = readPackageJson(pkgJsonPath);
+      if (!pkgJson) continue;
 
-    services.push({
-      match: relativePath,
-      kind,
-      summary: `${name} — ${kind} service`,
-    });
-  }
+      const relativePath = path.relative(root, dir);
+      const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
+      const kind = detectServiceKind(pkgJson, relativePath);
 
-  for (const dir of pkgDirs) {
-    const pkgJsonPath = path.join(dir, "package.json");
-    if (!fs.existsSync(pkgJsonPath)) continue;
+      services.push({
+        match: relativePath,
+        kind,
+        summary: `${name} — ${kind} service`,
+      });
+    }
 
-    const pkgJson = readPackageJson(pkgJsonPath);
-    if (!pkgJson) continue;
+    for (const dir of pkgDirs) {
+      const pkgJsonPath = path.join(dir, "package.json");
+      if (!fs.existsSync(pkgJsonPath)) continue;
 
-    const relativePath = path.relative(root, dir);
-    const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
-    const kind = classifyPackageKind(pkgJson, relativePath);
+      const pkgJson = readPackageJson(pkgJsonPath);
+      if (!pkgJson) continue;
 
-    sharedPackages.push({
-      id: name,
-      match: relativePath,
-      kind,
-      summary: `${name} — ${kind} shared package`,
-    });
+      const relativePath = path.relative(root, dir);
+      const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
+      const kind = classifyPackageKind(pkgJson, relativePath);
+
+      sharedPackages.push({
+        id: name,
+        match: relativePath,
+        kind,
+        summary: `${name} — ${kind} shared package`,
+      });
+    }
+  } else {
+    // ── Single-app layout ──────────────────────────────────────────────
+    // Detect a service at the root (package.json/go.mod/Cargo.toml/etc).
+    // Use the root directory as the service match.
+    const rootPkgJsonPath = path.join(root, "package.json");
+    const hasRootPkg = fs.existsSync(rootPkgJsonPath);
+    const hasGoMod = fs.existsSync(path.join(root, "go.mod"));
+    const hasCargo = fs.existsSync(path.join(root, "Cargo.toml"));
+
+    if (hasRootPkg || hasGoMod || hasCargo) {
+      let name = path.basename(root);
+      let kind: UsmConfigServiceRule["kind"] = "api-server";
+
+      if (hasRootPkg) {
+        const pkgJson = readPackageJson(rootPkgJsonPath);
+        if (pkgJson) {
+          name = shortNameFromPackageJson(pkgJson.name) || name;
+          kind = detectServiceKind(pkgJson, ".");
+        }
+      }
+      // Go and Rust default to api-server
+
+      services.push({
+        match: ".",
+        kind,
+        summary: `${name} — ${kind} service`,
+      });
+
+      // For single-app repos, scan the root (or src/ if it exists)
+      const srcDir = path.join(root, "src");
+      sourceIncludes = fs.existsSync(srcDir) ? ["src"] : ["."];
+    }
   }
 
   // 3. Detect Prisma schemas
@@ -110,7 +156,8 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
   if (fs.existsSync(rootPkgJsonPath)) {
     const rootPkgJson = readPackageJson(rootPkgJsonPath);
     if (rootPkgJson?.name) {
-      projectName = rootPkgJson.name.replace("@smith-gray/", "");
+      // Strip npm org scope (e.g. @payloadcms/template-website → template-website)
+      projectName = rootPkgJson.name.replace(/^@[^/]+\//, "");
     }
   }
 
@@ -121,7 +168,7 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
     name: projectName,
     sources: {
       root: ".",
-      include: ["apps/*", "packages/*"],
+      include: sourceIncludes,
       exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**", "**/build/**"],
       package_manifests: ["**/package.json"],
       code_globs: ["**/*.ts", "**/*.tsx", "**/*.js"],
