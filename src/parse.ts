@@ -180,11 +180,12 @@ export function findAllUsmFiles(root: string): string[] {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const glob = require("fast-glob");
 
-  // Find all directories named .usm (but not nested inside node_modules or .next)
+  // Find all directories named .usm (but not nested inside node_modules,
+  // .next, dist, or examples/ (fixture codebases for testing).
   const usmDirs = glob.sync("**/.usm", {
     cwd: resolvedRoot,
     absolute: true,
-    ignore: ["**/node_modules/**", "**/.next/**", "**/dist/**"],
+    ignore: ["**/node_modules/**", "**/.next/**", "**/dist/**", "examples/**"],
     onlyDirectories: true,
   });
 
