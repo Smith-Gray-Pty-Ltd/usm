@@ -6,6 +6,7 @@ on:
     paths:
       - "web/**"
       - "schema/**"
+      - "package.json"
       - ".github/workflows/marketing.yml"
   workflow_dispatch:
 
