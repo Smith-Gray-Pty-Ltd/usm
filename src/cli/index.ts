@@ -1193,6 +1193,32 @@ program
         console.error(fail(`togaf — ${(err as Error).message}`));
       }
     }
+
+    // ─── Pass 7: Copy static docs-source/ files (editor setup guides, etc.) ─
+    // Hand-authored content that supplements the generated docs (e.g. 35
+    // per-editor MCP setup guides) lives in docs-source/ and is copied into
+    // .usm-workspace/docs/ so it appears in both developer and help docs sites.
+    if (!options.check && (runAll || onlyTarget === "docs")) {
+      const docsSourceDir = path.join(root, "docs-source");
+      if (fs.existsSync(docsSourceDir)) {
+        const docsOutputDir = path.join(root, ".usm-workspace", "docs");
+        const copyDir = (srcDir: string, destDir: string) => {
+          for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+            const srcPath = path.join(srcDir, entry.name);
+            const destPath = path.join(destDir, entry.name);
+            if (entry.isDirectory()) {
+              fs.mkdirSync(destPath, { recursive: true });
+              copyDir(srcPath, destPath);
+            } else if (entry.isFile()) {
+              fs.mkdirSync(path.dirname(destPath), { recursive: true });
+              fs.copyFileSync(srcPath, destPath);
+              console.log(arrow(`${destPath} ${dim("(docs-source)")}`));
+            }
+          }
+        };
+        copyDir(docsSourceDir, docsOutputDir);
+      }
+    }
   });
 
 // ─── roundtrip ─────────────────────────────────────────────────────────────────
