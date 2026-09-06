@@ -1,0 +1,33 @@
+$schema: https://usm.dev/schema/v1.json
+$id: nextjs-single-app/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: nextjs-single-app — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: nextjs-single-app
+  domain: example.com
+services:
+  - id: nextjs-single-app/service
+    name: Service
+    ref: apps/nextjs-single-app/service.usm
+    port: 3000
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []

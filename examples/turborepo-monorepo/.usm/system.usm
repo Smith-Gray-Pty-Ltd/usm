@@ -1,0 +1,41 @@
+$schema: https://usm.dev/schema/v1.json
+$id: turborepo-monorepo/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: turborepo-monorepo — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: turborepo-monorepo
+  domain: example.com
+services:
+  - id: turborepo-monorepo/service
+    name: Service
+    ref: apps/api/service.usm
+  - id: turborepo-monorepo/service
+    name: Service
+    ref: apps/web/service.usm
+  - id: turborepo-monorepo/service
+    name: Service
+    ref: packages/@my-org/db/service.usm
+  - id: turborepo-monorepo/service
+    name: Service
+    ref: packages/@my-org/ui/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []

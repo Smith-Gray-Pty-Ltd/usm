@@ -58,21 +58,26 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
 
   if (isMonorepo) {
     for (const dir of appDirs) {
-      const pkgJsonPath = path.join(dir, "package.json");
-      if (!fs.existsSync(pkgJsonPath)) continue;
-
-      const pkgJson = readPackageJson(pkgJsonPath);
-      if (!pkgJson) continue;
-
       const relativePath = path.relative(root, dir);
-      const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
-      const kind = detectServiceKind(pkgJson, relativePath);
+      const pkgJsonPath = path.join(dir, "package.json");
+      const hasGoMod = fs.existsSync(path.join(dir, "go.mod"));
+      const hasCargo = fs.existsSync(path.join(dir, "Cargo.toml"));
+      const hasPyproject = fs.existsSync(path.join(dir, "pyproject.toml"));
+      const hasRequirements = fs.existsSync(path.join(dir, "requirements.txt"));
 
-      services.push({
-        match: relativePath,
-        kind,
-        summary: `${name} — ${kind} service`,
-      });
+      if (fs.existsSync(pkgJsonPath)) {
+        const pkgJson = readPackageJson(pkgJsonPath);
+        if (!pkgJson) continue;
+        const name = shortNameFromPackageJson(pkgJson.name) || shortNameFromPath(relativePath);
+        const kind = detectServiceKind(pkgJson, relativePath);
+        services.push({ match: relativePath, kind, summary: `${name} — ${kind} service` });
+      } else if (hasGoMod) {
+        services.push({ match: relativePath, kind: "api-server", summary: `${shortNameFromPath(relativePath)} — api-server service` });
+      } else if (hasCargo) {
+        services.push({ match: relativePath, kind: "api-server", summary: `${shortNameFromPath(relativePath)} — api-server service` });
+      } else if (hasPyproject || hasRequirements) {
+        services.push({ match: relativePath, kind: "api-server", summary: `${shortNameFromPath(relativePath)} — api-server service` });
+      }
     }
 
     for (const dir of pkgDirs) {
@@ -101,8 +106,10 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
     const hasRootPkg = fs.existsSync(rootPkgJsonPath);
     const hasGoMod = fs.existsSync(path.join(root, "go.mod"));
     const hasCargo = fs.existsSync(path.join(root, "Cargo.toml"));
+    const hasPyproject = fs.existsSync(path.join(root, "pyproject.toml"));
+    const hasRequirements = fs.existsSync(path.join(root, "requirements.txt"));
 
-    if (hasRootPkg || hasGoMod || hasCargo) {
+    if (hasRootPkg || hasGoMod || hasCargo || hasPyproject || hasRequirements) {
       let name = path.basename(root);
       let kind: UsmConfigServiceRule["kind"] = "api-server";
 

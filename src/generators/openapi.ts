@@ -643,7 +643,7 @@ export function generateOpenApiTypes(
   return {
     outputs: [
       {
-        path: `${root}/packages/types/src/openapi.ts`,
+        path: `${root}/.usm-workspace/openapi/openapi-types.ts`,
         content: lines.join("\n"),
       },
     ],

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://usm.dev/schema/usmconfig-v1.json",
+  "version": "1",
+  "name": "turborepo-monorepo",
+  "sources": {
+    "root": ".",
+    "include": [
+      "apps/*",
+      "packages/*"
+    ],
+    "exclude": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "**/build/**"
+    ],
+    "package_manifests": [
+      "**/package.json"
+    ],
+    "code_globs": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js"
+    ]
+  },
+  "shared": [
+    {
+      "id": "@my-org/db",
+      "match": "packages/db",
+      "kind": "orm",
+      "summary": "@my-org/db — orm shared package"
+    },
+    {
+      "id": "@my-org/ui",
+      "match": "packages/ui",
+      "kind": "ui-kit",
+      "summary": "@my-org/ui — ui-kit shared package"
+    }
+  ],
+  "services": [
+    {
+      "match": "apps/api",
+      "kind": "api-server",
+      "summary": "@my-org/api — api-server service"
+    },
+    {
+      "match": "apps/web",
+      "kind": "web-app",
+      "summary": "@my-org/web — web-app service"
+    }
+  ],
+  "data": [
+    {
+      "match": "packages/db/prisma/schema.prisma",
+      "kind": "prisma",
+      "extract": {
+        "models": true,
+        "relations": false,
+        "enums": false
+      }
+    }
+  ],
+  "outputs": {
+    "usm_source": ".usm/",
+    "design_docs": "docs/design/",
+    "help_docs": "docs/help/",
+    "api_docs": "docs/api/",
+    "agent_context": ".usm-workspace/",
+    "tests": "tests/auto-generated/",
+    "diagrams": "docs/diagrams/"
+  },
+  "generation": {
+    "merge_with_existing": "smart",
+    "preserve_comments": true,
+    "format": "github-flavored-markdown"
+  }
+}

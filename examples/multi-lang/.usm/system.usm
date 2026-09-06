@@ -1,0 +1,38 @@
+$schema: https://usm.dev/schema/v1.json
+$id: multi-lang/system
+$type: system
+$version: 1
+$last_updated: '2026-09-06'
+summary: multi-lang — system description. Edit this to describe what the system does in 1-3 sentences.
+identity:
+  name: multi-lang
+  domain: example.com
+services:
+  - id: multi-lang/service
+    name: Service
+    ref: apps/api/service.usm
+  - id: multi-lang/service
+    name: Service
+    ref: apps/web/service.usm
+  - id: multi-lang/service
+    name: Service
+    ref: packages/@my-org/db/service.usm
+roles: []
+apis: []
+data: []
+infrastructure:
+  cloud: ''
+  region: ''
+  dns: ''
+deployment:
+  environments:
+    - name: dev
+      url: http://localhost:3000
+      type: local
+operations:
+  monitoring: ''
+  alerts: ''
+  on_call: ''
+policies:
+  refs: []
+index: []
