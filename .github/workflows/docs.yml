@@ -29,9 +29,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install VitePress
-        run: pnpm add -D vitepress
-
       - name: Build USM
         run: pnpm run build
 

@@ -1,0 +1,246 @@
+{
+  "serverInfo": {
+    "name": "USM — Universal System Map",
+    "version": "0.7.0"
+  },
+  "authentication": {
+    "required": false,
+    "schemes": []
+  },
+  "tools": [
+    {
+      "name": "usm_list",
+      "description": "List all .usm files in a directory with id, type, version, and summary. Optionally filter by $type.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "directory": { "type": "string", "description": "Directory to search (default: all .usm dirs across monorepo)" },
+          "type": { "type": "string", "enum": ["system", "service", "feature", "api", "data", "policy", "operations"], "description": "Filter by $type" }
+        }
+      }
+    },
+    {
+      "name": "usm_read",
+      "description": "Read and parse a .usm file, returning the full object plus metadata.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Path to the .usm file (relative to monorepo root or absolute)" }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "usm_search",
+      "description": "Search all .usm files for a query string. Returns matching files with excerpts and relevance scores.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search query string" },
+          "directory": { "type": "string", "description": "Directory to search (default: all .usm dirs)" },
+          "case_sensitive": { "type": "boolean", "description": "Case-sensitive search (default: false)" }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "usm_query",
+      "description": "Query all .usm files with a predicate expression — typed impact analysis instead of grepping raw YAML.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Predicate query, e.g. 'features where status = planned'" },
+          "limit": { "type": "number", "description": "Max results to return (default: 50)" }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "usm_summary",
+      "description": "Get a quick summary of a .usm file — id, type, version, summary, and type-specific counts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Path to the .usm file" }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "usm_references",
+      "description": "Find all .usm files that reference a target $id. Useful for impact analysis.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target_id": { "type": "string", "description": "The $id to find references to" },
+          "directory": { "type": "string", "description": "Directory to search (default: .usm)" }
+        },
+        "required": ["target_id"]
+      }
+    },
+    {
+      "name": "usm_draft_feature",
+      "description": "Draft a feature .usm spec from structured fields. Validates against the v1 schema and returns YAML + markdown preview. Does NOT write to disk.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Feature $id (e.g. 'my-org/auth-login')" },
+          "system": { "type": "string", "description": "System $id this feature belongs to" },
+          "service": { "type": "string", "description": "Service $id this feature belongs to" },
+          "summary": { "type": "string", "description": "1-3 sentence summary" },
+          "intent": { "type": "string", "description": "Why this feature exists — 1-3 sentences" },
+          "status": { "type": "string", "enum": ["planned", "in-progress", "built", "deprecated"] },
+          "flows": { "type": "string", "description": "JSON array of flow objects" },
+          "contracts": { "type": "string", "description": "JSON array of contract objects" },
+          "tests": { "type": "string", "description": "JSON array of test objects" },
+          "decisions": { "type": "string", "description": "JSON array of decision objects" }
+        },
+        "required": ["id", "system", "service", "summary", "intent"]
+      }
+    },
+    {
+      "name": "usm_write_feature",
+      "description": "Write a feature .usm file to disk. Validates the YAML against the v1 schema before writing atomically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": { "type": "string", "description": "YAML content of the feature .usm file" },
+          "path": { "type": "string", "description": "Target file path (relative to monorepo root or absolute)" }
+        },
+        "required": ["yaml", "path"]
+      }
+    },
+    {
+      "name": "usm_write_service",
+      "description": "Create or replace a service .usm file. Validates against the v1 schema ($type: service) before writing atomically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": { "type": "string", "description": "Full YAML content of the service .usm file" },
+          "path": { "type": "string", "description": "Output path (e.g. .usm/apps/my-app/service.usm)" }
+        },
+        "required": ["yaml", "path"]
+      }
+    },
+    {
+      "name": "usm_write_system",
+      "description": "Create or replace a system.usm file. Validates against the v1 schema ($type: system) before writing atomically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "yaml": { "type": "string", "description": "Full YAML content of the system.usm file" },
+          "path": { "type": "string", "description": "Output path (defaults to .usm/system.usm)" }
+        },
+        "required": ["yaml"]
+      }
+    },
+    {
+      "name": "usm_update_feature",
+      "description": "Update fields on an existing feature .usm file. Id-bearing arrays (contracts, flows, tests, decisions) are merged by id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Feature $id to find" },
+          "path": { "type": "string", "description": "Direct file path (alternative to id)" },
+          "fields": { "type": "string", "description": "JSON object of fields to update" },
+          "replace": { "type": "string", "description": "JSON array of field names to replace wholesale" }
+        }
+      }
+    },
+    {
+      "name": "usm_update_feature_status",
+      "description": "Update the status of a feature (planned → in-progress → built → deprecated). Enforces valid transitions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Feature $id to find" },
+          "path": { "type": "string", "description": "Direct file path (alternative to id)" },
+          "status": { "type": "string", "enum": ["planned", "in-progress", "built", "deprecated"] },
+          "implementation_path": { "type": "string", "description": "Primary implementation file path" },
+          "test_code": { "type": "string", "description": "Test code file path" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "usm_update_service",
+      "description": "Update fields on an existing service .usm file. Id-bearing arrays (data_models, routes, modules) are merged by id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Service $id to find" },
+          "path": { "type": "string", "description": "Direct file path (alternative to id)" },
+          "fields": { "type": "string", "description": "JSON object of fields to update" },
+          "replace": { "type": "string", "description": "JSON array of field names to replace wholesale" }
+        }
+      }
+    },
+    {
+      "name": "usm_update_system",
+      "description": "Update fields on an existing system.usm file. Id-bearing arrays (services, index, roles) are merged by id.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "System $id to find" },
+          "path": { "type": "string", "description": "Direct file path (alternative to id)" },
+          "fields": { "type": "string", "description": "JSON object of fields to update" },
+          "replace": { "type": "string", "description": "JSON array of field names to replace wholesale" }
+        }
+      }
+    },
+    {
+      "name": "usm_validate",
+      "description": "Validate a .usm file (by path) or inline YAML content against the v1 JSON Schema. Returns { valid, errors }.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Path to the .usm file to validate" },
+          "content": { "type": "string", "description": "Inline YAML content to validate" }
+        }
+      }
+    },
+    {
+      "name": "usm_get_contracts",
+      "description": "Get the contracts array from a feature .usm file. Each contract has id, description, applies_after, and must_have.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Path to a feature .usm file" }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "usm_get_flows",
+      "description": "Get the flows array from a feature .usm file. Each flow has id, name, description, and steps.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Path to a feature .usm file" }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "usm_report_feedback",
+      "description": "Report a bug, improvement, or question as a structured $type: feedback entry in .usm/feedback/.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["bug", "improvement", "question"] },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "summary": { "type": "string", "description": "Description (min 10 chars)" },
+          "reported_by": { "type": "string", "description": "Who reported this (e.g. 'agent:glm-5.2' or 'human:james')" },
+          "title": { "type": "string" },
+          "feature": { "type": "string", "description": "Related feature $id" },
+          "reproduction": { "type": "string" },
+          "suggested_fix": { "type": "string" },
+          "write": { "type": "boolean", "description": "Force writing to disk" }
+        },
+        "required": ["kind", "severity", "summary", "reported_by"]
+      }
+    }
+  ],
+  "resources": [],
+  "prompts": []
+}
