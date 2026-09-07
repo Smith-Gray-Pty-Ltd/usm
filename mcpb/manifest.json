@@ -1,0 +1,61 @@
+{
+  "manifest_version": "0.3",
+  "name": "usm",
+  "display_name": "USM — Universal System Map",
+  "version": "0.7.0",
+  "description": "Structured source of truth for human + AI software development. Schema-validated specs, 18 MCP tools, auto-generated docs. Works with any MCP-compatible editor.",
+  "long_description": "USM (Universal System Map) is a spec-first development tool that gives AI agents structured context about your system. Write specs in YAML validated by a JSON Schema, and USM generates markdown docs, Mermaid diagrams, OpenAPI specs, TOGAF deliverables, and Vitest test scaffolds. 18 MCP tools let agents read, search, draft, write, and update specs — using 10-20x fewer tokens than bloated Markdown vaults.",
+  "author": {
+    "name": "Smith & Gray Pty Ltd",
+    "email": "james@smith-gray.com",
+    "url": "https://smith-gray.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Smith-Gray-Pty-Ltd/usm.git"
+  },
+  "homepage": "https://usm.dev",
+  "documentation": "https://docs.usm.dev",
+  "support": "https://github.com/Smith-Gray-Pty-Ltd/usm/issues",
+  "icon": "icon.png",
+  "tools": [
+    { "name": "usm_list", "description": "List all .usm files with id, type, version, and summary" },
+    { "name": "usm_read", "description": "Read and parse a .usm file" },
+    { "name": "usm_search", "description": "Search all .usm files for a query string" },
+    { "name": "usm_query", "description": "Query .usm files with a predicate expression" },
+    { "name": "usm_summary", "description": "Get a quick summary of a .usm file" },
+    { "name": "usm_references", "description": "Find all .usm files that reference a target $id" },
+    { "name": "usm_draft_feature", "description": "Draft a feature .usm spec from structured fields" },
+    { "name": "usm_write_feature", "description": "Write a feature .usm file to disk" },
+    { "name": "usm_write_service", "description": "Create or replace a service .usm file" },
+    { "name": "usm_write_system", "description": "Create or replace a system.usm file" },
+    { "name": "usm_update_feature", "description": "Update fields on an existing feature .usm file" },
+    { "name": "usm_update_feature_status", "description": "Update the status of a feature" },
+    { "name": "usm_update_service", "description": "Update fields on an existing service .usm file" },
+    { "name": "usm_update_system", "description": "Update fields on an existing system.usm file" },
+    { "name": "usm_validate", "description": "Validate a .usm file against the v1 JSON Schema" },
+    { "name": "usm_get_contracts", "description": "Get the contracts array from a feature .usm file" },
+    { "name": "usm_get_flows", "description": "Get the flows array from a feature .usm file" },
+    { "name": "usm_report_feedback", "description": "Report a bug, improvement, or question" }
+  ],
+  "tools_generated": false,
+  "keywords": ["spec-first", "documentation", "ai-coding", "mcp", "agentic", "system-design", "architecture", "openapi", "mermaid", "togaf"],
+  "license": "MIT",
+  "privacy_policies": [],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "server": {
+    "type": "binary",
+    "entry_point": "server/usm",
+    "mcp_config": {
+      "command": "${__dirname}/server/usm",
+      "args": ["mcp", "serve"],
+      "env": {}
+    }
+  },
+  "user_config": {}
+}
