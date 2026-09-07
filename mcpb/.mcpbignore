@@ -1,0 +1,16 @@
+.git
+.github
+.opencode
+.claude
+.usm
+.usm-workspace
+docs-source
+examples
+scripts
+tests
+web
+node_modules
+*.md
+!SKILL.md
+CHANGELOG.md
+LICENSE

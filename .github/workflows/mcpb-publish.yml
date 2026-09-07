@@ -1,0 +1,41 @@
+name: Publish MCPB bundle to Smithery
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Build and publish MCPB bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install MCPB CLI
+        run: npm install -g @anthropic-ai/mcpb
+
+      - name: Install USM package (for the server wrapper)
+        run: cd mcpb && npm install --production
+
+      - name: Build MCPB bundle
+        run: mcpb pack mcpb/ usm.mcpb
+
+      - name: Upload MCPB as release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: usm.mcpb
+
+      - name: Publish to Smithery
+        if: ${{ secrets.SMITHERY_API_KEY != '' }}
+        env:
+          SMITHERY_API_KEY: ${{ secrets.SMITHERY_API_KEY }}
+        run: |
+          smithery mcp publish ./usm.mcpb -n smith-gray/usm || echo "Smithery publish failed — upload manually at smithery.ai/new"

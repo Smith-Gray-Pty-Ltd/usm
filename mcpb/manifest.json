@@ -49,11 +49,11 @@
     }
   },
   "server": {
-    "type": "binary",
-    "entry_point": "server/usm",
+    "type": "node",
+    "entry_point": "server/index.js",
     "mcp_config": {
-      "command": "${__dirname}/server/usm",
-      "args": ["mcp", "serve"],
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
       "env": {}
     }
   },
