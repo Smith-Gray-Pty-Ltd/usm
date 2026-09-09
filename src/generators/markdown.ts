@@ -21,8 +21,45 @@ import { renderFeatureReferenceBlock, type FeatureReferenceBlock } from "./conte
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Known app directories in the monorepo (kind: web-app, mobile-app, desktop-app) */
-const APP_DIRS: string[] = [];
+/**
+ * Derive the set of app directory names (slugs) known to the generator.
+ *
+ * App dirs come from two sources:
+ *   1. Service files classified as "app" — their `paths[]` entries point at
+ *      `apps/<name>/` (resolved via appFromPaths).
+ *   2. Feature files' `$service` values — `appFromService("<org>/<app>")` yields
+ *      the trailing segment, which is the app slug.
+ *
+ * The returned array is de-duplicated and sorted for stable output. Features
+ * whose $service is the system itself (e.g. "smith-gray-ai/system") are NOT
+ * app dirs — they are cross-cutting and excluded here.
+ */
+function deriveAppDirs(
+  services: ServiceUsm[] = [],
+  features: FeatureUsm[] = [],
+): string[] {
+  const appSlugs = new Set<string>();
+
+  // From service files whose paths point at apps/*
+  for (const svc of services) {
+    if (classifyService(svc) === "app") {
+      const slug = appFromPaths(svc.paths || []);
+      if (slug !== "unknown") appSlugs.add(slug);
+    }
+  }
+
+  // From feature files' $service (only app-scoped services, not the system)
+  for (const feat of features) {
+    if (!feat.$service) continue;
+    const slug = appFromService(feat.$service);
+    // Skip the system service slug (e.g. "system") — system-level features are
+    // cross-cutting and do not map to an apps/<slug>/ directory.
+    if (feat.$system && feat.$service === feat.$system) continue;
+    if (slug !== "unknown") appSlugs.add(slug);
+  }
+
+  return [...appSlugs].sort();
+}
 
 /** Service kinds that map to shared services (full shape) */
 const SHARED_SERVICE_KINDS = new Set(["idp", "llm-gateway", "agent-flows", "database", "cache", "queue", "api"]);
@@ -353,17 +390,17 @@ function generateFeatureMarkdown(
     }
   }
 
-  // Output path: determine which app this feature belongs to
-  const serviceDir = file.$service
-    ? file.$service.split("/")[1] || "unknown"
-    : "unknown";
-  const appDir = `apps/${serviceDir}`;
-
+  // Output path: feature docs live in the root docs workspace, mirroring the
+  // .usm/features/<area>/<slug> layout. This keeps all features discoverable by
+  // the VitePress sidebar (which scans .usm-workspace/docs/features/) regardless
+  // of which service owns the feature — including system-level features whose
+  // $service is the system itself (e.g. "smith-gray-ai/system"), which previously
+  // routed to a phantom apps/system/ directory. See issues #24 and #25.
   const hasSubPath = featureSlug.includes("/");
   const featureOutputName = hasSubPath
     ? `${featureSlug}.md`
     : `${featureSlug}/index.md`;
-  const outputPath = `${root}/${appDir}/.usm-workspace/docs/features/${featureOutputName}`;
+  const outputPath = `${root}/.usm-workspace/docs/features/${featureOutputName}`;
 
   return {
     outputs: [{ path: outputPath, content: lines.join("\n") }],
@@ -1187,8 +1224,8 @@ export function generateSurfaceTables(
 ): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  // For each app service
-  for (const app of APP_DIRS) {
+  // For each app service (derived from service files + feature $service values)
+  for (const app of deriveAppDirs(services, features)) {
     const appFeatures = featuresForApp(features, app);
     const overviewPath = `${root}/apps/${app}/.usm-workspace/docs/overview.md`;
 
@@ -1347,12 +1384,19 @@ function injectSurfaceTables(
 
 /**
  * Infer the app name from a feature's $service or apps[] field.
+ *
+ * The apps[] field is authoritative when present. Otherwise the trailing
+ * segment of $service is the app slug — except when $service equals $system
+ * (a system-level, cross-cutting feature), in which case there is no owning
+ * app.
  */
 function inferAppName(feat: FeatureUsm): string | undefined {
   if (feat.apps && feat.apps.length > 0) return feat.apps[0];
   if (feat.$service) {
+    // System-level features (e.g. "smith-gray-ai/system") are not owned by an app.
+    if (feat.$system && feat.$service === feat.$system) return undefined;
     const slug = feat.$service.split("/").pop() || "";
-    if (APP_DIRS.includes(slug)) return slug;
+    if (slug) return slug;
   }
   return undefined;
 }
@@ -2734,7 +2778,7 @@ export function generatePerAppDecisions(
 ): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  for (const app of APP_DIRS) {
+  for (const app of deriveAppDirs(services, features)) {
     const appFeatures = featuresOwnedByApp(features, app);
     const appServices = servicesForApp(services, app);
     if (appFeatures.length === 0 && appServices.length === 0) continue;
@@ -2804,7 +2848,7 @@ export function generatePerAppDecisions(
 export function generatePerAppApiReference(features: FeatureUsm[], root: string): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  for (const app of APP_DIRS) {
+  for (const app of deriveAppDirs([], features)) {
     const appFeatures = featuresOwnedByApp(features, app);
     const apiRoutes = collectApiRoutes(appFeatures);
     if (apiRoutes.length === 0) continue;
@@ -2839,7 +2883,7 @@ export function generatePerAppApiReference(features: FeatureUsm[], root: string)
 export function generatePerAppApiContracts(features: FeatureUsm[], root: string): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  for (const app of APP_DIRS) {
+  for (const app of deriveAppDirs([], features)) {
     const appFeatures = featuresOwnedByApp(features, app);
     const hasContracts = appFeatures.some(f => f.contracts && f.contracts.length > 0);
     if (!hasContracts) continue;
@@ -2875,7 +2919,7 @@ export function generatePerAppApiContracts(features: FeatureUsm[], root: string)
 export function generatePerAppUiMap(features: FeatureUsm[], root: string): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  for (const app of APP_DIRS) {
+  for (const app of deriveAppDirs([], features)) {
     const appFeatures = featuresOwnedByApp(features, app);
     const hasInterfaces = appFeatures.some(f => f.interfaces && f.interfaces.length > 0);
     if (!hasInterfaces) continue;
@@ -2950,7 +2994,7 @@ export function generatePerAppUiMap(features: FeatureUsm[], root: string): Gener
 export function generatePerAppTestSpecs(features: FeatureUsm[], root: string): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
 
-  for (const app of APP_DIRS) {
+  for (const app of deriveAppDirs([], features)) {
     const appFeatures = featuresOwnedByApp(features, app);
     const hasTests = appFeatures.some(f => f.tests && f.tests.length > 0);
     if (!hasTests) continue;
