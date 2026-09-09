@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "usm",
   "display_name": "USM — Universal System Map",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Structured source of truth for human + AI software development. Schema-validated specs, 18 MCP tools, auto-generated docs. Works with any MCP-compatible editor.",
   "long_description": "USM (Universal System Map) is a spec-first development tool that gives AI agents structured context about your system. Write specs in YAML validated by a JSON Schema, and USM generates markdown docs, Mermaid diagrams, OpenAPI specs, TOGAF deliverables, and Vitest test scaffolds. 18 MCP tools let agents read, search, draft, write, and update specs — using 10-20x fewer tokens than bloated Markdown vaults.",
   "author": {
