@@ -1,5 +1,75 @@
 # Changelog
 
+## 0.8.0
+
+### Minor Changes
+
+- 4bd7cb4: Fix `usm init` to detect single-app vs monorepo layouts and add 7 fixture codebases for integration testing.
+
+  **`usm init` improvements:**
+
+  - Detect monorepo (apps/_ or packages/_ exist) vs single-app layout (root package.json/go.mod/Cargo.toml/pyproject.toml/requirements.txt)
+  - For single-app repos: register the root as a single service and set source include to ['src'] (or ['.'] if no src/)
+  - For monorepo apps/: detect Go (go.mod), Rust (Cargo.toml), and Python (pyproject.toml/requirements.txt) in addition to package.json
+  - Strip any npm org scope from project name (not just @smith-gray/)
+
+  **OpenAPI generator fix:**
+
+  - Write openapi-types.ts to .usm-workspace/openapi/ instead of packages/types/src/ (which polluted single-app repos and broke monorepo detection on re-scan)
+
+  **Fixture tests (tests/fixtures.test.ts):**
+
+  - 7 fixture codebases in examples/ covering: nextjs-single-app, turborepo-monorepo, go-api, python-fastapi, express-api, prisma-monorepo, multi-lang
+  - 35 tests: init detection, scan structure, generate output, golden file comparison, idempotency
+  - Each fixture has committed .usm/ golden files — tests verify scan output matches
+  - All 201 tests pass (166 existing + 35 new)
+
+- a30de27: Add VitePress as devDependency, Smithery MCP server card, and clean up CI.
+
+  **VitePress dependency:**
+
+  - VitePress was already an optional peer dependency but not installed by default
+  - Added to devDependencies so `pnpm install` includes it — the docs commands
+    (`usm docs serve`, `usm docs build`) are core CLI features
+  - Removed the manual `pnpm add -D vitepress` step from the CI docs workflow
+  - The existing `requireVitePress()` helper in docs.ts already handles the
+    "not installed" case with a helpful install prompt
+
+  **Smithery MCP registry:**
+
+  - Added `.well-known/mcp/server-card.json` — static server card describing
+    all 18 MCP tools with their input schemas
+  - Smithery reads this to list USM in their MCP server registry at
+    smithery.ai — the primary discovery platform for MCP servers
+  - Submit at smithery.ai/new using our GitHub repo URL
+
+### Patch Changes
+
+- 8e3e142: Fix docs generation: feature markdown output path and watch mode.
+
+  **Feature markdown output path (#24, #25 items 1 & 2):** feature docs were
+  written to `apps/<service>/.usm-workspace/docs/features/` while every other
+  generator writes to the root `.usm-workspace/docs/`. This caused system-level
+  features (`$service === $system`, e.g. `smith-gray-ai/system`) to route to a
+  phantom `apps/system/` directory, and left all feature docs invisible to the
+  VitePress sidebar (only 2 of 36 features appeared, because the serve-time
+  `consolidateFeatureDocs` band-aid only rescued a couple). Feature docs now
+  write to the root `.usm-workspace/docs/features/<area>/<slug>.md`, matching
+  the other generators; the sidebar auto-discovers all features.
+
+  Also fixes a latent bug found during investigation: `APP_DIRS` / `KNOWN_APP_DIRS`
+  were declared empty and never populated, silently disabling six per-app
+  aggregator generators (surface tables, per-app decisions, API reference,
+  contracts, UI map, test specs). App dirs are now derived from service files
+  and feature `$service` values.
+
+  **Watch mode (#25 item 3):** `usm docs serve --watch` did not pick up new `.usm`
+  files in newly-created subdirectories — the watcher walked `.usm/` once at
+  startup and registered non-recursive `fs.watch` on existing dirs only. Replaced
+  with `fs.watch({ recursive: true })` on `.usm/` (with a defensive per-directory
+  fallback that registers watchers for new subdirs on platforms without
+  recursive support).
+
 ## 0.7.0
 
 ### Minor Changes
