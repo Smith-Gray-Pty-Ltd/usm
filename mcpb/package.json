@@ -1,6 +1,6 @@
 {
   "name": "usm-mcpb-server",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "USM MCP server wrapper for MCPB bundles",
   "main": "server/index.js",
   "dependencies": {
