@@ -1184,62 +1184,43 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
 }
 
 /**
- * Start watching .usm/ files and regenerate docs on changes.
- * Returns a cleanup function to stop watching.
+ * Watch a .usm/ directory tree for `.usm` file changes (including NEW files in
+ * NEWLY-CREATED subdirectories) and invoke `regenerate` (debounced) on change.
+ *
+ * Returns a cleanup function that closes all watchers and clears the debounce
+ * timer.
+ *
+ * Strategy: a single `fs.watch` with `{ recursive: true }` on the .usm/ root,
+ * which natively observes changes — including new files in new subdirectories —
+ * on macOS and Windows. On platforms without recursive watch support (detected
+ * via a synchronous throw or an async 'error' event), falls back to a
+ * per-directory walk that also registers watchers for newly-created
+ * subdirectories so new files in new dirs are still detected (issue #25.3).
+ *
+ * Extracted from `startWatchMode` so the watch logic is unit-testable without
+ * spawning a docs server or subprocess: tests pass a mock `regenerate`.
+ *
+ * @param usmDir  Absolute path to the `.usm/` directory to watch.
+ * @param regenerate  Invoked (debounced, 500ms) when a `.usm` file changes/is added.
+ * @returns Cleanup function — call to stop watching.
  */
-function startWatchMode(root: string, _docsRoot: string, _audience: Audience): () => void {
-  const usmDir = path.join(root, ".usm");
-  if (!fs.existsSync(usmDir)) {
-    console.log("No .usm/ directory found — watch mode disabled.");
-    return () => {};
-  }
-
+export function watchUsmDir(
+  usmDir: string,
+  regenerate: () => void,
+): () => void {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let changedCount = 0;
 
-  const regenerate = async () => {
-    if (changedCount === 0) return;
-    const count = changedCount;
-    changedCount = 0;
-
-    try {
-      // Run generate in-process via a subprocess call to the built CLI
-      const { execSync } = await import("node:child_process");
-      const cliPath = path.join(root, "dist", "cli", "index.js");
-      const fallbackPath = path.join(root, "src", "cli", "index.ts");
-      let cmd: string;
-      if (fs.existsSync(cliPath)) {
-        cmd = `node "${cliPath}" generate --only docs`;
-      } else if (fs.existsSync(fallbackPath)) {
-        cmd = `npx tsx "${fallbackPath}" generate --only docs`;
-      } else {
-        throw new Error("Could not find CLI entrypoint (dist or src)");
-      }
-      execSync(cmd, { cwd: root, stdio: "pipe", timeout: 30000 });
-      console.log(`Regenerated docs (${count} file${count !== 1 ? "s" : ""} changed)`);
-    } catch (err) {
-      console.error("Watch regeneration failed:", (err as Error).message);
-    }
+  const scheduleRegen = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(regenerate, 500);
   };
 
-  // Watch .usm/ recursively. Using a single fs.watch with { recursive: true }
-  // picks up changes (including NEW files) in ALL subdirectories — including
-  // newly-created ones — which the previous per-directory walk-and-watch
-  // approach missed (issue #25.3: adding a .usm file in a new subdirectory
-  // like .usm/features/new-area/ triggered no regeneration because the new
-  // directory had no watcher registered).
-  //
-  // { recursive: true } is supported on macOS and Windows. On platforms that
-  // don't support it, fs.watch emits an 'error' event; we fall back to the
-  // walk-and-watch strategy (with directory-creation handling) in that case.
   const watchedWatchers: fs.FSWatcher[] = [];
   const watchedPaths = new Set<string>();
 
   const onFileChange = (_event: string, filename: string | null) => {
     if (filename && filename.endsWith(".usm")) {
-      changedCount++;
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(regenerate, 500);
+      scheduleRegen();
     }
   };
 
@@ -1255,9 +1236,7 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
           if (fs.statSync(newPath).isDirectory() && !watchedPaths.has(newPath)) {
             watchDirRecursive(newPath);
             // A new directory may already contain files; trigger a regen.
-            changedCount++;
-            if (debounceTimer) clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(regenerate, 500);
+            scheduleRegen();
           }
         } catch {
           // Path no longer exists (transient) — ignore.
@@ -1299,14 +1278,64 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     watchDirRecursive(usmDir);
   }
 
-  console.log(`Watching .usm/ for changes (recursive, ${watchedWatchers.length} watcher${watchedWatchers.length !== 1 ? "s" : ""})...`);
-
   return () => {
     for (const w of watchedWatchers) {
       try { w.close(); } catch { /* ignore */ }
     }
     if (debounceTimer) clearTimeout(debounceTimer);
   };
+}
+
+/**
+ * Start watching .usm/ files and regenerate docs on changes.
+ * Returns a cleanup function to stop watching.
+ */
+function startWatchMode(root: string, _docsRoot: string, _audience: Audience): () => void {
+  const usmDir = path.join(root, ".usm");
+  if (!fs.existsSync(usmDir)) {
+    console.log("No .usm/ directory found — watch mode disabled.");
+    return () => {};
+  }
+
+  let pendingChanges = 0;
+
+  const regenerate = async () => {
+    if (pendingChanges === 0) return;
+    const count = pendingChanges;
+    pendingChanges = 0;
+
+    try {
+      // Run generate in-process via a subprocess call to the built CLI
+      const { execSync } = await import("node:child_process");
+      const cliPath = path.join(root, "dist", "cli", "index.js");
+      const fallbackPath = path.join(root, "src", "cli", "index.ts");
+      let cmd: string;
+      if (fs.existsSync(cliPath)) {
+        cmd = `node "${cliPath}" generate --only docs`;
+      } else if (fs.existsSync(fallbackPath)) {
+        cmd = `npx tsx "${fallbackPath}" generate --only docs`;
+      } else {
+        throw new Error("Could not find CLI entrypoint (dist or src)");
+      }
+      execSync(cmd, { cwd: root, stdio: "pipe", timeout: 30000 });
+      console.log(`Regenerated docs (${count} file${count !== 1 ? "s" : ""} changed)`);
+    } catch (err) {
+      console.error("Watch regeneration failed:", (err as Error).message);
+    }
+  };
+
+  // Track pending changes so the debounced regenerate only fires when there
+  // was an actual change. watchUsmDir debounces the call; we count the triggers.
+  const trackedRegen = () => {
+    pendingChanges++;
+    // regenerate is async but watchUsmDir ignores the promise; call it via
+    // a microtask-safe wrapper that the debounce timer invokes.
+    void regenerate();
+  };
+
+  const stop = watchUsmDir(usmDir, trackedRegen);
+  console.log("Watching .usm/ for changes (recursive)...");
+  return stop;
 }
 
 /**
