@@ -8,8 +8,6 @@ import type {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const KNOWN_APP_DIRS: string[] = [];
-
 const APP_URLS: Record<string, { prod: string; local: string; label: string }> = {};
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -59,8 +57,10 @@ function inferArea(featureId: string): string {
 function inferAppName(feature: FeatureUsm): string {
   if (feature.apps && feature.apps.length > 0) return feature.apps[0];
   if (feature.$service) {
+    // System-level features (e.g. "smith-gray-ai/system") are cross-cutting.
+    if (feature.$system && feature.$service === feature.$system) return "unknown";
     const slug = feature.$service.split("/").pop() || "";
-    if (KNOWN_APP_DIRS.includes(slug)) return slug;
+    if (slug) return slug;
   }
   return "unknown";
 }

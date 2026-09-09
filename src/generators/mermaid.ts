@@ -45,9 +45,6 @@ function escapeMermaidText(s: string | undefined | null): string {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Known app directories — populated dynamically from system.usm services[] */
-const APP_DIRS: string[] = [];
-
 /** Service kinds that map to shared services */
 const SHARED_SERVICE_KINDS = new Set(["idp", "llm-gateway", "agent-flows", "database", "cache", "queue", "api"]);
 
@@ -462,7 +459,7 @@ export function generateServiceDependencies(
   // Generate diagrams for each service that has depends_on
   for (const svc of systemServices) {
     const deps = svc.depends_on || [];
-    if (deps.length === 0 && !APP_DIRS.includes(svc.id)) continue;  // Skip services with no deps (unless it's an app — apps always get a diagram)
+    if (deps.length === 0 && classifyServiceById(svc.id, serviceUsmMap) !== "app") continue;  // Skip services with no deps (unless it's an app — apps always get a diagram)
 
     const diagram = buildServiceDependencyDiagram(svc, deps, systemServiceMap, serviceDetails);
     const content = buildServiceDependencyMd(svc, diagram);

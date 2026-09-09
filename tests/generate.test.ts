@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { generate } from "../src/generate.js";
 import { parseUsmFile } from "../src/parse.js";
 import path from "node:path";
+import fs from "node:fs";
 
 const FIXTURES = path.resolve(__dirname, "../examples");
 const SPEC_DIR = path.resolve(__dirname, "../.usm");
@@ -72,5 +73,50 @@ describe("generate markdown", () => {
   it("throws on unknown generator", () => {
     const parsed = parseUsmFile(path.join(FIXTURES, "system.usm"));
     expect(() => generate(parsed, ["unknown" as any])).toThrow("Unknown generator");
+  });
+
+  // Regression tests for issues #24 and #25: feature markdown must be written to
+  // the root .usm-workspace/docs/features/ workspace, NOT under apps/<service>/
+  // (which produced a phantom apps/system/ dir for system-level features and
+  // made feature docs invisible to the VitePress sidebar).
+  describe("feature output path (issues #24 + #25)", () => {
+    it("writes app-service feature docs to the root docs workspace, not apps/<service>/", () => {
+      const parsed = parseUsmFile(path.join(FIXTURES, "feature.usm")) as any;
+      const result = generate(parsed, ["markdown"], "/tmp/test-root");
+      expect(result.outputs).toHaveLength(1);
+      const out = result.outputs[0].path;
+      // Must be in the root .usm-workspace/docs/features/ tree
+      expect(out).toMatch(/\/tmp\/test-root\/\.usm-workspace\/docs\/features\//);
+      // Must NOT route to apps/<service>/.usm-workspace/ (the old buggy behaviour)
+      expect(out).not.toMatch(/\/apps\/[^/]+\/\.usm-workspace\//);
+    });
+
+    it("writes system-level feature docs to the root docs workspace (no phantom apps/system/)", () => {
+      // A system-level feature: $service === $system. Previously this routed to
+      // apps/system/.usm-workspace/... which doesn't exist as a directory.
+      const yaml = [
+        "$schema: https://usm.dev/schema/v1.json",
+        "$id: example/infrastructure",
+        "$type: feature",
+        "$version: 1",
+        "summary: System-level cross-cutting feature.",
+        "$system: example/system",
+        "$service: example/system",
+        "intent: Cross-cutting infra concern.",
+      ].join("\n");
+      const tmpFile = path.join(__dirname, "fixtures-tmp-system-feature.usm");
+      fs.writeFileSync(tmpFile, yaml, "utf-8");
+      try {
+        const parsed = parseUsmFile(tmpFile) as any;
+        const result = generate(parsed, ["markdown"], "/tmp/test-root");
+        expect(result.outputs).toHaveLength(1);
+        const out = result.outputs[0].path;
+        expect(out).toMatch(/\/tmp\/test-root\/\.usm-workspace\/docs\/features\//);
+        expect(out).not.toMatch(/\/apps\/system\/\.usm-workspace\//);
+        expect(out).not.toMatch(/\/apps\/[^/]+\/\.usm-workspace\//);
+      } finally {
+        fs.rmSync(tmpFile, { force: true });
+      }
+    });
   });
 });
