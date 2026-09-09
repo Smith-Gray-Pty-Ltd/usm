@@ -1222,31 +1222,55 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     }
   };
 
-  // Watch .usm/ recursively — walk all subdirectories and watch each
+  // Watch .usm/ recursively. Using a single fs.watch with { recursive: true }
+  // picks up changes (including NEW files) in ALL subdirectories — including
+  // newly-created ones — which the previous per-directory walk-and-watch
+  // approach missed (issue #25.3: adding a .usm file in a new subdirectory
+  // like .usm/features/new-area/ triggered no regeneration because the new
+  // directory had no watcher registered).
+  //
+  // { recursive: true } is supported on macOS and Windows. On platforms that
+  // don't support it, fs.watch emits an 'error' event; we fall back to the
+  // walk-and-watch strategy (with directory-creation handling) in that case.
   const watchedWatchers: fs.FSWatcher[] = [];
+  const watchedPaths = new Set<string>();
 
-  const watchDir = (dir: string) => {
-    try {
-      const watcher = fs.watch(dir, { recursive: false }, (_event, filename) => {
-        if (filename && filename.endsWith(".usm")) {
-          changedCount++;
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(regenerate, 500);
-        }
-      });
-      watchedWatchers.push(watcher);
-    } catch {
-      // ignore — directory may have been removed
+  const onFileChange = (_event: string, filename: string | null) => {
+    if (filename && filename.endsWith(".usm")) {
+      changedCount++;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(regenerate, 500);
     }
   };
 
-  // Watch the root .usm/ dir and all subdirectories recursively
-  const walkAndWatch = (dir: string) => {
-    watchDir(dir);
+  // Fallback: per-directory watchers that also register watchers for newly
+  // created subdirectories (covers platforms without recursive watch support).
+  const watchDirRecursive = (dir: string) => {
+    const watcher = fs.watch(dir, { recursive: false }, (event, filename) => {
+      onFileChange(event, filename);
+      // Detect a newly-created subdirectory and start watching it too.
+      if (filename) {
+        const newPath = path.join(dir, filename);
+        try {
+          if (fs.statSync(newPath).isDirectory() && !watchedPaths.has(newPath)) {
+            watchDirRecursive(newPath);
+            // A new directory may already contain files; trigger a regen.
+            changedCount++;
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(regenerate, 500);
+          }
+        } catch {
+          // Path no longer exists (transient) — ignore.
+        }
+      }
+    });
+    watchedWatchers.push(watcher);
+    watchedPaths.add(dir);
     try {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
-          walkAndWatch(path.join(dir, entry.name));
+          const sub = path.join(dir, entry.name);
+          if (!watchedPaths.has(sub)) watchDirRecursive(sub);
         }
       }
     } catch {
@@ -1254,8 +1278,28 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     }
   };
 
-  walkAndWatch(usmDir);
-  console.log(`Watching .usm/ for changes (recursive, ${watchedWatchers.length} directories)...`);
+  let usingRecursive = false;
+  try {
+    const recursiveWatcher = fs.watch(usmDir, { recursive: true }, (event, filename) => {
+      onFileChange(event, filename);
+    });
+    // Detect lack of recursive support: some platforms throw asynchronously.
+    recursiveWatcher.on("error", () => {
+      if (usingRecursive) return; // already fell back
+      usingRecursive = false;
+      recursiveWatcher.close();
+      watchedWatchers.length = 0;
+      watchedPaths.clear();
+      watchDirRecursive(usmDir);
+    });
+    watchedWatchers.push(recursiveWatcher);
+    usingRecursive = true;
+  } catch {
+    // Synchronous throw — platform doesn't support recursive watch.
+    watchDirRecursive(usmDir);
+  }
+
+  console.log(`Watching .usm/ for changes (recursive, ${watchedWatchers.length} watcher${watchedWatchers.length !== 1 ? "s" : ""})...`);
 
   return () => {
     for (const w of watchedWatchers) {
