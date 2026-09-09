@@ -1184,6 +1184,109 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
 }
 
 /**
+ * Watch a .usm/ directory tree for `.usm` file changes (including NEW files in
+ * NEWLY-CREATED subdirectories) and invoke `regenerate` (debounced) on change.
+ *
+ * Returns a cleanup function that closes all watchers and clears the debounce
+ * timer.
+ *
+ * Strategy: a single `fs.watch` with `{ recursive: true }` on the .usm/ root,
+ * which natively observes changes — including new files in new subdirectories —
+ * on macOS and Windows. On platforms without recursive watch support (detected
+ * via a synchronous throw or an async 'error' event), falls back to a
+ * per-directory walk that also registers watchers for newly-created
+ * subdirectories so new files in new dirs are still detected (issue #25.3).
+ *
+ * Extracted from `startWatchMode` so the watch logic is unit-testable without
+ * spawning a docs server or subprocess: tests pass a mock `regenerate`.
+ *
+ * @param usmDir  Absolute path to the `.usm/` directory to watch.
+ * @param regenerate  Invoked (debounced, 500ms) when a `.usm` file changes/is added.
+ * @returns Cleanup function — call to stop watching.
+ */
+export function watchUsmDir(
+  usmDir: string,
+  regenerate: () => void,
+): () => void {
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const scheduleRegen = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(regenerate, 500);
+  };
+
+  const watchedWatchers: fs.FSWatcher[] = [];
+  const watchedPaths = new Set<string>();
+
+  const onFileChange = (_event: string, filename: string | null) => {
+    if (filename && filename.endsWith(".usm")) {
+      scheduleRegen();
+    }
+  };
+
+  // Fallback: per-directory watchers that also register watchers for newly
+  // created subdirectories (covers platforms without recursive watch support).
+  const watchDirRecursive = (dir: string) => {
+    const watcher = fs.watch(dir, { recursive: false }, (event, filename) => {
+      onFileChange(event, filename);
+      // Detect a newly-created subdirectory and start watching it too.
+      if (filename) {
+        const newPath = path.join(dir, filename);
+        try {
+          if (fs.statSync(newPath).isDirectory() && !watchedPaths.has(newPath)) {
+            watchDirRecursive(newPath);
+            // A new directory may already contain files; trigger a regen.
+            scheduleRegen();
+          }
+        } catch {
+          // Path no longer exists (transient) — ignore.
+        }
+      }
+    });
+    watchedWatchers.push(watcher);
+    watchedPaths.add(dir);
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const sub = path.join(dir, entry.name);
+          if (!watchedPaths.has(sub)) watchDirRecursive(sub);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  let usingRecursive = false;
+  try {
+    const recursiveWatcher = fs.watch(usmDir, { recursive: true }, (event, filename) => {
+      onFileChange(event, filename);
+    });
+    // Detect lack of recursive support: some platforms throw asynchronously.
+    recursiveWatcher.on("error", () => {
+      if (usingRecursive) return; // already fell back
+      usingRecursive = false;
+      recursiveWatcher.close();
+      watchedWatchers.length = 0;
+      watchedPaths.clear();
+      watchDirRecursive(usmDir);
+    });
+    watchedWatchers.push(recursiveWatcher);
+    usingRecursive = true;
+  } catch {
+    // Synchronous throw — platform doesn't support recursive watch.
+    watchDirRecursive(usmDir);
+  }
+
+  return () => {
+    for (const w of watchedWatchers) {
+      try { w.close(); } catch { /* ignore */ }
+    }
+    if (debounceTimer) clearTimeout(debounceTimer);
+  };
+}
+
+/**
  * Start watching .usm/ files and regenerate docs on changes.
  * Returns a cleanup function to stop watching.
  */
@@ -1194,13 +1297,12 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     return () => {};
   }
 
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let changedCount = 0;
+  let pendingChanges = 0;
 
   const regenerate = async () => {
-    if (changedCount === 0) return;
-    const count = changedCount;
-    changedCount = 0;
+    if (pendingChanges === 0) return;
+    const count = pendingChanges;
+    pendingChanges = 0;
 
     try {
       // Run generate in-process via a subprocess call to the built CLI
@@ -1222,47 +1324,18 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     }
   };
 
-  // Watch .usm/ recursively — walk all subdirectories and watch each
-  const watchedWatchers: fs.FSWatcher[] = [];
-
-  const watchDir = (dir: string) => {
-    try {
-      const watcher = fs.watch(dir, { recursive: false }, (_event, filename) => {
-        if (filename && filename.endsWith(".usm")) {
-          changedCount++;
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(regenerate, 500);
-        }
-      });
-      watchedWatchers.push(watcher);
-    } catch {
-      // ignore — directory may have been removed
-    }
+  // Track pending changes so the debounced regenerate only fires when there
+  // was an actual change. watchUsmDir debounces the call; we count the triggers.
+  const trackedRegen = () => {
+    pendingChanges++;
+    // regenerate is async but watchUsmDir ignores the promise; call it via
+    // a microtask-safe wrapper that the debounce timer invokes.
+    void regenerate();
   };
 
-  // Watch the root .usm/ dir and all subdirectories recursively
-  const walkAndWatch = (dir: string) => {
-    watchDir(dir);
-    try {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (entry.isDirectory()) {
-          walkAndWatch(path.join(dir, entry.name));
-        }
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  walkAndWatch(usmDir);
-  console.log(`Watching .usm/ for changes (recursive, ${watchedWatchers.length} directories)...`);
-
-  return () => {
-    for (const w of watchedWatchers) {
-      try { w.close(); } catch { /* ignore */ }
-    }
-    if (debounceTimer) clearTimeout(debounceTimer);
-  };
+  const stop = watchUsmDir(usmDir, trackedRegen);
+  console.log("Watching .usm/ for changes (recursive)...");
+  return stop;
 }
 
 /**
