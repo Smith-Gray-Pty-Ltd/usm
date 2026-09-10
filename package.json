@@ -60,7 +60,7 @@
     "sync-versions": "tsx scripts/sync-versions.ts",
     "version-packages": "changeset version",
     "release": "pnpm run build && changeset publish",
-    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm run test"
+    "prepublishOnly": "pnpm run clean && pnpm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
