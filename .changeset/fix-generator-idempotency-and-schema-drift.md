@@ -47,3 +47,11 @@ correct link instead of guessing.
 **Fixture test hang on macOS (#29):** `runUsm` used synchronous `execSync`,
 which blocks the event loop so vitest's `testTimeout` could never fire; the
 fixture suite now uses async `execFile` and completes on macOS (170 tests).
+
+**`usm check` false positives on multi-path implementations:** the check tested
+`implementation.primary` as a single path, so any spec using `;`-separated
+paths or `(annotation)` suffixes (e.g. `src/cli/docs.ts; src/cli/index.ts
+(generate command)`) warned even though every path existed. The value is now
+split into individual paths via a shared, unit-tested `splitImplementationPaths`
+helper. The summary line also no longer subtracts warning counts from the file
+count (a file with 3 warnings is one file, not three).

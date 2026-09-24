@@ -11,7 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseUsm, parseUsmFile } from "../src/parse.js";
+import { parseUsm, parseUsmFile, splitImplementationPaths } from "../src/parse.js";
 import { validateUsm } from "../src/validate.js";
 import { smartMerge } from "../src/generators/agentsMd.js";
 import { generateDataModelDoc } from "../src/generators/markdown.js";
@@ -316,5 +316,33 @@ describe("test-spec source resolution (issue #37 class)", () => {
     const projectSpec = result.outputs.find((o) => o.path.endsWith("scaffold-project.spec.ts"));
     expect(projectSpec).toBeDefined();
     expect(projectSpec!.content).toContain("scaffold-project.usm");
+  });
+});
+
+// ─── usm check: implementation.primary path splitting ───────────────────────
+
+describe("splitImplementationPaths (usm check false positives)", () => {
+  it("splits semicolon-separated paths", () => {
+    expect(splitImplementationPaths("src/a.ts; src/b.ts")).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+
+  it("strips (annotation) suffixes", () => {
+    expect(splitImplementationPaths("src/cli/index.ts (generate command)")).toEqual([
+      "src/cli/index.ts",
+    ]);
+  });
+
+  it("handles a mix of separators, annotations, and whitespace", () => {
+    expect(
+      splitImplementationPaths("src/generators/markdown.ts; src/cli/docs.ts; src/cli/index.ts"),
+    ).toEqual(["src/generators/markdown.ts", "src/cli/docs.ts", "src/cli/index.ts"]);
+  });
+
+  it("returns a single path unchanged", () => {
+    expect(splitImplementationPaths("src/mcp/write.ts")).toEqual(["src/mcp/write.ts"]);
+  });
+
+  it("ignores empty segments", () => {
+    expect(splitImplementationPaths("src/a.ts;;  ; src/b.ts")).toEqual(["src/a.ts", "src/b.ts"]);
   });
 });

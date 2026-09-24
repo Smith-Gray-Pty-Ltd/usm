@@ -58,6 +58,21 @@ export function isDataFile(file: UsmFile): file is DataUsm {
   return file.$type === "data";
 }
 
+/**
+ * Split an `implementation.primary` value into individual file paths.
+ *
+ * Specs commonly use `;`-separated paths and optional `(annotation)` suffixes,
+ * e.g. `src/cli/docs.ts; src/cli/index.ts (generate command)`. Treating the
+ * whole string as a single path makes `usm check` warn on every multi-path
+ * spec (false positives), so consumers must split first.
+ */
+export function splitImplementationPaths(primary: string): string[] {
+  return primary
+    .split(";")
+    .map((p) => p.replace(/\([^)]*\)/g, "").trim())
+    .filter((p) => p.length > 0);
+}
+
 // ─── Parse integrity check ──────────────────────────────────────────────────
 
 /**

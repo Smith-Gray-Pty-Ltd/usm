@@ -3,7 +3,7 @@
 import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
-import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile } from "../parse.js";
+import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile, splitImplementationPaths as splitImplementationPathsUtil } from "../parse.js";
 import { validateUsm, validateUsmFile } from "../validate.js";
 import { generate } from "../generate.js";
 import { findUsmFiles, findAllUsmFiles } from "../parse.js";
@@ -90,6 +90,15 @@ try {
 } catch {
   // ignore — keep fallback
 }
+
+/**
+ * Split an `implementation.primary` value into individual file paths.
+ *
+ * Real specs use `;`-separated paths and optional `(annotation)` suffixes,
+ * e.g. `src/cli/docs.ts; src/cli/index.ts (generate command)`. Treating the
+ * whole string as one path makes `usm check` warn on every multi-path spec.
+ */
+const splitImplementationPaths = splitImplementationPathsUtil;
 
 program
   .name("usm")
@@ -1664,6 +1673,9 @@ program
     const allFiles = findAllUsmFiles(root);
     let errors = 0;
     let warnings = 0;
+    // File-level counters — a file with N warnings must not be subtracted N times.
+    let warnFiles = 0;
+    let okFiles = 0;
 
     console.log(bold(`Checking ${metric(String(allFiles.length))} .usm file(s)...\n`));
 
@@ -1694,10 +1706,11 @@ program
         if (isFeatureFile(parsed)) {
           const feature = parsed as FeatureUsm;
           if (feature.implementation?.primary) {
-            const implPath = path.resolve(root, feature.implementation.primary);
-            if (!fs.existsSync(implPath)) {
+            const implPaths = splitImplementationPaths(feature.implementation.primary);
+            const missing = implPaths.filter((p) => !fs.existsSync(path.resolve(root, p)));
+            if (missing.length > 0) {
               console.log(warn(filePath));
-              console.log(`  implementation.primary: ${feature.implementation.primary} does not exist`);
+              console.log(`  implementation.primary: ${missing.join("; ")} does not exist`);
               warnings++;
               hasWarnings = true;
             }
@@ -1709,10 +1722,13 @@ program
 
       if (!hasWarnings) {
         console.log(ok(filePath));
+        okFiles++;
+      } else {
+        warnFiles++;
       }
     }
 
-    console.log(`\n${ok(String(allFiles.length - errors - warnings))} valid, ${warn(String(warnings))} warnings, ${fail(String(errors))} errors`);
+    console.log(`\n${ok(String(okFiles))} valid, ${warn(String(warnings))} warnings across ${warn(String(String(warnFiles)))} file(s), ${fail(String(errors))} errors`);
 
     if (errors > 0) {
       process.exit(1);
