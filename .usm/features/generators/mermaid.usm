@@ -2,14 +2,17 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-mermaid
 $type: feature
 $version: 1
-$last_updated: "2026-06-19"
-summary: Mermaid diagram generator — produces architecture, ER, sequence, and service-dependency diagrams from .usm data.
-
+$last_updated: "2026-09-24"
+summary: >-
+  Mermaid diagram generator — produces architecture, ER, sequence, and service-dependency diagrams
+  from .usm data. The ER section is built as a pure function of the Prisma schema and composed into
+  data/models.md by the markdown generator (single writer).
 $system: usm/system
 $service: usm/cli
-intent: |
-  Visual diagrams make the system structure immediately understandable. Mermaid diagrams render natively on GitHub and in most markdown viewers, providing zero-cost visualization of services, data models, and user flows.
-
+intent: >
+  Visual diagrams make the system structure immediately understandable. Mermaid diagrams render
+  natively on GitHub and in most markdown viewers, providing zero-cost visualization of services,
+  data models, and user flows.
 flows:
   - id: arch-diagram
     name: Generate architecture diagram
@@ -24,14 +27,20 @@ flows:
       - id: s3
         action: submit
         target: write to docs/diagrams/architecture.mmd
-
 contracts:
   - id: mermaid-valid-syntax
     description: Generated Mermaid files must parse without syntax errors
     must_have:
-      - "Special characters escaped (colons, pipes, brackets)"
-      - "Each diagram in its own .mmd file"
-
+      - Special characters escaped (colons, pipes, brackets)
+      - Each diagram in its own .mmd file
+  - id: er-section-is-pure
+    description: >-
+      The ER diagram section must be a pure function of the Prisma schema, never of prior on-disk
+      output
+    must_have:
+      - buildERDiagramSection(root) reads only packages/db/prisma/schema.prisma
+      - generateDataModelDoc is the sole writer of .usm-workspace/docs/data/models.md
+      - No generator reads a file it is about to overwrite
 tests:
   - id: arch-diagram-valid
     setup:
@@ -43,11 +52,9 @@ tests:
       data_models_present: true
     expect:
       - assertion: er-diagram.mmd contains erDiagram syntax
-
 implementation:
   primary: src/generators/mermaid.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/cli-generate"
+  - usm/cli-generate

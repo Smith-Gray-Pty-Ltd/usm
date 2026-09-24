@@ -3,7 +3,7 @@
 import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
-import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile } from "../parse.js";
+import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile, splitImplementationPaths as splitImplementationPathsUtil } from "../parse.js";
 import { validateUsm, validateUsmFile } from "../validate.js";
 import { generate } from "../generate.js";
 import { findUsmFiles, findAllUsmFiles } from "../parse.js";
@@ -53,7 +53,6 @@ import {
 } from "../generators/testSpecs.js";
 import {
   generateArchitectureDiagram,
-  generateERDiagram,
   generateServiceDependencies,
 } from "../generators/mermaid.js";
 import {
@@ -91,6 +90,15 @@ try {
 } catch {
   // ignore — keep fallback
 }
+
+/**
+ * Split an `implementation.primary` value into individual file paths.
+ *
+ * Real specs use `;`-separated paths and optional `(annotation)` suffixes,
+ * e.g. `src/cli/docs.ts; src/cli/index.ts (generate command)`. Treating the
+ * whole string as one path makes `usm check` warn on every multi-path spec.
+ */
+const splitImplementationPaths = splitImplementationPathsUtil;
 
 program
   .name("usm")
@@ -971,6 +979,18 @@ program
     const featureFiles: FeatureUsm[] = [];
     const dataFiles: DataUsm[] = [];
 
+    // Content generated this run, keyed by output path. Used by later passes
+    // that compose onto earlier output (e.g. surface tables injected into
+    // overview.md) so `--check` can compare against the final content without
+    // reading pre-composition files off disk — otherwise those paths report
+    // "out of date" forever (the same never-pass class as #32/#37).
+    const generatedByPath = new Map<string, string>();
+    // Output paths to report on, in first-emission order (check mode only).
+    const checkedPaths: string[] = [];
+    const noteCheckPath = (p: string): void => {
+      if (!checkedPaths.includes(p)) checkedPaths.push(p);
+    };
+
     // ─── Pass 1: Per-file generation (system, service, feature) ────────────
     const progressBar = startProgress("Generating", files.length);
     for (const filePath of files) {
@@ -998,18 +1018,9 @@ program
         const result = generate(parsed, ["markdown"], root, filePath);
 
         for (const output of result.outputs) {
-          if (options.check) {
-            if (fs.existsSync(output.path)) {
-              const existing = fs.readFileSync(output.path, "utf-8");
-              if (existing === output.content) {
-                console.log(ok(`${output.path} ${dim("(up to date)")}`));
-              } else {
-                console.log(fail(`${output.path} ${dim("(out of date)")}`));
-              }
-            } else {
-              console.log(fail(`${output.path} ${dim("(missing)")}`));
-            }
-          } else {
+          generatedByPath.set(output.path, output.content);
+          noteCheckPath(output.path);
+          if (!options.check) {
             const outDir = path.dirname(output.path);
             if (!fs.existsSync(outDir)) {
               fs.mkdirSync(outDir, { recursive: true });
@@ -1029,18 +1040,9 @@ program
     const areaResult = generateAreaOverviews(root);
 
     for (const output of areaResult.outputs) {
-      if (options.check) {
-        if (fs.existsSync(output.path)) {
-          const existing = fs.readFileSync(output.path, "utf-8");
-          if (existing === output.content) {
-            console.log(ok(`${output.path} ${dim("(up to date)")}`));
-          } else {
-            console.log(fail(`${output.path} ${dim("(out of date)")}`));
-          }
-        } else {
-          console.log(fail(`${output.path} ${dim("(missing)")}`));
-        }
-      } else {
+      generatedByPath.set(output.path, output.content);
+      noteCheckPath(output.path);
+      if (!options.check) {
         const outDir = path.dirname(output.path);
         if (!fs.existsSync(outDir)) {
           fs.mkdirSync(outDir, { recursive: true });
@@ -1095,18 +1097,9 @@ program
         try {
           const result = agg.fn();
           for (const output of result.outputs) {
-            if (options.check) {
-              if (fs.existsSync(output.path)) {
-                const existing = fs.readFileSync(output.path, "utf-8");
-                if (existing === output.content) {
-                  console.log(ok(`${output.path} ${dim("(up to date)")}`));
-                } else {
-                  console.log(fail(`${output.path} ${dim("(out of date)")}`));
-                }
-              } else {
-                console.log(fail(`${output.path} ${dim("(missing)")}`));
-              }
-            } else {
+            generatedByPath.set(output.path, output.content);
+            noteCheckPath(output.path);
+            if (!options.check) {
               const outDir = path.dirname(output.path);
               if (!fs.existsSync(outDir)) {
                 fs.mkdirSync(outDir, { recursive: true });
@@ -1122,13 +1115,19 @@ program
     }
 
     // ─── Pass 4: Surface tables (injected into overview.md files) ────────
-    // This MUST run after all overview.md files are written (Passes 1-3)
-    if (systemFile && !options.check) {
+    // This MUST run after all overview.md files are written (Passes 1-3).
+    // Runs in check mode too, seeded with the in-memory overview content, so
+    // the composed file is what `--check` compares against.
+    if (systemFile) {
       try {
-        const surfaceResult = generateSurfaceTables(featureFiles, serviceFiles, root);
+        const surfaceResult = generateSurfaceTables(featureFiles, serviceFiles, root, generatedByPath);
         for (const output of surfaceResult.outputs) {
-          fs.writeFileSync(output.path, output.content, "utf-8");
-          console.log(arrow(`${output.path} ${dim("(surface tables)")}`));
+          generatedByPath.set(output.path, output.content);
+          noteCheckPath(output.path);
+          if (!options.check) {
+            fs.writeFileSync(output.path, output.content, "utf-8");
+            console.log(arrow(`${output.path} ${dim("(surface tables)")}`));
+          }
         }
       } catch (err) {
         console.error(fail(`surface-tables — ${(err as Error).message}`));
@@ -1141,10 +1140,6 @@ program
         {
           name: "architecture-diagram",
           fn: () => generateArchitectureDiagram(systemFile, root),
-        },
-        {
-          name: "er-diagram",
-          fn: () => generateERDiagram(dataFiles, root),
         },
         {
           name: "service-dependencies",
@@ -1217,6 +1212,30 @@ program
           }
         };
         copyDir(docsSourceDir, docsOutputDir);
+      }
+    }
+
+    // ─── Report: compare final composed content against disk (check mode) ───
+    // Runs after every composing pass so paths that are written once and then
+    // patched (e.g. overview.md + surface tables) are compared as a whole.
+    if (options.check) {
+      let staleCount = 0;
+      for (const outputPath of checkedPaths) {
+        const expected = generatedByPath.get(outputPath);
+        if (expected === undefined) continue;
+        if (!fs.existsSync(outputPath)) {
+          console.log(fail(`${outputPath} ${dim("(missing)")}`));
+          staleCount++;
+        } else if (fs.readFileSync(outputPath, "utf-8") === expected) {
+          console.log(ok(`${outputPath} ${dim("(up to date)")}`));
+        } else {
+          console.log(fail(`${outputPath} ${dim("(out of date)")}`));
+          staleCount++;
+        }
+      }
+      if (staleCount > 0) {
+        console.log(`\n${fail(`${staleCount} output(s) out of date. Run 'usm generate' to refresh.`)}`);
+        process.exitCode = 1;
       }
     }
   });
@@ -1654,6 +1673,9 @@ program
     const allFiles = findAllUsmFiles(root);
     let errors = 0;
     let warnings = 0;
+    // File-level counters — a file with N warnings must not be subtracted N times.
+    let warnFiles = 0;
+    let okFiles = 0;
 
     console.log(bold(`Checking ${metric(String(allFiles.length))} .usm file(s)...\n`));
 
@@ -1684,10 +1706,11 @@ program
         if (isFeatureFile(parsed)) {
           const feature = parsed as FeatureUsm;
           if (feature.implementation?.primary) {
-            const implPath = path.resolve(root, feature.implementation.primary);
-            if (!fs.existsSync(implPath)) {
+            const implPaths = splitImplementationPaths(feature.implementation.primary);
+            const missing = implPaths.filter((p) => !fs.existsSync(path.resolve(root, p)));
+            if (missing.length > 0) {
               console.log(warn(filePath));
-              console.log(`  implementation.primary: ${feature.implementation.primary} does not exist`);
+              console.log(`  implementation.primary: ${missing.join("; ")} does not exist`);
               warnings++;
               hasWarnings = true;
             }
@@ -1699,10 +1722,13 @@ program
 
       if (!hasWarnings) {
         console.log(ok(filePath));
+        okFiles++;
+      } else {
+        warnFiles++;
       }
     }
 
-    console.log(`\n${ok(String(allFiles.length - errors - warnings))} valid, ${warn(String(warnings))} warnings, ${fail(String(errors))} errors`);
+    console.log(`\n${ok(String(okFiles))} valid, ${warn(String(warnings))} warnings across ${warn(String(String(warnFiles)))} file(s), ${fail(String(errors))} errors`);
 
     if (errors > 0) {
       process.exit(1);

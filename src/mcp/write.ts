@@ -5,7 +5,7 @@ import yaml from "js-yaml";
 import { parseUsm, parseUsmFile, isFeatureFile, isSystemFile, isServiceFile } from "../parse.js";
 import { validateUsm, validateUsmString } from "../validate.js";
 import { generateMarkdown } from "../generators/markdown.js";
-import { resolvePath, allUsmFilesInMonorepo } from "../mcp-utils.js";
+import { resolvePath, allUsmFilesInMonorepo, featureDocsUrl } from "../mcp-utils.js";
 import type { FeatureUsm, UsmFile } from "../types.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -255,12 +255,17 @@ export async function writeFeatureTool(args: { yaml: string; path: string }) {
     const filePath = resolvePath(args.path);
     atomicWrite(filePath, args.yaml);
 
+    const docs = featureDocsUrl(filePath);
+
     return {
       content: [{
         type: "text" as const,
         text: JSON.stringify({
           written: true,
           path: filePath,
+          docs_url: docs.url,
+          docs_path: docs.path,
+          docs_hint: docs.hint,
         }, null, 2),
       }],
     };
@@ -403,6 +408,8 @@ export async function updateFeatureTool(args: { id?: string; path?: string; fiel
     const yamlContent = featureToYaml(feature);
     atomicWrite(filePath, yamlContent);
 
+    const docs = featureDocsUrl(filePath);
+
     return {
       content: [{
         type: "text" as const,
@@ -410,6 +417,9 @@ export async function updateFeatureTool(args: { id?: string; path?: string; fiel
           updated: true,
           path: filePath,
           fields_updated: fieldsUpdated,
+          docs_url: docs.url,
+          docs_path: docs.path,
+          docs_hint: docs.hint,
           ...(Object.keys(mergeDetails).length > 0 ? { merge_details: mergeDetails } : {}),
         }, null, 2),
       }],
@@ -533,6 +543,8 @@ export async function updateFeatureStatusTool(args: {
     const yamlContent = featureToYaml(feature);
     atomicWrite(filePath, yamlContent);
 
+    const docs = featureDocsUrl(filePath);
+
     return {
       content: [{
         type: "text" as const,
@@ -541,6 +553,9 @@ export async function updateFeatureStatusTool(args: {
           path: filePath,
           old_status: oldStatus,
           new_status: args.status,
+          docs_url: docs.url,
+          docs_path: docs.path,
+          docs_hint: docs.hint,
         }, null, 2),
       }],
     };

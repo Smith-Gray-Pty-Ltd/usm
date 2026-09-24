@@ -1,7 +1,7 @@
 // @smith-gray/usm — Universal System Map SDK
 // Parse, validate, and generate from .usm spec files.
 
-export { parseUsm, parseUsmFile, isSystemFile, isServiceFile, isFeatureFile, isFeedbackFile, findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "./parse.js";
+export { parseUsm, parseUsmFile, isSystemFile, isServiceFile, isFeatureFile, isDataFile, isFeedbackFile, splitImplementationPaths, findUsmFiles, findAllUsmFiles, findAllUsmDirs } from "./parse.js";
 export { validateUsm, validateUsmString, validateUsmFile } from "./validate.js";
 export { generate, type Generator } from "./generate.js";
 export {

@@ -2,14 +2,16 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-markdown
 $type: feature
 $version: 1
-$last_updated: "2026-06-19"
-summary: Markdown generator — produces GitHub-flavored markdown docs for each .usm file, plus cross-cutting aggregator docs (risks, roadmap, data model, AGENTS.md, etc.).
-
+$last_updated: "2026-09-24"
+summary: >-
+  Markdown generator — produces GitHub-flavored markdown docs for each .usm file, plus cross-cutting
+  aggregator docs (risks, roadmap, data model, AGENTS.md, etc.).
 $system: usm/system
 $service: usm/cli
-intent: |
-  Markdown is the primary human-readable output. Each .usm file gets a per-file doc, and aggregator generators produce cross-app docs like shared-services-index, packages-index, per-app-api-reference, and AGENTS.md.
-
+intent: >
+  Markdown is the primary human-readable output. Each .usm file gets a per-file doc, and aggregator
+  generators produce cross-app docs like shared-services-index, packages-index,
+  per-app-api-reference, and AGENTS.md.
 flows:
   - id: per-file-md
     name: Generate per-file markdown
@@ -24,15 +26,24 @@ flows:
       - id: s3
         action: submit
         target: write to .agents-workspace/docs/<area>/overview.md
-
 contracts:
   - id: markdown-gfm
     description: Markdown output must be valid GitHub-flavored markdown
     must_have:
-      - "H1 heading matches the .usm $id or name"
-      - "Tables for flows, contracts, tests"
-      - "No broken links"
-
+      - H1 heading matches the .usm $id or name
+      - Tables for flows, contracts, tests
+      - No broken links
+  - id: markdown-single-writer-per-path
+    description: >-
+      Each output path must have exactly one generating pass, and output must be a pure function of
+      the .usm inputs
+    must_have:
+      - No generator derives output by reading the file it is about to overwrite
+      - generateDataModelDoc owns .usm-workspace/docs/data/models.md (ER section composed in)
+      - >-
+        Area overviews write to the root .usm-workspace/docs/features/ — never
+        apps/<svc>/.usm-workspace/
+      - "`usm generate --check` converges immediately after a clean `usm generate`"
 tests:
   - id: md-service-file
     setup:
@@ -44,11 +55,9 @@ tests:
       valid_feature_usm: true
     expect:
       - assertion: overview.md written with flows, contracts, tests sections
-
 implementation:
   primary: src/generators/markdown.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/cli-generate"
+  - usm/cli-generate

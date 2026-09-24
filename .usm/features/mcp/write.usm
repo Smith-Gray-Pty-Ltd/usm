@@ -2,11 +2,12 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/mcp-write
 $type: feature
 $version: 1
-$last_updated: "2026-06-22"
+$last_updated: "2026-09-24"
 status: built
-summary: |
-  MCP write tools — let agents author and update .usm feature specs as part of the spec-first workflow. Adds draft_feature, update_feature, and update_feature_status tools to the MCP server, closing the loop between human discussion and agent implementation.
-
+summary: >
+  MCP write tools — let agents author and update .usm feature specs as part of the spec-first
+  workflow. Adds draft_feature, update_feature, and update_feature_status tools to the MCP server,
+  closing the loop between human discussion and agent implementation.
 $system: usm/system
 $service: usm/mcp
 command: usm_draft_feature, usm_write_feature, usm_update_feature, usm_update_feature_status
@@ -17,7 +18,6 @@ intent: |
   the human the generated markdown for review, then update the feature after
   implementation. Without write tools, this loop is broken: the human must
   manually write YAML, which defeats the purpose of agent-first authoring.
-
 decisions:
   - id: write-tools-as-mcp-not-cli
     decision: Implement authoring as MCP tools rather than CLI commands only
@@ -28,10 +28,14 @@ decisions:
       directly. CLI wrappers can be added later for human use.
     alternatives:
       - option: CLI commands only (usm feature draft, usm feature update)
-        rejected_because: "Agents must shell out, parse stdout, handle errors externally — MCP returns structured JSON directly"
+        rejected_because: >-
+          Agents must shell out, parse stdout, handle errors externally — MCP returns structured
+          JSON directly
       - option: File system writes only (agent writes YAML directly)
-        rejected_because: "No validation, no markdown preview, no status transition enforcement — agents would produce invalid .usm files"
-    consequences: "MCP server gains write capability — needs careful validation to prevent corruption"
+        rejected_because: >-
+          No validation, no markdown preview, no status transition enforcement — agents would
+          produce invalid .usm files
+    consequences: MCP server gains write capability — needs careful validation to prevent corruption
     status: accepted
   - id: draft-returns-preview
     decision: draft_feature returns both YAML and generated markdown
@@ -40,7 +44,7 @@ decisions:
       show the human the readable preview immediately without a separate generate
       step. The agent can also iterate on the draft based on feedback before
       writing to disk.
-    consequences: "draft_feature is heavier than a pure YAML generator, but the review step is the whole point"
+    consequences: draft_feature is heavier than a pure YAML generator, but the review step is the whole point
     status: accepted
   - id: validate-before-write
     decision: All write operations validate against the v1 schema before persisting
@@ -48,9 +52,10 @@ decisions:
       An invalid .usm file breaks downstream generators and MCP read tools.
       Validation at write time prevents corruption. The tool returns structured
       validation errors so the agent can fix them before retrying.
-    consequences: "Write operations are slower due to validation, but prevent corrupt .usm files from entering the system"
+    consequences: >-
+      Write operations are slower due to validation, but prevent corrupt .usm files from entering
+      the system
     status: accepted
-
 flows:
   - id: draft-feature-from-discussion
     name: Draft a feature spec from human discussion
@@ -77,7 +82,6 @@ flows:
       - id: s6
         action: write
         target: if approved, agent calls write_feature to persist the .usm file
-
   - id: update-feature-status
     name: Update feature status after implementation
     description: |
@@ -102,7 +106,6 @@ flows:
       - id: s6
         action: write
         target: persisted .usm file with $last_updated bumped
-
   - id: update-feature-fields
     name: Update arbitrary fields on an existing feature
     description: |
@@ -121,33 +124,39 @@ flows:
       - id: s4
         action: write
         target: persisted .usm file if valid, error if not
-
 contracts:
   - id: draft-validates-before-returning
     description: draft_feature must validate the spec before returning it
     must_have:
       - "Returns validation_status: valid or invalid"
-      - "If invalid, returns structured errors with field paths"
-      - "YAML is only generated if validation passes"
+      - If invalid, returns structured errors with field paths
+      - YAML is only generated if validation passes
   - id: write-is-atomic
     description: write_feature must not leave partial/corrupt files on disk
     must_have:
-      - "Validates full file before writing"
-      - "Writes to temp then renames (atomic on POSIX)"
-      - "Returns error if write fails — original file untouched"
+      - Validates full file before writing
+      - Writes to temp then renames (atomic on POSIX)
+      - Returns error if write fails — original file untouched
   - id: update-preserves-unspecified-fields
     description: update_feature merges provided fields without losing existing ones
     must_have:
-      - "Fields not in the update payload are preserved"
-      - "Array fields are replaced, not merged (explicit intent)"
-      - "$id, $type, $schema are immutable — cannot be changed via update"
+      - Fields not in the update payload are preserved
+      - Array fields are replaced, not merged (explicit intent)
+      - $id, $type, $schema are immutable — cannot be changed via update
   - id: status-transitions-are-sane
     description: update_feature_status enforces valid status transitions
     must_have:
-      - "planned → in-progress → built is valid"
-      - "built → deprecated is valid"
-      - "built → planned is rejected (use a new feature instead)"
-
+      - planned → in-progress → built is valid
+      - built → deprecated is valid
+      - built → planned is rejected (use a new feature instead)
+  - id: write-returns-docs-url
+    description: >-
+      Write and update tools return the canonical docs link so agents don't guess ports or URL
+      shapes (issue #34)
+    must_have:
+      - write_feature, update_feature and update_feature_status include docs_path on success
+      - docs_url is a full localhost URL when a docs server port is recorded
+      - docs_hint explains how to get a live URL when none is running
 tests:
   - id: draft-minimal-feature
     setup:
@@ -196,13 +205,11 @@ tests:
     expect:
       - assertion: error returned with message about invalid transition
       - assertion: original file unchanged
-
 implementation:
   primary: src/mcp/write.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/mcp"
-  - "usm/mcp-validate"
-  - "usm/gen-feature-review"
+  - usm/mcp
+  - usm/mcp-validate
+  - usm/gen-feature-review

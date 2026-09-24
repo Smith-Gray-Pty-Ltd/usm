@@ -8,6 +8,32 @@ import { getDesignSections, DESIGN_SECTION_LABELS } from "../generators/technica
 
 type Audience = "developer" | "help";
 
+/**
+ * Best-effort project identity for docs-serve startup output. Prefers the
+ * system.usm identity name, then package.json name, then the directory name.
+ * A visible identity makes a stale/wrong-directory server obvious at a glance
+ * (issue #34).
+ */
+function readProjectName(root: string): string {
+  const systemPath = path.join(root, ".usm", "system.usm");
+  if (fs.existsSync(systemPath)) {
+    try {
+      const system = parseUsmFile(systemPath) as SystemUsm;
+      if (system.identity?.name) return system.identity.name;
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8")) as { name?: string };
+    if (pkg.name) return pkg.name;
+  } catch {
+    /* fall through */
+  }
+  return path.basename(root);
+}
+
+
 // ─── Port helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -133,12 +159,12 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-interface SidebarItem {
+export interface SidebarItem {
   text: string;
   link: string;
 }
 
-interface SidebarGroup {
+export interface SidebarGroup {
   text: string;
   collapsed?: boolean;
   items: (SidebarItem | SidebarGroup)[];
@@ -544,7 +570,7 @@ const STATUS_ORDER: Record<string, number> = {
  *
  * Groups and pages only appear when their data exists.
  */
-function generateSidebar(root: string, docsRoot: string, audience: Audience = "developer"): SidebarGroup[] {
+export function generateSidebar(root: string, docsRoot: string, audience: Audience = "developer"): SidebarGroup[] {
   const systemPath = path.join(root, ".usm", "system.usm");
   const featuresRoot = path.join(docsRoot, "features");
   const sidebar: SidebarGroup[] = [];
@@ -658,18 +684,51 @@ function generateSidebar(root: string, docsRoot: string, audience: Audience = "d
     const featureEntries = fs.readdirSync(featuresRoot, { withFileTypes: true });
     for (const entry of featureEntries) {
       if (entry.isDirectory()) {
-        const indexPath = path.join(featuresRoot, entry.name, "index.md");
-        if (fs.existsSync(indexPath)) {
-          addDiskFeature(null, entry.name, `/features/${entry.name}/`);
-        } else {
-          const areaDisplay = areaDisplayName(entry.name);
-          const areaDir = path.join(featuresRoot, entry.name);
-          for (const md of fs.readdirSync(areaDir)) {
-            if (md.endsWith(".md") && md !== "index.md") {
-              const slug = md.replace(/\.md$/, "");
-              addDiskFeature(areaDisplay, `${entry.name}/${slug}`, `/features/${entry.name}/${slug}`);
+        const areaDir = path.join(featuresRoot, entry.name);
+        const indexPath = path.join(areaDir, "index.md");
+        const hasIndex = fs.existsSync(indexPath);
+        const areaDisplay = areaDisplayName(entry.name);
+
+        // Enumerate every page in the area regardless of whether an area
+        // index.md exists. Previously a directory with index.md was treated as
+        // an index-only link and its feature pages were silently omitted from
+        // the sidebar (issue #36).
+        const pageSlugs: string[] = [];
+        const walk = (rel: string): void => {
+          const abs = rel ? path.join(areaDir, rel) : areaDir;
+          for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+            const nextRel = rel ? `${rel}/${e.name}` : e.name;
+            if (e.isDirectory()) {
+              walk(nextRel);
+            } else if (e.name.endsWith(".md") && nextRel !== "index.md") {
+              // A nested `.../index.md` is the directory's own page; everything
+              // else is a page whose link drops the `.md` suffix.
+              pageSlugs.push(
+                e.name === "index.md"
+                  ? nextRel.replace(/\/index\.md$/, "")
+                  : nextRel.replace(/\.md$/, ""),
+              );
             }
           }
+        };
+        walk("");
+
+        if (pageSlugs.length === 0) {
+          // Index-only area (or a dir with no pages) — a flat link is correct.
+          if (hasIndex) addDiskFeature(null, entry.name, `/features/${entry.name}/`);
+          continue;
+        }
+
+        for (const slug of pageSlugs) {
+          addDiskFeature(areaDisplay, `${entry.name}/${slug}`, `/features/${entry.name}/${slug}`);
+        }
+
+        // Keep the area overview reachable inside the collapsible group.
+        const overviewLink = `/features/${entry.name}/`;
+        if (hasIndex && !coveredLinks.has(overviewLink.replace(/\/+$/, ""))) {
+          if (!diskFeaturesByArea.has(areaDisplay)) diskFeaturesByArea.set(areaDisplay, []);
+          diskFeaturesByArea.get(areaDisplay)!.push({ text: "Overview", link: overviewLink });
+          coverLink(overviewLink);
         }
       } else if (entry.name.endsWith(".md") && entry.name !== "index.md") {
         addDiskFeature(null, entry.name.replace(/\.md$/, ""), `/features/${entry.name.replace(/\.md$/, "")}`);
@@ -1123,7 +1182,11 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   console.log("Generated .vitepress/config.mts");
 
   // ── Start VitePress ──────────────────────────────────────────────────────
-  console.log(`\nStarting dev server on port ${port}...`);
+  const projectName = readProjectName(root);
+  console.log(`\nServing project "${projectName}" from ${root}`);
+  console.log(`Docs route shape: /features/<area>/<slug> — the $system namespace is dropped (issue #34).`);
+  console.log(`Starting dev server on port ${port}...`);
+  console.log(`  http://localhost:${port}/`);
   const child = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(port)], {
     stdio: "inherit",
     cwd: root,

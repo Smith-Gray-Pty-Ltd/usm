@@ -4,7 +4,6 @@ import type {
   SystemUsm,
   ServiceUsm,
   FeatureUsm,
-  DataUsm,
   Flow,
   FlowStep,
   GenerationResult,
@@ -332,12 +331,18 @@ function formatExpectationNote(
 // ─── 3. ER Diagram (from data/models.usm + Prisma schema) ──────────────────
 
 /**
- * Generate a Mermaid erDiagram from data/models.usm and the Prisma schema.
- * Appends the diagram to the existing models.md content.
+ * Build the ER Diagram markdown section from the Prisma schema.
  *
- * Output: injected into `.usm-workspace/docs/data/models.md`
+ * This is a **pure function** of the on-disk Prisma schema — it never reads
+ * (or depends on) the `models.md` file it ends up in. The data-model generator
+ * (`generateDataModelDoc` in markdown.ts) is the sole owner of
+ * `.usm-workspace/docs/data/models.md` and appends this section, so there is
+ * exactly one writer for that path and `usm generate --check` can converge.
+ * See issue #37.
+ *
+ * @returns the section, including a leading blank line and a trailing newline
  */
-export function generateERDiagram(dataFiles: DataUsm[], root: string, _serviceFiles?: ServiceUsm[]): GenerationResult {
+export function buildERDiagramSection(root: string): string {
   // Parse the Prisma schema for the full ER info
   const schemaPath = path.join(root, "packages", "db", "prisma", "schema.prisma");
   const prismaContent = readPrismaSchema(schemaPath);
@@ -389,38 +394,7 @@ export function generateERDiagram(dataFiles: DataUsm[], root: string, _serviceFi
   lines.push("```");
   lines.push("");
 
-  // Now read the existing models.md and append the ER diagram section
-  const existingPath = `${root}/.usm-workspace/docs/data/models.md`;
-  // Existing content is always set in try/catch below; declare without initializer
-  let existingContent: string;
-  try {
-    existingContent = fs.readFileSync(existingPath, "utf-8");
-  } catch {
-    // If it doesn't exist yet, we'll create it from scratch
-    existingContent = "# Data Model\n\nSource: `.usm/data/*.usm` + `packages/db/prisma/schema.prisma`\n\n";
-  }
-
-  // Remove any existing ER Diagram section to avoid duplication
-  const erSectionStart = existingContent.indexOf("\n## ER Diagram\n");
-  if (erSectionStart !== -1) {
-    // Find the end of the ER section (next ## or end of file)
-    const afterEr = existingContent.indexOf("\n## ", erSectionStart + 1);
-    if (afterEr !== -1) {
-      existingContent = existingContent.slice(0, erSectionStart) + existingContent.slice(afterEr);
-    } else {
-      existingContent = existingContent.slice(0, erSectionStart);
-    }
-  }
-
-  // Append the new ER diagram section
-  const finalContent = existingContent.trimEnd() + "\n" + lines.join("\n");
-
-  return {
-    outputs: [{
-      path: existingPath,
-      content: finalContent,
-    }],
-  };
+  return lines.join("\n");
 }
 
 // ─── 4. Service Dependency Graph ───────────────────────────────────────────

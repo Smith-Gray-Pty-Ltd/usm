@@ -98,6 +98,84 @@ summary: "Missing identity"
     const result = validateUsm(parsed);
     expect(result.valid).toBe(false);
   });
+
+  // Regression test for issue #33: `$type: data` was advertised by the
+  // TypeScript type surface (UsmFileType / DataUsm) but missing from the
+  // schema, so validate rejected any file that declared it.
+  describe("$type: data (issue #33)", () => {
+    it("validates a minimal data file", () => {
+      const yaml = `
+$schema: https://usm.dev/schema/v1.json
+$id: test/models
+$type: data
+$version: 1
+$system: test/system
+summary: "A test data source for validation"
+`;
+      const result = validateUsm(parseUsm(yaml));
+      expect(result.valid).toBe(true);
+    });
+
+    it("validates a fully-populated data file", () => {
+      const yaml = `
+$schema: https://usm.dev/schema/v1.json
+$id: test/models
+$type: data
+$version: 1
+$system: test/system
+name: Platform DB
+summary: "The platform Postgres database accessed via Prisma"
+type: postgres
+runtime: prisma
+port: 5432
+schema_source: packages/db/prisma/schema.prisma
+models:
+  - User
+modules:
+  - name: User
+    purpose: Account records
+`;
+      const result = validateUsm(parseUsm(yaml));
+      expect(result.valid).toBe(true);
+    });
+
+    it("rejects a data file missing $system", () => {
+      const yaml = `
+$schema: https://usm.dev/schema/v1.json
+$id: test/models
+$type: data
+$version: 1
+summary: "Missing the required $system field"
+`;
+      const result = validateUsm(parseUsm(yaml));
+      expect(result.valid).toBe(false);
+    });
+  });
+
+  // Anti-drift: every $type advertised by the schema's commonFields enum must
+  // have a matching branch in oneOf, so the type surface and validator agree.
+  it("every $type in the schema discriminator enum is accepted", () => {
+    const discriminatorTypes = ["system", "service", "feature", "data", "feedback"];
+    const minimalByType: Record<string, string> = {
+      system: "identity:\n  name: T\n  domain: t.com",
+      service: "$system: test/system\ntype: web-app\nruntime: node",
+      feature: "$system: test/system\n$service: test/svc\nintent: Because.",
+      data: "$system: test/system",
+      feedback: "kind: bug\nseverity: low\nstatus: open\nreported_by: agent:test",
+    };
+    for (const t of discriminatorTypes) {
+      const yaml = [
+        "$schema: https://usm.dev/schema/v1.json",
+        `$id: test/${t}`,
+        `$type: ${t}`,
+        "$version: 1",
+        "summary: A generated minimal file for validation",
+        minimalByType[t],
+      ].join("\n");
+      const result = validateUsm(parseUsm(yaml));
+      expect(result.valid, `${t} should validate: ${JSON.stringify(result.errors)}`).toBe(true);
+    }
+  });
 });
 
 describe("validateUsmFile", () => {

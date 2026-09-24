@@ -53,13 +53,14 @@ export function validateUsm(file: UsmFile): ValidationResult {
     system: "systemFile",
     service: "serviceFile",
     feature: "featureFile",
+    data: "dataFile",
     feedback: "feedbackFile",
   };
   const defName = typeToDef[file.$type];
   if (!defName) {
     return {
       valid: false,
-      errors: [{ path: "/$type", message: `Unknown $type: '${file.$type}'. Must be one of: system, service, feature, feedback.` }],
+      errors: [{ path: "/$type", message: `Unknown $type: '${file.$type}'. Must be one of: ${Object.keys(typeToDef).join(", ")}.` }],
     };
   }
 

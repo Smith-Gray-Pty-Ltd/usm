@@ -23,10 +23,19 @@ export function smartMerge(existing: string, generated: string): string {
   const endIdx = existing.indexOf(endMarker);
 
   if (startIdx !== -1 && endIdx !== -1) {
-    // Strategy 1: Merge mode — replace generated section, keep hand-written before + after
+    // Strategy 1: Merge mode — replace generated section, keep hand-written before + after.
+    //
+    // Normalise whitespace so repeated merges are byte-identical (issue #32):
+    // the generated section ends in exactly one newline, and any run of blank
+    // lines immediately after the end marker collapses to that single newline.
+    // Without this, each run re-appends the previous run's trailing newline
+    // and the file grows by one byte on every `usm generate`.
     const before = existing.slice(0, startIdx);
     const after = existing.slice(endIdx + endMarker.length);
-    return before + generated + after;
+    const generatedNorm = generated.replace(/\n+$/, "");
+    const afterNorm = after.replace(/^\n+/, "");
+    const tail = afterNorm === "" ? "\n" : "\n" + afterNorm;
+    return before + generatedNorm + tail;
   }
 
   // Strategy 2: No markers — insert the USM section after the first H1,
@@ -275,7 +284,7 @@ export function generateRootAgentsMd(
   lines.push("2. Call `usm_draft_feature` with structured fields (summary, intent, flows, contracts, tests)");
   lines.push("3. Show the human the generated markdown preview for review");
   lines.push("4. If approved, call `usm_write_feature` to persist the .usm file");
-  lines.push("5. **Return the live docs link** (e.g. `http://localhost:5173/features/...`) so the human can review the rendered spec in the browser");
+  lines.push("5. **Return the live docs link** so the human can review the rendered spec in the browser. The MCP tool returns `docs_url`/`docs_path` — use those. Docs routes mirror `.usm/features/<area>/<slug>.usm` at `/features/<area>/<slug>` (the `$system` namespace is dropped), served at the port `usm docs serve --watch` reports");
   lines.push("6. Wait for human confirmation that the spec is correct before implementing");
   lines.push("7. Implement the feature in code");
   lines.push("8. Call `usm_update_feature_status` to mark as built (with implementation path)");

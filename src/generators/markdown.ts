@@ -15,7 +15,7 @@ import type {
   ServiceInfrastructure,
 } from "../types.js";
 import { findUsmFiles, findAllUsmFiles, parseUsmFile, isServiceFile, isFeatureFile, findAllUsmDirs } from "../index.js";
-import { generateSequenceDiagrams } from "./mermaid.js";
+import { generateSequenceDiagrams, buildERDiagramSection } from "./mermaid.js";
 import { USM_UPSTREAM_TRACKER } from "./rulesFiles.js";
 import { renderFeatureReferenceBlock, type FeatureReferenceBlock } from "./contentBlocks.js";
 
@@ -491,10 +491,13 @@ export function generateAreaOverviews(root: string): GenerationResult {
       const serviceDir = primaryService
         ? primaryService.split("/")[1] || "unknown"
         : "unknown";
-      const appDir = `apps/${serviceDir}`;
 
       const content = buildAreaOverviewContent(areaName, subFeatures, serviceDir);
-      const outputPath = `${root}/${appDir}/.usm-workspace/docs/features/${areaName}/index.md`;
+      // Area overviews belong in the single root docs workspace — the same
+      // place feature markdown is written. Writing into apps/<svc>/.usm-workspace
+      // produced a stray nested workspace and meant a plain `usm generate` never
+      // populated the root docs tree (issue #35).
+      const outputPath = `${root}/.usm-workspace/docs/features/${areaName}/index.md`;
 
       outputs.push({ path: outputPath, content });
     }
@@ -1220,21 +1223,28 @@ function buildRoadmapMd(file: ServiceUsm): string {
 export function generateSurfaceTables(
   features: FeatureUsm[],
   services: ServiceUsm[],
-  root: string
+  root: string,
+  overrides?: Map<string, string>
 ): GenerationResult {
   const outputs: GenerationResult["outputs"] = [];
+
+  // Prefer freshly-generated in-memory content when available. In `--check`
+  // mode nothing is written to disk, so reading the overview from disk would
+  // compare against pre-surface-table content and report "out of date" forever.
+  const readOverview = (p: string): string | null => {
+    if (overrides?.has(p)) return overrides.get(p) ?? null;
+    if (fs.existsSync(p)) return fs.readFileSync(p, "utf-8");
+    return null;
+  };
 
   // For each app service (derived from service files + feature $service values)
   for (const app of deriveAppDirs(services, features)) {
     const appFeatures = featuresForApp(features, app);
     const overviewPath = `${root}/apps/${app}/.usm-workspace/docs/overview.md`;
 
-    if (fs.existsSync(overviewPath)) {
-      const content = injectSurfaceTables(
-        fs.readFileSync(overviewPath, "utf-8"),
-        appFeatures,
-        app
-      );
+    const existing = readOverview(overviewPath);
+    if (existing !== null) {
+      const content = injectSurfaceTables(existing, appFeatures, app);
       outputs.push({ path: overviewPath, content });
     }
   }
@@ -1248,12 +1258,9 @@ export function generateSurfaceTables(
     const svcFeatures = featuresForService(features, slug);
     const overviewPath = `${root}/.usm-workspace/docs/shared-services/${slug}/overview.md`;
 
-    if (fs.existsSync(overviewPath)) {
-      const content = injectSurfaceTables(
-        fs.readFileSync(overviewPath, "utf-8"),
-        svcFeatures,
-        slug
-      );
+    const existing = readOverview(overviewPath);
+    if (existing !== null) {
+      const content = injectSurfaceTables(existing, svcFeatures, slug);
       outputs.push({ path: overviewPath, content });
     }
   }
@@ -2566,6 +2573,12 @@ export function generateDataModelDoc(dataFiles: DataUsm[], root: string, service
       }
     }
   }
+
+  // The ER Diagram section is owned by this generator (not the mermaid pass):
+  // it is a pure function of the Prisma schema, so composing it here keeps a
+  // single writer for models.md and makes the output deterministic. See #37.
+  lines.push(buildERDiagramSection(root).trimEnd());
+  lines.push("");
 
   return {
     outputs: [{

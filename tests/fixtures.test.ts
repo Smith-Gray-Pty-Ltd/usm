@@ -15,7 +15,7 @@
  * re-run `usm scan && usm generate` in the fixture dir and commit the new output.
  */
 import { describe, it, expect } from "vitest";
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -84,14 +84,35 @@ const FIXTURES: Fixture[] = [
   { name: "cpp-drogon", expectedServices: 1, expectedSystemUsm: true },
 ];
 
-function runUsm(args: string, cwd: string): string {
+/**
+ * Run the USM CLI as a child process and resolve with its stdout.
+ *
+ * Uses async `execFile` (not `execSync`) so the Node event loop stays free:
+ * vitest's `testTimeout` relies on that event loop to fire, so a synchronous
+ * spawn that hangs permanently wedges the whole worker with no timeout rescue
+ * (issue #29). With the async form, a stuck child fails the test cleanly.
+ */
+function runUsm(args: string, cwd: string): Promise<string> {
   const cliPath = path.join(ROOT, "dist", "cli", "index.js");
-  return execSync(`node "${cliPath}" ${args}`, {
-    cwd,
-    encoding: "utf-8",
-    timeout: 60_000,
-    stdio: ["pipe", "pipe", "pipe"],
-    maxBuffer: 10 * 1024 * 1024,
+  const argv = args.match(/(?:[^\s"]+|"[^"]*")+/g)?.map((a) => a.replace(/^"|"$/g, "")) ?? [];
+  return new Promise((resolve, reject) => {
+    execFile(
+      process.execPath,
+      [cliPath, ...argv],
+      {
+        cwd,
+        encoding: "utf-8",
+        timeout: 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(`${error.message}\nstdout: ${stdout}\nstderr: ${stderr}`));
+          return;
+        }
+        resolve(stdout);
+      },
+    );
   });
 }
 
@@ -134,13 +155,13 @@ function readDirRecursive(dir: string, base: string = dir): string[] {
 describe("fixture tests", () => {
   for (const fixture of FIXTURES) {
     describe(fixture.name, () => {
-      it("init detects services and creates usmconfig.json", () => {
+      it("init detects services and creates usmconfig.json", async () => {
         const tmp = copyFixtureToTemp(fixture.name);
         fs.rmSync(path.join(tmp, "usmconfig.json"), { force: true });
         fse.removeSync(path.join(tmp, ".usm"));
         fse.removeSync(path.join(tmp, ".usm-workspace"));
 
-        const output = runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
+        const output = await runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
         const plain = output.replace(/\x1b\[\d+m/g, "");
 
         expect(plain).toContain("Services:");
@@ -151,14 +172,14 @@ describe("fixture tests", () => {
         expect(fs.existsSync(path.join(tmp, "usmconfig.json"))).toBe(true);
       });
 
-      it("scan produces .usm/ files with correct structure", () => {
+      it("scan produces .usm/ files with correct structure", async () => {
         const tmp = copyFixtureToTemp(fixture.name);
         fs.rmSync(path.join(tmp, "usmconfig.json"), { force: true });
         fse.removeSync(path.join(tmp, ".usm"));
         fse.removeSync(path.join(tmp, ".usm-workspace"));
 
-        runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
-        const output = runUsm(`scan --root . --config ./usmconfig.json`, tmp);
+        await runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
+        const output = await runUsm(`scan --root . --config ./usmconfig.json`, tmp);
 
         // Strip ANSI codes for matching
         const plain = output.replace(/\x1b\[[\d;]*m/g, "");
@@ -170,15 +191,15 @@ describe("fixture tests", () => {
         expect(usmFiles.some((f) => f.endsWith("service.usm"))).toBe(true);
       });
 
-      it("generate produces .usm-workspace/ output", () => {
+      it("generate produces .usm-workspace/ output", async () => {
         const tmp = copyFixtureToTemp(fixture.name);
         fs.rmSync(path.join(tmp, "usmconfig.json"), { force: true });
         fse.removeSync(path.join(tmp, ".usm"));
         fse.removeSync(path.join(tmp, ".usm-workspace"));
 
-        runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
-        runUsm(`scan --root . --config ./usmconfig.json`, tmp);
-        runUsm(`generate --root .`, tmp);
+        await runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
+        await runUsm(`scan --root . --config ./usmconfig.json`, tmp);
+        await runUsm(`generate --root .`, tmp);
 
         const workspaceDir = path.join(tmp, ".usm-workspace");
         expect(fs.existsSync(workspaceDir)).toBe(true);
@@ -190,14 +211,14 @@ describe("fixture tests", () => {
         expect(workspaceFiles.some((f) => f.includes("architecture"))).toBe(true);
       });
 
-      it("scan produces all expected .usm/ files", () => {
+      it("scan produces all expected .usm/ files", async () => {
         const tmp = copyFixtureToTemp(fixture.name);
         fs.rmSync(path.join(tmp, "usmconfig.json"), { force: true });
         fse.removeSync(path.join(tmp, ".usm"));
         fse.removeSync(path.join(tmp, ".usm-workspace"));
 
-        runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
-        runUsm(`scan --root . --config ./usmconfig.json`, tmp);
+        await runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
+        await runUsm(`scan --root . --config ./usmconfig.json`, tmp);
 
         // At least system.usm + one service.usm
         const usmFiles = readDirRecursive(path.join(tmp, ".usm"));
@@ -206,15 +227,15 @@ describe("fixture tests", () => {
         expect(usmFiles.length).toBeGreaterThanOrEqual(2);
       });
 
-      it("generate is idempotent (running twice produces same output)", () => {
+      it("generate is idempotent (running twice produces same output)", async () => {
         const tmp = copyFixtureToTemp(fixture.name);
         fs.rmSync(path.join(tmp, "usmconfig.json"), { force: true });
         fse.removeSync(path.join(tmp, ".usm"));
         fse.removeSync(path.join(tmp, ".usm-workspace"));
 
-        runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
-        runUsm(`scan --root . --config ./usmconfig.json`, tmp);
-        runUsm(`generate --root .`, tmp);
+        await runUsm(`init --root . --output ./usmconfig.json --force`, tmp);
+        await runUsm(`scan --root . --config ./usmconfig.json`, tmp);
+        await runUsm(`generate --root .`, tmp);
 
         const workspaceDir = path.join(tmp, ".usm-workspace");
         const beforeFiles = readDirRecursive(workspaceDir);
@@ -223,7 +244,7 @@ describe("fixture tests", () => {
         );
 
         // Generate again
-        runUsm(`generate --root .`, tmp);
+        await runUsm(`generate --root .`, tmp);
 
         const afterFiles = readDirRecursive(workspaceDir);
         const afterContent = afterFiles.map((f) =>
