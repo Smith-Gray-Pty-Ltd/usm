@@ -14,6 +14,9 @@
       "$ref": "#/$defs/featureFile"
     },
     {
+      "$ref": "#/$defs/dataFile"
+    },
+    {
       "$ref": "#/$defs/feedbackFile"
     }
   ],
@@ -1460,6 +1463,125 @@
         "$system",
         "$service",
         "intent"
+      ],
+      "additionalProperties": false
+    },
+    "dataFile": {
+      "type": "object",
+      "description": "A first-class data-model file ($type: data). Describes a database or data source — models, schema source, and runtime. Lives in .usm/data/. Consumed by generateDataModelDoc to produce .usm-workspace/docs/data/models.md.",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "const": "https://usm.dev/schema/v1.json"
+        },
+        "$id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$",
+          "description": "Unique identifier: system/name (e.g. smith-gray/models)"
+        },
+        "$type": {
+          "type": "string",
+          "const": "data"
+        },
+        "$version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "$last_updated": {
+          "type": "string"
+        },
+        "$system": {
+          "type": "string",
+          "description": "The $id of the system this data source belongs to"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable name"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 10,
+          "description": "What this data source is and what it stores"
+        },
+        "type": {
+          "type": "string",
+          "description": "Data store kind (e.g. postgres, mysql, sqlite)"
+        },
+        "runtime": {
+          "type": "string",
+          "description": "ORM / access layer (e.g. prisma, drizzle)"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "schema_source": {
+          "type": "string",
+          "description": "Path to the canonical schema file (e.g. packages/db/prisma/schema.prisma)"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Model names exposed by this data source"
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "purpose"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "dev": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "env": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "$schema",
+        "$id",
+        "$type",
+        "$version",
+        "summary",
+        "$system"
       ],
       "additionalProperties": false
     },

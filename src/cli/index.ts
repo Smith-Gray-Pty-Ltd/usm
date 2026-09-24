@@ -53,7 +53,6 @@ import {
 } from "../generators/testSpecs.js";
 import {
   generateArchitectureDiagram,
-  generateERDiagram,
   generateServiceDependencies,
 } from "../generators/mermaid.js";
 import {
@@ -971,6 +970,18 @@ program
     const featureFiles: FeatureUsm[] = [];
     const dataFiles: DataUsm[] = [];
 
+    // Content generated this run, keyed by output path. Used by later passes
+    // that compose onto earlier output (e.g. surface tables injected into
+    // overview.md) so `--check` can compare against the final content without
+    // reading pre-composition files off disk — otherwise those paths report
+    // "out of date" forever (the same never-pass class as #32/#37).
+    const generatedByPath = new Map<string, string>();
+    // Output paths to report on, in first-emission order (check mode only).
+    const checkedPaths: string[] = [];
+    const noteCheckPath = (p: string): void => {
+      if (!checkedPaths.includes(p)) checkedPaths.push(p);
+    };
+
     // ─── Pass 1: Per-file generation (system, service, feature) ────────────
     const progressBar = startProgress("Generating", files.length);
     for (const filePath of files) {
@@ -998,18 +1009,9 @@ program
         const result = generate(parsed, ["markdown"], root, filePath);
 
         for (const output of result.outputs) {
-          if (options.check) {
-            if (fs.existsSync(output.path)) {
-              const existing = fs.readFileSync(output.path, "utf-8");
-              if (existing === output.content) {
-                console.log(ok(`${output.path} ${dim("(up to date)")}`));
-              } else {
-                console.log(fail(`${output.path} ${dim("(out of date)")}`));
-              }
-            } else {
-              console.log(fail(`${output.path} ${dim("(missing)")}`));
-            }
-          } else {
+          generatedByPath.set(output.path, output.content);
+          noteCheckPath(output.path);
+          if (!options.check) {
             const outDir = path.dirname(output.path);
             if (!fs.existsSync(outDir)) {
               fs.mkdirSync(outDir, { recursive: true });
@@ -1029,18 +1031,9 @@ program
     const areaResult = generateAreaOverviews(root);
 
     for (const output of areaResult.outputs) {
-      if (options.check) {
-        if (fs.existsSync(output.path)) {
-          const existing = fs.readFileSync(output.path, "utf-8");
-          if (existing === output.content) {
-            console.log(ok(`${output.path} ${dim("(up to date)")}`));
-          } else {
-            console.log(fail(`${output.path} ${dim("(out of date)")}`));
-          }
-        } else {
-          console.log(fail(`${output.path} ${dim("(missing)")}`));
-        }
-      } else {
+      generatedByPath.set(output.path, output.content);
+      noteCheckPath(output.path);
+      if (!options.check) {
         const outDir = path.dirname(output.path);
         if (!fs.existsSync(outDir)) {
           fs.mkdirSync(outDir, { recursive: true });
@@ -1095,18 +1088,9 @@ program
         try {
           const result = agg.fn();
           for (const output of result.outputs) {
-            if (options.check) {
-              if (fs.existsSync(output.path)) {
-                const existing = fs.readFileSync(output.path, "utf-8");
-                if (existing === output.content) {
-                  console.log(ok(`${output.path} ${dim("(up to date)")}`));
-                } else {
-                  console.log(fail(`${output.path} ${dim("(out of date)")}`));
-                }
-              } else {
-                console.log(fail(`${output.path} ${dim("(missing)")}`));
-              }
-            } else {
+            generatedByPath.set(output.path, output.content);
+            noteCheckPath(output.path);
+            if (!options.check) {
               const outDir = path.dirname(output.path);
               if (!fs.existsSync(outDir)) {
                 fs.mkdirSync(outDir, { recursive: true });
@@ -1122,13 +1106,19 @@ program
     }
 
     // ─── Pass 4: Surface tables (injected into overview.md files) ────────
-    // This MUST run after all overview.md files are written (Passes 1-3)
-    if (systemFile && !options.check) {
+    // This MUST run after all overview.md files are written (Passes 1-3).
+    // Runs in check mode too, seeded with the in-memory overview content, so
+    // the composed file is what `--check` compares against.
+    if (systemFile) {
       try {
-        const surfaceResult = generateSurfaceTables(featureFiles, serviceFiles, root);
+        const surfaceResult = generateSurfaceTables(featureFiles, serviceFiles, root, generatedByPath);
         for (const output of surfaceResult.outputs) {
-          fs.writeFileSync(output.path, output.content, "utf-8");
-          console.log(arrow(`${output.path} ${dim("(surface tables)")}`));
+          generatedByPath.set(output.path, output.content);
+          noteCheckPath(output.path);
+          if (!options.check) {
+            fs.writeFileSync(output.path, output.content, "utf-8");
+            console.log(arrow(`${output.path} ${dim("(surface tables)")}`));
+          }
         }
       } catch (err) {
         console.error(fail(`surface-tables — ${(err as Error).message}`));
@@ -1141,10 +1131,6 @@ program
         {
           name: "architecture-diagram",
           fn: () => generateArchitectureDiagram(systemFile, root),
-        },
-        {
-          name: "er-diagram",
-          fn: () => generateERDiagram(dataFiles, root),
         },
         {
           name: "service-dependencies",
@@ -1217,6 +1203,30 @@ program
           }
         };
         copyDir(docsSourceDir, docsOutputDir);
+      }
+    }
+
+    // ─── Report: compare final composed content against disk (check mode) ───
+    // Runs after every composing pass so paths that are written once and then
+    // patched (e.g. overview.md + surface tables) are compared as a whole.
+    if (options.check) {
+      let staleCount = 0;
+      for (const outputPath of checkedPaths) {
+        const expected = generatedByPath.get(outputPath);
+        if (expected === undefined) continue;
+        if (!fs.existsSync(outputPath)) {
+          console.log(fail(`${outputPath} ${dim("(missing)")}`));
+          staleCount++;
+        } else if (fs.readFileSync(outputPath, "utf-8") === expected) {
+          console.log(ok(`${outputPath} ${dim("(up to date)")}`));
+        } else {
+          console.log(fail(`${outputPath} ${dim("(out of date)")}`));
+          staleCount++;
+        }
+      }
+      if (staleCount > 0) {
+        console.log(`\n${fail(`${staleCount} output(s) out of date. Run 'usm generate' to refresh.`)}`);
+        process.exitCode = 1;
       }
     }
   });

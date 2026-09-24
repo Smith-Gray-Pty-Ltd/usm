@@ -2,14 +2,16 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-agentsmd
 $type: feature
 $version: 1
-$last_updated: "2026-06-19"
-summary: AGENTS.md generator — produces AI agent context files with USM-augmented system descriptions, smart-merged with existing hand-written content.
-
+$last_updated: "2026-09-24"
+summary: >-
+  AGENTS.md generator — produces AI agent context files with USM-augmented system descriptions,
+  smart-merged with existing hand-written content.
 $system: usm/system
 $service: usm/cli
-intent: |
-  AI coding agents (Claude, Cursor, Codex) read AGENTS.md for project context. The generator augments existing AGENTS.md files with USM-derived sections (apps, shared packages, key patterns) between USM:START/USM:END markers, preserving all hand-written content.
-
+intent: >
+  AI coding agents (Claude, Cursor, Codex) read AGENTS.md for project context. The generator
+  augments existing AGENTS.md files with USM-derived sections (apps, shared packages, key patterns)
+  between USM:START/USM:END markers, preserving all hand-written content.
 flows:
   - id: gen-agents-md
     name: Generate AGENTS.md
@@ -24,15 +26,14 @@ flows:
       - id: s3
         action: merge
         target: insert between USM:START/USM:END markers or after first H1
-
 contracts:
   - id: agents-md-preserve
-    description: AGENTS.md generator must never destroy hand-written content
+    description: AGENTS.md generator must never destroy hand-written content and must be idempotent
     must_have:
-      - "Content between USM:START and USM:END replaced with generated content"
-      - "Content outside markers preserved exactly"
-      - "If no markers exist, insert after first H1 heading"
-
+      - Content between USM:START and USM:END replaced with generated content
+      - Content outside markers preserved exactly
+      - If no markers exist, insert after first H1 heading
+      - "Repeated runs are byte-identical — no trailing-newline accumulation (issue #32)"
 tests:
   - id: agents-md-with-markers
     setup:
@@ -46,11 +47,15 @@ tests:
     expect:
       - assertion: USM section inserted after first H1
       - assertion: Original content preserved below
-
+  - id: agents-md-idempotent
+    setup:
+      agents_md_with_usm_markers: true
+    expect:
+      - assertion: merging the generated section repeatedly is byte-identical
+      - assertion: exactly one newline follows the end marker for a single trailing merge
 implementation:
   primary: src/generators/agentsMd.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/cli-generate"
+  - usm/cli-generate

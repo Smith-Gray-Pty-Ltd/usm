@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { parseUsmFile } from "../parse.js";
 import type {
   FeatureUsm,
   GenerationResult,
@@ -159,23 +160,45 @@ export function generateAllTestSpecs(
   const usmFeaturesDir = path.resolve(root, ".usm", "features");
   const usmFiles = fs.existsSync(usmFeaturesDir) ? findUsmFilesRecursive(usmFeaturesDir) : [];
 
+  // Map $id → source path by parsing each file, NOT by substring matching.
+  // A substring check like `content.includes("$id: usm/cli-scaffold")` also
+  // matches `$id: usm/cli-scaffold-project`, so two features would resolve to
+  // the same source and collide on one output path (issue #37 class — two
+  // generators writing one file).
+  const sourceById = new Map<string, string>();
+  for (const fp of usmFiles) {
+    try {
+      const parsed = parseUsmFile(fp) as { $id?: string };
+      if (parsed.$id && !sourceById.has(parsed.$id)) {
+        sourceById.set(parsed.$id, fp);
+      }
+    } catch {
+      // Skip unparseable files
+    }
+  }
+
   for (const feat of features) {
     const hasTests = feat.tests && feat.tests.length > 0;
     const hasFlows = feat.flows && feat.flows.length > 0;
     if (!hasTests && !hasFlows) continue;
 
-    // Find source file path for this feature
-    const sourceFilePath = usmFiles.find((fp) => {
-      try {
-        const content = fs.readFileSync(fp, "utf-8");
-        return content.includes(`$id: ${feat.$id}`) || content.includes(`$id: '${feat.$id}'`) || content.includes(`$id: "${feat.$id}"`);
-      } catch {
-        return false;
-      }
-    });
+    const sourceFilePath = sourceById.get(feat.$id);
 
     const result = generateTestSpec(feat, root, sourceFilePath);
     outputs.push(...result.outputs);
+  }
+
+  // Guard against path collisions: two features must never target the same
+  // spec file, or the second silently overwrites the first.
+  const seen = new Map<string, string>();
+  for (const output of outputs) {
+    const existing = seen.get(output.path);
+    if (existing !== undefined && existing !== output.content) {
+      throw new Error(
+        `test-spec output collision: ${output.path} generated with differing content from two features`,
+      );
+    }
+    seen.set(output.path, output.content);
   }
 
   return { outputs };
