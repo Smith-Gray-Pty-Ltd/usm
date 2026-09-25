@@ -1,0 +1,60 @@
+name: OIDC Probe
+
+# Temporary diagnostic: tests the npm trusted publishing (OIDC) token
+# exchange exactly as pnpm publish performs it. Delete after debugging.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  probe:
+    name: Probe OIDC exchange
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Probe OIDC token exchange
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "=== env markers ==="
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL set: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN set: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+yes}"
+          echo "NPM_CONFIG_USERCONFIG: $NPM_CONFIG_USERCONFIG"
+          echo "--- .npmrc contents (token redacted) ---"
+          sed -e 's/=[^=]*$/=***REDACTED***/' "$NPM_CONFIG_USERCONFIG" || true
+          echo "NODE_AUTH_TOKEN set: ${NODE_AUTH_TOKEN:+yes}"
+
+          echo "=== fetch GitHub OIDC token (audience: npm registry) ==="
+          OIDC_TOKEN=$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).value||'')}catch(e){console.log('PARSE_ERROR:'+d.slice(0,200))}})")
+          echo "OIDC token length: ${#OIDC_TOKEN}"
+          [ ${#OIDC_TOKEN} -lt 50 ] && echo "OIDC fetch FAILED: $OIDC_TOKEN" && exit 1
+          echo "OIDC token prefix: ${OIDC_TOKEN:0:20}..."
+
+          echo "=== npm OIDC token exchange (as pnpm publish does it) ==="
+          HTTP_CODE=$(curl -sS -o /tmp/exchange.json -w "%{http_code}" \
+            -X POST \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Length: 0" \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@smithgray%2Fusm")
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response body:"
+          node -e "
+            const fs = require('fs');
+            try {
+              const j = JSON.parse(fs.readFileSync('/tmp/exchange.json','utf8'));
+              const redacted = JSON.stringify(j, (k,v) => /token|secret/i.test(k) ? (typeof v === 'string' ? v.slice(0,12)+'***REDACTED' : v) : v, 2);
+              console.log(redacted);
+            } catch(e) { console.log(fs.readFileSync('/tmp/exchange.json','utf8').slice(0,500)); }
+          "
