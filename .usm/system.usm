@@ -300,18 +300,21 @@ roadmap:
   - id: roadmap-improvements
     title: Roadmap with feature links and delivery tracking
     description: "Roadmap items link to feature specs, show shipped_in version, sidebar dead links fixed, mermaid rendering"
-    status: in-progress
+    status: shipped
     feature: usm/gen-roadmap
+    shipped_in: "0.8.2"
   - id: config-outputs
     title: Configurable output paths
     description: "Generators read output paths from usmconfig.json — no hardcoded .usm-workspace layout"
-    status: in-progress
+    status: shipped
     feature: usm/cli-config-outputs
+    shipped_in: "0.8.2"
   - id: help-reference-expansion
     title: Help docs reference expansion
     description: "CLI reference, usage examples, options, and prerequisites rendered in help docs from spec data"
     status: in-progress
     feature: usm/gen-help-reference
+    shipped_in: "0.8.2"
   - id: agent-authoring-tools
     title: MCP write tools
     description: "draft_feature, update_feature_status — close the spec-first loop so agents can author .usm files"

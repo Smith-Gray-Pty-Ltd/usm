@@ -2,11 +2,12 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-help-reference
 $type: feature
 $version: 1
-$last_updated: "2026-06-23"
-status: in-progress
-summary: |
-  Help docs reference expansion — adds usage/options/prerequisites fields to feature schema, and new generators for CLI reference, config reference, schema reference, and MCP tools reference pages. Gives help docs the depth that Vitest-style docs have.
-
+$last_updated: "2026-09-25"
+status: built
+summary: >
+  Help docs reference expansion — adds usage/options/prerequisites fields to feature schema, and new
+  generators for CLI reference, config reference, schema reference, and MCP tools reference pages.
+  Gives help docs the depth that Vitest-style docs have.
 $system: usm/system
 $service: usm/cli
 intent: |
@@ -17,7 +18,6 @@ intent: |
   fields does usmconfig.json have?" without reading source code. This
   feature adds the schema fields and generators to produce these reference
   pages from the .usm source of truth.
-
 decisions:
   - id: usage-in-feature-spec
     decision: Add usage/options/prerequisites to FeatureUsm schema (optional fields)
@@ -29,10 +29,10 @@ decisions:
       and produces terse output.
     alternatives:
       - option: Parse commander --help output at generation time
-        rejected_because: "Terse output, brittle parsing, not available to MCP tools"
+        rejected_because: Terse output, brittle parsing, not available to MCP tools
       - option: Hand-write reference pages in markdown
-        rejected_because: "Not generated from source, will drift, not generic"
-    consequences: "Feature specs for CLI commands need updating with usage/options fields — one-time effort"
+        rejected_because: Not generated from source, will drift, not generic
+    consequences: Feature specs for CLI commands need updating with usage/options fields — one-time effort
     status: accepted
   - id: config-reference-from-schema
     decision: Generate usmconfig reference from usmconfig-v1.json schema descriptions
@@ -40,7 +40,7 @@ decisions:
       The JSON schema already has descriptions for every field. Generating
       a human-readable reference from the schema means it's always in sync.
       No need for a separate .usm spec for the config file.
-    consequences: "Config reference page is only as good as the schema descriptions — may need enriching"
+    consequences: Config reference page is only as good as the schema descriptions — may need enriching
     status: accepted
   - id: schema-reference-from-v1-json
     decision: Generate schema reference from v1.json schema descriptions
@@ -48,9 +48,8 @@ decisions:
       Same principle — the v1.json schema has descriptions for every field.
       Generate a human-readable reference showing required vs optional,
       types, and descriptions for each .usm file type.
-    consequences: "Schema reference is comprehensive but may be dense — could add examples later"
+    consequences: Schema reference is comprehensive but may be dense — could add examples later
     status: accepted
-
 flows:
   - id: generate-cli-reference
     name: Generate CLI reference page from feature specs
@@ -71,7 +70,6 @@ flows:
       - id: s4
         action: write
         target: .usm-workspace/docs/cli-reference.md
-
   - id: generate-config-reference
     name: Generate usmconfig reference from JSON schema
     description: |
@@ -90,7 +88,6 @@ flows:
       - id: s4
         action: write
         target: .usm-workspace/docs/config-reference.md
-
   - id: generate-schema-reference
     name: Generate .usm schema reference from v1.json
     description: |
@@ -109,7 +106,6 @@ flows:
       - id: s4
         action: write
         target: .usm-workspace/docs/schema-reference.md
-
   - id: generate-mcp-reference
     name: Generate MCP tools reference page
     description: |
@@ -128,29 +124,27 @@ flows:
       - id: s4
         action: write
         target: .usm-workspace/docs/mcp-reference.md
-
 contracts:
   - id: cli-reference-has-all-commands
     description: CLI reference page includes all CLI commands with usage
     must_have:
-      - "Every feature in features/cli/ with usage field appears in the reference"
-      - "Each command shows usage examples and options table"
+      - Every feature in features/cli/ with usage field appears in the reference
+      - Each command shows usage examples and options table
   - id: config-reference-from-schema
     description: Config reference is generated from usmconfig-v1.json
     must_have:
-      - "Every field in usmconfig-v1.json appears in the reference"
-      - "Each field shows type, description, and default"
+      - Every field in usmconfig-v1.json appears in the reference
+      - Each field shows type, description, and default
   - id: schema-reference-covers-all-types
     description: Schema reference covers system, service, feature, and data types
     must_have:
-      - "Each .usm type has a field table"
-      - "Required vs optional clearly marked"
+      - Each .usm type has a field table
+      - Required vs optional clearly marked
   - id: mcp-reference-has-all-tools
     description: MCP reference lists all 12 tools
     must_have:
-      - "All read tools (8) and write tools (4) appear in the table"
-      - "Each tool shows summary and when to use"
-
+      - All read tools (8) and write tools (4) appear in the table
+      - Each tool shows summary and when to use
 tests:
   - id: cli-reference-generated
     setup:
@@ -176,13 +170,11 @@ tests:
     expect:
       - assertion: mcp-reference.md exists
       - assertion: lists all 12 MCP tools
-
 implementation:
   primary: src/generators/markdown.ts
-  test_code: ""
-  test_code_status: none
-
+  test_code: tests/helpReference.test.ts
+  test_code_status: manual
 see_also:
-  - "usm/gen-markdown"
-  - "usm/cli-docs"
-  - "usm/gen-docs-split"
+  - usm/gen-markdown
+  - usm/cli-docs
+  - usm/gen-docs-split
