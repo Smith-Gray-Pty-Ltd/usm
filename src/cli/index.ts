@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { outDir } from "../outputPaths.js";
 import fs from "node:fs";
 import path from "node:path";
 import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile, splitImplementationPaths as splitImplementationPathsUtil } from "../parse.js";
@@ -863,13 +864,13 @@ program
 
     // Handle help-docs target specially (filter existing docs, no generation)
     if (onlyTarget === "help-docs") {
-      const docsRoot = path.join(root, ".usm-workspace", "docs");
+      const docsRoot = outDir(root, "docs");
       if (!fs.existsSync(docsRoot)) {
         console.error(fail("No developer docs found. Run 'usm generate' first."));
         process.exit(1);
       }
       const { filterForHelpAudience } = await import("./docs.js");
-      const helpRoot = path.join(root, ".usm-workspace", "help-docs");
+      const helpRoot = outDir(root, "help_docs");
       const spinner = startSpinner("Generating help docs...");
       console.log("Generating help docs (filtering developer docs)...");
       const count = filterForHelpAudience(root, docsRoot, helpRoot);
@@ -1021,9 +1022,9 @@ program
           generatedByPath.set(output.path, output.content);
           noteCheckPath(output.path);
           if (!options.check) {
-            const outDir = path.dirname(output.path);
-            if (!fs.existsSync(outDir)) {
-              fs.mkdirSync(outDir, { recursive: true });
+            const outParentDir = path.dirname(output.path);
+            if (!fs.existsSync(outParentDir)) {
+              fs.mkdirSync(outParentDir, { recursive: true });
             }
             fs.writeFileSync(output.path, output.content, "utf-8");
             console.log(arrow(output.path));
@@ -1043,9 +1044,9 @@ program
       generatedByPath.set(output.path, output.content);
       noteCheckPath(output.path);
       if (!options.check) {
-        const outDir = path.dirname(output.path);
-        if (!fs.existsSync(outDir)) {
-          fs.mkdirSync(outDir, { recursive: true });
+        const outParentDir = path.dirname(output.path);
+        if (!fs.existsSync(outParentDir)) {
+          fs.mkdirSync(outParentDir, { recursive: true });
         }
         fs.writeFileSync(output.path, output.content, "utf-8");
         console.log(arrow(`${output.path} ${dim("(area overview)")}`));
@@ -1100,9 +1101,9 @@ program
             generatedByPath.set(output.path, output.content);
             noteCheckPath(output.path);
             if (!options.check) {
-              const outDir = path.dirname(output.path);
-              if (!fs.existsSync(outDir)) {
-                fs.mkdirSync(outDir, { recursive: true });
+              const outParentDir = path.dirname(output.path);
+              if (!fs.existsSync(outParentDir)) {
+                fs.mkdirSync(outParentDir, { recursive: true });
               }
               fs.writeFileSync(output.path, output.content, "utf-8");
               console.log(arrow(`${output.path} ${dim(`(${agg.name})`)}`));
@@ -1151,9 +1152,9 @@ program
         try {
           const result = gen.fn();
           for (const output of result.outputs) {
-            const outDir = path.dirname(output.path);
-            if (!fs.existsSync(outDir)) {
-              fs.mkdirSync(outDir, { recursive: true });
+            const outParentDir = path.dirname(output.path);
+            if (!fs.existsSync(outParentDir)) {
+              fs.mkdirSync(outParentDir, { recursive: true });
             }
             fs.writeFileSync(output.path, output.content, "utf-8");
             console.log(arrow(`${output.path} ${dim(`(${gen.name})`)}`));
@@ -1169,9 +1170,9 @@ program
       try {
         const togafResult = generateAllTogafDeliverables(systemFile, root);
         for (const output of togafResult.outputs) {
-          const outDir = path.dirname(output.path);
-          if (!fs.existsSync(outDir)) {
-            fs.mkdirSync(outDir, { recursive: true });
+          const outParentDir = path.dirname(output.path);
+          if (!fs.existsSync(outParentDir)) {
+            fs.mkdirSync(outParentDir, { recursive: true });
           }
           fs.writeFileSync(output.path, output.content, "utf-8");
           console.log(arrow(`${output.path} ${dim("(togaf)")}`));
@@ -1179,7 +1180,7 @@ program
           // Also surface in the developer docs tree as the Architecture section
           // (help audience omits it). Only during full generate, not standalone togaf.
           if (runAll) {
-            const docsArchDir = path.join(root, ".usm-workspace", "docs", "architecture");
+            const docsArchDir = path.join(outDir(root, "docs"), "architecture");
             fs.mkdirSync(docsArchDir, { recursive: true });
             fs.writeFileSync(path.join(docsArchDir, path.basename(output.path)), output.content, "utf-8");
           }
@@ -1196,7 +1197,7 @@ program
     if (!options.check && (runAll || onlyTarget === "docs")) {
       const docsSourceDir = path.join(root, "docs-source");
       if (fs.existsSync(docsSourceDir)) {
-        const docsOutputDir = path.join(root, ".usm-workspace", "docs");
+        const docsOutputDir = outDir(root, "docs");
         const copyDir = (srcDir: string, destDir: string) => {
           for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
             const srcPath = path.join(srcDir, entry.name);

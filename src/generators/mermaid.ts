@@ -1,4 +1,6 @@
 import path from "node:path";
+import { outPath } from "../outputPaths.js";
+
 import fs from "node:fs";
 import type {
   SystemUsm,
@@ -170,7 +172,7 @@ export function generateArchitectureDiagram(system: SystemUsm, root: string): Ge
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/architecture/architecture.md`,
+      path: outPath(root, "docs", "architecture/architecture.md"),
       content: lines.join("\n"),
     }],
   };
@@ -447,13 +449,13 @@ export function generateServiceDependencies(
         outputPath = `${root}/apps/${svc.id}/.usm-workspace/docs/architecture/dependencies.md`;
         break;
       case "shared-service":
-        outputPath = `${root}/.usm-workspace/docs/shared-services/${svc.id}/architecture/dependencies.md`;
+        outputPath = outPath(root, "docs", `shared-services/${svc.id}/architecture/dependencies.md`);
         break;
       case "package":
-        outputPath = `${root}/.usm-workspace/docs/packages/${svc.id}/dependencies.md`;
+        outputPath = outPath(root, "docs", `packages/${svc.id}/dependencies.md`);
         break;
       default:
-        outputPath = `${root}/.usm-workspace/docs/packages/${svc.id}/dependencies.md`;
+        outputPath = outPath(root, "docs", `packages/${svc.id}/dependencies.md`);
     }
 
     outputs.push({ path: outputPath, content });

@@ -6,7 +6,8 @@
 // page, system.usm declares reference_pages with inline content blocks or
 // runtime sources (detectors, schema, config), and this function renders them.
 
-import path from "node:path";
+import { outPath } from "../outputPaths.js";
+
 import type { SystemUsm, ServiceUsm, FeatureUsm, GenerationResult } from "../types.js";
 import {
   renderReferencePage,
@@ -75,7 +76,7 @@ export function generateReferencePages(
     );
 
     outputs.push({
-      path: path.join(root, ".usm-workspace", "docs", `${page.id}.md`),
+      path: outPath(root, "docs", `${page.id}.md`),
       content: markdown,
     });
   }

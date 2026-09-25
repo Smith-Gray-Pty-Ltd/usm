@@ -7,6 +7,8 @@
 // See: .usm/features/generators/technical-design.usm
 
 import path from "node:path";
+import { outPath } from "../outputPaths.js";
+
 import fs from "node:fs";
 import type {
   SystemUsm,
@@ -67,7 +69,7 @@ type SystemWithDesign = SystemUsm & SystemDesignFields;
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function writeDoc(root: string, relativePath: string, content: string): string {
-  const fullPath = path.join(root, ".usm-workspace", "docs", "design", relativePath);
+  const fullPath = outPath(root, "docs", path.join("design", relativePath));
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, "utf-8");
   return fullPath;

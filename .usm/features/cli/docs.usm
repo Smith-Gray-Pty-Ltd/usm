@@ -2,8 +2,8 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-docs
 $type: feature
 $version: 1
-$last_updated: "2026-09-24"
-status: planned
+$last_updated: "2026-09-25"
+status: built
 summary: >
   usm docs serve and usm docs build — serves generated docs locally via VitePress dev server with
   live reload for the spec-first review workflow, and builds a static site for Cloudflare Pages

@@ -1,4 +1,6 @@
 import yaml from "js-yaml";
+import { outPath } from "../outputPaths.js";
+
 import type {
   FeatureUsm,
   GenerationResult,
@@ -140,7 +142,7 @@ export function generateOpenApiSpec(
     return {
       outputs: [
         {
-          path: `${root}/.usm-workspace/openapi/openapi.yaml`,
+          path: outPath(root, "openapi", "openapi.yaml"),
           content: `openapi: 3.1.0
 info:
   title: Smith & Gray AI Platform API
@@ -450,7 +452,7 @@ tags: []
   return {
     outputs: [
       {
-        path: `${root}/.usm-workspace/openapi/openapi.yaml`,
+        path: outPath(root, "openapi", "openapi.yaml"),
         content: yamlContent,
       },
     ],
@@ -643,7 +645,7 @@ export function generateOpenApiTypes(
   return {
     outputs: [
       {
-        path: `${root}/.usm-workspace/openapi/openapi-types.ts`,
+        path: outPath(root, "openapi", "openapi-types.ts"),
         content: lines.join("\n"),
       },
     ],

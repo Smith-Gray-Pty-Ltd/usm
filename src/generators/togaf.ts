@@ -1,4 +1,6 @@
 import path from "node:path";
+import { outPath } from "../outputPaths.js";
+
 import fs from "node:fs";
 import type {
   SystemUsm,
@@ -62,7 +64,7 @@ export function generateAllTogafDeliverables(system: SystemUsm, root: string): G
 // ─── Helpers ──────────────────────────────────────────────────────────────────────
 
 function writeDoc(root: string, relativePath: string, content: string): string {
-  const fullPath = path.join(root, ".usm-workspace", "togaf", relativePath);
+  const fullPath = outPath(root, "togaf", relativePath);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, "utf-8");
   return fullPath;

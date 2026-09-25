@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { outDir } from "../outputPaths.js";
 import type {
   SystemUsm,
   ServiceUsm,
@@ -476,12 +477,12 @@ export function generateArchiMateModel(system: SystemUsm, root: string): Generat
   const xml = renderXmi(elements, relationships, system);
 
   // 4. Write output
-  const outPath = path.join(root, ".usm-workspace", "archimate", "model.xml");
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, xml, "utf-8");
+  const modelPath = path.join(outDir(root, "archimate"), "model.xml");
+  fs.mkdirSync(path.dirname(modelPath), { recursive: true });
+  fs.writeFileSync(modelPath, xml, "utf-8");
 
   return {
-    outputs: [{ path: outPath, content: xml }],
+    outputs: [{ path: modelPath, content: xml }],
   };
 }
 

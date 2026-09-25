@@ -1,4 +1,6 @@
 import path from "node:path";
+import { outPath } from "../outputPaths.js";
+
 import fs from "node:fs";
 import type {
   UsmFile,
@@ -145,7 +147,7 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   return {
     outputs: [
       {
-        path: `${root}/.usm-workspace/docs/README.md`,
+        path: outPath(root, "docs", "README.md"),
         content: lines.join("\n"),
       },
     ],
@@ -400,7 +402,7 @@ function generateFeatureMarkdown(
   const featureOutputName = hasSubPath
     ? `${featureSlug}.md`
     : `${featureSlug}/index.md`;
-  const outputPath = `${root}/.usm-workspace/docs/features/${featureOutputName}`;
+  const outputPath = outPath(root, "docs", `features/${featureOutputName}`);
 
   return {
     outputs: [{ path: outputPath, content: lines.join("\n") }],
@@ -497,7 +499,7 @@ export function generateAreaOverviews(root: string): GenerationResult {
       // place feature markdown is written. Writing into apps/<svc>/.usm-workspace
       // produced a stray nested workspace and meant a plain `usm generate` never
       // populated the root docs tree (issue #35).
-      const outputPath = `${root}/.usm-workspace/docs/features/${areaName}/index.md`;
+      const outputPath = outPath(root, "docs", `features/${areaName}/index.md`);
 
       outputs.push({ path: outputPath, content });
     }
@@ -663,7 +665,7 @@ function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): G
 // ─── Shared Service Docs (Full Shape) ─────────────────────────────────────────
 
 function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
-  const svcRoot = `${root}/.usm-workspace/docs/shared-services/${slug}`;
+  const svcRoot = outPath(root, "docs", `shared-services/${slug}`);
   const outputs: GenerationResult["outputs"] = [];
 
   // README.md — entry point
@@ -704,7 +706,7 @@ function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string)
 // ─── Package Docs (Light Shape) ───────────────────────────────────────────────
 
 function generatePackageDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
-  const pkgRoot = `${root}/.usm-workspace/docs/packages/${slug}`;
+  const pkgRoot = outPath(root, "docs", `packages/${slug}`);
   const outputs: GenerationResult["outputs"] = [];
 
   // README.md
@@ -1256,7 +1258,7 @@ export function generateSurfaceTables(
 
   for (const slug of sharedServiceSlugs) {
     const svcFeatures = featuresForService(features, slug);
-    const overviewPath = `${root}/.usm-workspace/docs/shared-services/${slug}/overview.md`;
+    const overviewPath = outPath(root, "docs", `shared-services/${slug}/overview.md`);
 
     const existing = readOverview(overviewPath);
     if (existing !== null) {
@@ -1457,7 +1459,7 @@ export function generateSharedServicesIndex(services: ServiceUsm[], root: string
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/shared-services/README.md`,
+      path: outPath(root, "docs", "shared-services/README.md"),
       content: lines.join("\n"),
     }],
   };
@@ -1488,7 +1490,7 @@ export function generatePackagesIndex(services: ServiceUsm[], root: string): Gen
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/packages/README.md`,
+      path: outPath(root, "docs", "packages/README.md"),
       content: lines.join("\n"),
     }],
   };
@@ -1521,7 +1523,7 @@ export function generateRisksDoc(system: SystemUsm, root: string): GenerationRes
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/risks.md`,
+      path: outPath(root, "docs", "risks.md"),
       content: lines.join("\n"),
     }],
   };
@@ -1582,7 +1584,7 @@ export function generateRoadmapDoc(system: SystemUsm, root: string): GenerationR
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/roadmap.md`,
+      path: outPath(root, "docs", "roadmap.md"),
       content: lines.join("\n"),
     }],
   };
@@ -1665,7 +1667,7 @@ export function generateDeploymentDoc(system: SystemUsm, root: string): Generati
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/deployment.md`,
+      path: outPath(root, "docs", "deployment.md"),
       content: lines.join("\n"),
     }],
   };
@@ -1811,7 +1813,7 @@ export function generateCliReference(root: string): GenerationResult {
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/cli-reference.md`,
+      path: outPath(root, "docs", "cli-reference.md"),
       content: lines.join("\n"),
     }],
   };
@@ -1877,7 +1879,7 @@ export function generateConfigReference(root: string): GenerationResult {
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/config-reference.md`,
+      path: outPath(root, "docs", "config-reference.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2180,7 +2182,7 @@ export function generateSchemaReference(root: string): GenerationResult {
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/schema-reference.md`,
+      path: outPath(root, "docs", "schema-reference.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2269,7 +2271,7 @@ export function generateMcpReference(root: string): GenerationResult {
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/mcp-reference.md`,
+      path: outPath(root, "docs", "mcp-reference.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2401,7 +2403,7 @@ export function generateFeedbackPage(system: SystemUsm, root: string): Generatio
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/feedback.md`,
+      path: outPath(root, "docs", "feedback.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2582,7 +2584,7 @@ export function generateDataModelDoc(dataFiles: DataUsm[], root: string, service
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/data/models.md`,
+      path: outPath(root, "docs", "data/models.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2602,7 +2604,7 @@ export function generateDataIndex(root: string): GenerationResult {
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/data/README.md`,
+      path: outPath(root, "docs", "data/README.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2775,7 +2777,7 @@ export function generateSeedDataDoc(serviceFiles: ServiceUsm[], root: string): G
 
   return {
     outputs: [{
-      path: `${root}/.usm-workspace/docs/data/seed_users.md`,
+      path: outPath(root, "docs", "data/seed_users.md"),
       content: lines.join("\n"),
     }],
   };
@@ -2846,7 +2848,7 @@ export function generatePerAppDecisions(
       renderDecisionsTable(lines, svc.decisions);
 
       outputs.push({
-        path: `${root}/.usm-workspace/docs/shared-services/${slug}/decisions/README.md`,
+        path: outPath(root, "docs", `shared-services/${slug}/decisions/README.md`),
         content: lines.join("\n"),
       });
     }

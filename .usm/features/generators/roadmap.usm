@@ -2,11 +2,12 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-roadmap
 $type: feature
 $version: 1
-$last_updated: "2026-06-22"
-status: in-progress
-summary: |
-  Roadmap improvements — add feature links and shipped_in version to roadmap items, fill in USM's own roadmap with real delivery items, and render the roadmap page with status badges and feature cross-links. Also fixes sidebar dead links and mermaid rendering.
-
+$last_updated: "2026-09-25"
+status: built
+summary: >
+  Roadmap improvements — add feature links and shipped_in version to roadmap items, fill in USM's
+  own roadmap with real delivery items, and render the roadmap page with status badges and feature
+  cross-links. Also fixes sidebar dead links and mermaid rendering.
 $system: usm/system
 $service: usm/cli
 intent: |
@@ -17,7 +18,6 @@ intent: |
   detail. Additionally, the sidebar has dead links (risks, roadmap, usmconfig,
   case-mismatched agentsMd/testSpecs) and mermaid diagrams don't render in
   VitePress. These are all fixed together.
-
 decisions:
   - id: roadmap-links-to-features
     decision: Roadmap items can optionally reference a feature $id via a feature field
@@ -50,7 +50,6 @@ decisions:
       raw text. The vitepress-plugin-mermaid plugin (or MermaidMarkdown plugin)
       enables mermaid rendering. This is configured in the VitePress config.
     status: accepted
-
 flows:
   - id: generate-roadmap-with-links
     name: Generate roadmap page with feature links and status badges
@@ -71,7 +70,6 @@ flows:
       - id: s4
         action: write
         target: .usm-workspace/docs/roadmap.md (only if roadmap items exist)
-
   - id: fix-sidebar-dead-links
     name: Fix sidebar to only include links to existing files
     description: |
@@ -91,7 +89,6 @@ flows:
       - id: s4
         action: skip
         target: omit sidebar entries for non-existent files
-
   - id: fix-sidebar-case-sensitivity
     name: Fix sidebar slug case to match actual file names
     description: |
@@ -109,7 +106,6 @@ flows:
       - id: s3
         action: generate
         target: sidebar link with correct case
-
   - id: enable-mermaid-in-vitepress
     name: Enable mermaid rendering in VitePress config
     description: |
@@ -126,30 +122,28 @@ flows:
       - id: s3
         action: verify
         target: architecture diagram renders on the architecture page
-
 contracts:
   - id: roadmap-only-generated-when-non-empty
     description: Roadmap page is only generated when system.usm has roadmap items
     must_have:
-      - "Empty roadmap array → no roadmap.md generated"
-      - "Non-empty roadmap → roadmap.md with table"
+      - Empty roadmap array → no roadmap.md generated
+      - Non-empty roadmap → roadmap.md with table
   - id: sidebar-no-dead-links
     description: Sidebar must not contain links to non-existent files
     must_have:
-      - "Links to /risks only if risks.md exists"
-      - "Links to /roadmap only if roadmap.md exists"
-      - "Feature links only if the feature doc file exists"
+      - Links to /risks only if risks.md exists
+      - Links to /roadmap only if roadmap.md exists
+      - Feature links only if the feature doc file exists
   - id: sidebar-case-matches-files
     description: Sidebar links must match actual file name case
     must_have:
-      - "agentsMd link matches agentsMd.md file"
-      - "testSpecs link matches testSpecs.md file"
+      - agentsMd link matches agentsMd.md file
+      - testSpecs link matches testSpecs.md file
   - id: mermaid-renders-in-vitepress
     description: Mermaid code blocks render as diagrams, not raw text
     must_have:
-      - "Architecture page shows rendered diagram"
-      - "Other mermaid blocks render properly"
-
+      - Architecture page shows rendered diagram
+      - Other mermaid blocks render properly
 tests:
   - id: roadmap-with-items
     setup:
@@ -174,12 +168,10 @@ tests:
       feature_with_camelcase_filename: true
     expect:
       - assertion: sidebar link matches file name case exactly
-
 implementation:
   primary: src/generators/markdown.ts
-  test_code: ""
-  test_code_status: none
-
+  test_code: tests/roadmap.test.ts
+  test_code_status: manual
 see_also:
-  - "usm/gen-markdown"
-  - "usm/cli-docs"
+  - usm/gen-markdown
+  - usm/cli-docs

@@ -3,6 +3,7 @@ import path from "node:path";
 import net from "node:net";
 import { spawn, execSync } from "node:child_process";
 import { parseUsmFile, isFeatureFile, findAllUsmFiles } from "../parse.js";
+import { outDir } from "../outputPaths.js";
 import type { SystemUsm, FeatureUsm, ServiceUsm, DataUsm } from "../types.js";
 import { getDesignSections, DESIGN_SECTION_LABELS } from "../generators/technicalDesign.js";
 
@@ -269,7 +270,7 @@ async function requireVitePress(): Promise<void> {
  * VitePress needs everything under a single root, so we copy them in.
  */
 function consolidateFeatureDocs(root: string): number {
-  const docsRoot = path.join(root, ".usm-workspace", "docs");
+  const docsRoot = outDir(root, "docs");
   const featuresRoot = path.join(docsRoot, "features");
   let copied = 0;
 
@@ -279,7 +280,7 @@ function consolidateFeatureDocs(root: string): number {
 
   for (const entry of fs.readdirSync(appsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const appFeaturesDir = path.join(appsDir, entry.name, ".usm-workspace", "docs", "features");
+    const appFeaturesDir = path.join(appsDir, entry.name, ".usm-workspace", "docs", "features") /* app-relative: keep */;
     if (!fs.existsSync(appFeaturesDir)) continue;
 
     // Copy each subdirectory (cli, generators, mcp, schema) into featuresRoot
@@ -1027,8 +1028,8 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
 
   // Determine docs root based on audience
   const docsRoot = audience === "help"
-    ? path.join(root, ".usm-workspace", "help-docs")
-    : path.join(root, ".usm-workspace", "docs");
+    ? outDir(root, "help_docs")
+    : outDir(root, "docs");
 
   if (!fs.existsSync(docsRoot)) {
     if (audience === "help") {
@@ -1113,8 +1114,8 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
 
   // Determine docs root based on audience
   const docsRoot = audience === "help"
-    ? path.join(root, ".usm-workspace", "help-docs")
-    : path.join(root, ".usm-workspace", "docs");
+    ? outDir(root, "help_docs")
+    : outDir(root, "docs");
 
   if (!fs.existsSync(docsRoot)) {
     if (audience === "help") {
@@ -1434,8 +1435,8 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
  */
 export function docsStatus(root: string, audience: Audience = "developer"): void {
   const docsRoot = audience === "help"
-    ? path.join(root, ".usm-workspace", "help-docs")
-    : path.join(root, ".usm-workspace", "docs");
+    ? outDir(root, "help_docs")
+    : outDir(root, "docs");
 
   const pid = readPidFile(docsRoot);
   if (pid && isProcessAlive(pid)) {
@@ -1453,8 +1454,8 @@ export function docsStatus(root: string, audience: Audience = "developer"): void
  */
 export function docsStop(root: string, audience: Audience = "developer"): void {
   const docsRoot = audience === "help"
-    ? path.join(root, ".usm-workspace", "help-docs")
-    : path.join(root, ".usm-workspace", "docs");
+    ? outDir(root, "help_docs")
+    : outDir(root, "docs");
 
   const pid = readPidFile(docsRoot);
   if (!pid) {

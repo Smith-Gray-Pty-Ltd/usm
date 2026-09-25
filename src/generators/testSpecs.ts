@@ -1,4 +1,6 @@
 import path from "node:path";
+import { outPath } from "../outputPaths.js";
+
 import fs from "node:fs";
 import { parseUsmFile } from "../parse.js";
 import type {
@@ -141,7 +143,7 @@ export function generateTestSpec(
 
   // Output path — mirror the .usm source tree structure
   // e.g. .usm/features/agent/events.usm → .usm-workspace/tests/features/agent/events.spec.ts
-  const outputPath = `${root}/.usm-workspace/tests/features/${featureSlug}.spec.ts`;
+  const outputPath = outPath(root, "tests", `features/${featureSlug}.spec.ts`);
 
   return {
     outputs: [{ path: outputPath, content: lines.join("\n") }],
@@ -285,7 +287,7 @@ export function generateAggregatedSpecs(
   return {
     outputs: [
       {
-        path: `${root}/.usm-workspace/tests/specs.md`,
+        path: outPath(root, "tests", "specs.md"),
         content: lines.join("\n"),
       },
     ],
