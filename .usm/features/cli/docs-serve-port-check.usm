@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/docs-serve-port-check
 $type: feature
 $version: 1
-$last_updated: "2026-07-16"
+$last_updated: "2026-09-25"
 summary: >-
   Add port availability checking, already-serving detection, watch mode for auto-regeneration,
   graceful shutdown, and browser-open to `usm docs serve` — making the dev loop seamless for both
@@ -117,22 +117,26 @@ flows:
         action: add
         target: "usm docs stop command: reads PID file, kills the process, removes PID file"
 contracts:
-  - id: port-check-clear-error
-    description: >-
-      When the port is in use and --auto-port is not set, the user gets a clear, actionable error
-      message.
+  - description: >-
+      When an EXPLICITLY requested --port is in use, the user gets a clear, actionable error message
+      — explicit requests are strict.
+    id: port-check-clear-error
     must_have:
       - Error message includes the port number
       - Error message includes the process name/PID using the port (when detectable via lsof)
-      - Error message suggests --port N, --auto-port, or --restart as remedies
+      - Error message suggests --auto-port (omit --port) or --restart as remedies
       - Exit code is non-zero
-  - id: auto-port-selection
-    description: When --auto-port is set, the next available port is selected automatically.
+  - description: >-
+      When no --port is given, the next available port is selected automatically — concurrent
+      instances never clash.
+    id: auto-port-selection
     must_have:
-      - Probes ports starting from the requested port, incrementing until one is free
+      - Default port base is 5173; if taken, probe incrementing until free (max 100 probes)
       - Logs the selected port clearly (e.g. 'Port 5173 in use, using port 5174 instead')
       - Works for both --audience developer and --audience help
-      - Does not probe more than 100 ports (safety limit)
+      - >-
+        The announced URL is always the bound URL (USM probes and passes --strictPort to VitePress;
+        bind failure fails loudly, never silently drifts)
   - id: already-serving-detection
     description: Running serve when a server is already up is handled gracefully.
     must_have:
@@ -165,13 +169,13 @@ contracts:
       - usm docs build is unaffected
       - No new required dependencies (net, fs, child_process are all built-in)
 tests:
-  - id: port-free-passes-through
+  - expect:
+      - assertion: VitePress starts on port 5173
+      - assertion: No port-related warnings or errors in output
+    id: port-free-passes-through
     setup:
       port_5173_is_free: true
       run_docs_serve: true
-    expect:
-      - assertion: VitePress starts on port 5173
-      - assertion: No port-related warnings or errors in output
   - id: port-in-use-clear-error
     setup:
       port_5173_is_in_use: true
@@ -180,81 +184,93 @@ tests:
       - assertion: Command fails with non-zero exit code
       - assertion: Error message mentions port 5173
       - assertion: Error message suggests --port N, --auto-port, or --restart
-  - id: auto-port-selects-next
+  - expect:
+      - assertion: VitePress starts on port 5174
+      - assertion: "Log message: 'Port 5173 in use, using port 5174 instead'"
+    id: auto-port-selects-next
     setup:
       port_5173_is_in_use: true
       port_5174_is_free: true
-      run_docs_serve_with_auto_port: true
-    expect:
-      - assertion: VitePress starts on port 5174
-      - assertion: "Log message: 'Port 5173 in use, using port 5174 instead'"
-  - id: auto-port-safety-limit
-    setup:
-      ports_5173_to_5272_all_in_use: true
-      run_docs_serve_with_auto_port: true
-    expect:
+      run_docs_serve_no_port_flag: true
+  - expect:
       - assertion: Command fails after probing 100 ports
       - assertion: "Error message: 'No free port found between 5173 and 5272'"
-  - id: already-serving-detected
+    id: auto-port-safety-limit
+    setup:
+      ports_5173_to_5272_all_in_use: true
+      run_docs_serve_no_port_flag: true
+  - expect:
+      - assertion: >-
+          Prints 'Docs already served at http://localhost:<bound-port> (PID X)' using the port file,
+          not the requested port
+      - assertion: Does not start a second VitePress process
+    id: already-serving-detected
     setup:
       server_already_running_on_5173: true
       run_docs_serve: true
-    expect:
-      - assertion: Prints 'Docs already served at http://localhost:5173 (PID X)'
-      - assertion: Does not start a second VitePress process
-  - id: restart-kills-and-restarts
-    setup:
-      server_already_running_on_5173: true
-      run_docs_serve_with_restart: true
-    expect:
+  - expect:
       - assertion: Old server process is killed
       - assertion: New VitePress starts on port 5173
       - assertion: PID file updated with new PID
-  - id: watch-regenerates-on-change
+    id: restart-kills-and-restarts
+    setup:
+      server_already_running_on_5173: true
+      run_docs_serve_with_restart: true
+  - expect:
+      - assertion: "Log message: 'Regenerated docs (1 file changed)'"
+      - assertion: VitePress HMR picks up the change
+    id: watch-regenerates-on-change
     setup:
       server_running_with_watch: true
       modify_usm_file: true
-    expect:
-      - assertion: "Log message: 'Regenerated docs (1 file changed)'"
-      - assertion: VitePress HMR picks up the change
-  - id: docs-status-shows-running
+  - expect:
+      - assertion: Prints 'Served at http://localhost:5173 (PID X)'
+    id: docs-status-shows-running
     setup:
       server_running_on_5173: true
       run_docs_status: true
-    expect:
-      - assertion: Prints 'Served at http://localhost:5173 (PID X)'
-  - id: docs-status-shows-not-running
+  - expect:
+      - assertion: Prints 'Not running'
+    id: docs-status-shows-not-running
     setup:
       no_server_running: true
       run_docs_status: true
-    expect:
-      - assertion: Prints 'Not running'
-  - id: docs-stop-kills-server
-    setup:
-      server_running_on_5173: true
-      run_docs_stop: true
-    expect:
+  - expect:
       - assertion: Server process is killed
       - assertion: PID file is removed
       - assertion: Prints 'Stopped docs server (was PID X)'
-  - id: graceful-shutdown-cleans-up
+    id: docs-stop-kills-server
     setup:
-      server_running: true
-      send_sigint: true
-    expect:
+      server_running_on_5173: true
+      run_docs_stop: true
+  - expect:
       - assertion: VitePress child process is killed
       - assertion: PID file is removed
       - assertion: Exit code is 0
-  - id: help-audience-works
+    id: graceful-shutdown-cleans-up
+    setup:
+      server_running: true
+      send_sigint: true
+  - expect:
+      - assertion: Port check, PID file, and all features work for --audience help
+    id: help-audience-works
     setup:
       run_docs_serve_help_audience: true
-    expect:
-      - assertion: Port check, PID file, and all features work for --audience help
+  - expect:
+      - assertion: Command fails with non-zero exit code, never silently moves to another port
+      - assertion: >-
+          Error output mentions the requested port and remedies (--auto-port by omitting --port,
+          --restart)
+    id: strict-port-bind-failure
+    setup:
+      explicit_port_requested: true
+      port_free_at_preflight_check: true
+      port_taken_by_the_time_vitepress_binds: true
 decisions:
-  - id: no-dependency
-    decision: >-
+  - decision: >-
       Implement port probing with Node.js built-in net module — no third-party dependency like
       detect-port or chokidar.
+    id: no-dependency
     rationale: >-
       Keeps the dependency footprint zero. net.createServer().listen() for port probing and fs.watch
       for file watching are both built-in and sufficient.
@@ -265,35 +281,48 @@ decisions:
       Users expect --port 5173 to mean port 5173. Silently switching ports would break bookmarks,
       CORS configs, and automation scripts.
     status: accepted
-  - id: lsof-best-effort
-    decision: Process detection via lsof is best-effort only — graceful degradation if lsof is unavailable.
+  - decision: Process detection via lsof is best-effort only — graceful degradation if lsof is unavailable.
+    id: lsof-best-effort
     rationale: >-
       lsof may not be installed in minimal Docker images or on Windows. The error message should
       still be clear without it, just omitting the process name.
     status: accepted
-  - id: pid-file-approach
-    decision: >-
-      Use a PID file (.usm-workspace/.vitepress.pid) for already-serving detection, not
-      port-sniffing alone.
+  - decision: >-
+      Use a PID file (.usm-workspace/.vitepress.pid) plus a port file (.vitepress.port) for
+      already-serving detection, not port-sniffing alone.
+    id: pid-file-approach
     rationale: >-
       Port-sniffing can't distinguish between a VitePress server and another process on the same
-      port. A PID file gives us certainty and enables usm docs stop.
+      port. The PID file gives certainty and enables usm docs stop; the port file records the
+      actually-bound port so status/serve messages never echo a requested-but-unbound port
+      (wrong-URL bug, 2026-09-25).
     status: accepted
-  - id: watch-in-process
-    decision: >-
+  - decision: >-
       Watch-mode regeneration runs usm generate --only docs in-process (calling the generator
       functions directly), not as a subprocess.
+    id: watch-in-process
     rationale: >-
       Avoids the overhead and complexity of spawning a child process. The generator functions are
       already imported and callable.
     status: accepted
-  - id: debounce-500ms
-    decision: >-
+  - decision: >-
       Watch-mode debounce is 500ms — a pragmatic balance between responsiveness and avoiding thrash
       on bulk writes.
+    id: debounce-500ms
     rationale: >-
       git checkout, usm scan, and editor auto-save can touch many files in rapid succession. 500ms
       is fast enough to feel instant but long enough to batch.
+    status: accepted
+  - decision: >-
+      Auto-port is the DEFAULT when --port is omitted; an explicit --port N is strict and fails
+      loudly if N is taken.
+    id: auto-port-default
+    rationale: >-
+      Supersedes auto-port-opt-in (2026-09-25). Real usage: many USM projects run docs servers
+      concurrently on one machine; port clashes were the actual pain (servers drifting to unexpected
+      ports, agents verifying the wrong server). Nobody bookmarks hot-reloading dev docs. Omitting
+      --port now means 'give me a free port and tell me which one'. Explicit --port still means
+      exactly that port — but with --strictPort so announced==bound, always.
     status: accepted
 implementation:
   primary: src/cli/docs.ts; src/cli/index.ts

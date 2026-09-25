@@ -1,0 +1,222 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/gen-user-docs
+$type: feature
+$version: 1
+$last_updated: "2026-09-25"
+summary: >-
+  Personas and journey flows (actor/surface per step) become first-class spec data; a new user-doc
+  generator composes task-oriented user guides and Playwright e2e skeletons from persona journeys;
+  help docs for feature pages are composed from persona/journey content instead of filtering
+  developer docs. Backward compatible: flows without persona actors stay pipeline flows in the
+  developer stream. NOTE: flow steps are drafted with actor semantics embedded in action text
+  because the current schema lacks actor/surface — those fields are added by this feature, after
+  which the flows are re-annotated (dogfooding).
+$system: usm/system
+$service: usm/cli
+intent: >-
+  Restores the founding vision: the spec holds personas, UI journeys, and e2e-testable flows, so
+  user documentation is COMPOSED from that data (persona guides, task-oriented walkthroughs) while
+  developer docs remain a separate stream. Today's help docs are produced by subtracting developer
+  content from developer docs — the reverse of the vision — and the schema cannot express personas
+  or UI interactions at all. This feature makes personas and journey flows first-class, generates
+  user docs from them, derives Playwright e2e skeletons from the same journeys, and replaces
+  subtraction-based help docs for feature pages with composition.
+status: planned
+flows:
+  - id: author-personas-journeys
+    name: Author personas and journey flows
+    steps:
+      - action: author adds
+        id: s1
+        target: "personas[] to system.usm (id, name, description) — surface: spec"
+      - action: author annotates
+        id: s2
+        target: "flows with actor (flow-level or per-step) and optional surface, marking them as journeys — surface: spec"
+      - action: agent validates
+        id: s3
+        target: "schema: persona ids referenced by actor exist; unknown actors rejected"
+      - action: author reviews
+        id: s4
+        target: "composed user docs rendered live via usm docs serve — surface: browser"
+  - id: generate-user-docs
+    name: Generate user documentation from personas and journeys
+    steps:
+      - action: agent parses
+        id: s1
+        target: personas from system.usm, journey flows across all feature specs
+      - action: agent composes
+        id: s2
+        target: per-persona guide sections; each journey becomes a task-oriented guide page
+      - action: agent renders
+        id: s3
+        target: persona steps as instructions, system/agent steps as 'the system will …' statements
+      - action: agent writes
+        id: s4
+        target: user-docs output tree; developer stream untouched
+  - id: generate-e2e-specs
+    name: Generate e2e specs from journeys
+    steps:
+      - action: agent selects
+        id: s1
+        target: journey flows with linked tests[] entries (optional tests[].flow reference)
+      - action: agent emits
+        id: s2
+        target: Playwright .spec.ts skeletons per journey under tests/auto-generated/e2e/
+      - action: agent preserves
+        id: s3
+        target: existing Vitest generation for non-journey tests
+  - id: help-docs-composed
+    name: Compose help docs from user content
+    steps:
+      - action: agent composes
+        id: s1
+        target: feature pages in help docs from summary, intent, and public journey guides
+      - action: agent retains
+        id: s2
+        target: subtraction filter for non-feature (system-level) help pages only
+      - action: agent deprecates
+        id: s3
+        target: subtraction path for feature pages, kept functional for one transition cycle
+contracts:
+  - id: personas-first-class
+    description: >-
+      system.usm gains personas[] — id, name, description. Flows and steps gain optional actor
+      (persona id, or 'system'/'agent') and optional surface (e.g. ui, cli, api).
+    must_have:
+      - "personas[] validates: unique ids, non-empty name"
+      - actor values either reference a declared persona id or are system/agent
+      - validate fails on unknown persona references (typo protection)
+      - existing specs without personas/actor validate unchanged
+  - id: journeys-vs-pipelines
+    description: >-
+      A flow is a journey when its actor (flow-level or step-level) references a persona; otherwise
+      it is a pipeline and behaves exactly as today.
+    must_have:
+      - flows with default (no) actor default to system and stay in the developer stream
+      - journeys render in user docs; pipelines never do
+      - step-level actor overrides flow-level default
+  - id: user-docs-composed
+    description: >-
+      New user-doc generator composes guides from personas and journeys — never by filtering
+      developer content.
+    must_have:
+      - "one guide page per journey: task-oriented title from flow name, ordered steps"
+      - >-
+        steps with actor=system/agent rendered as 'the system …' prose, persona steps as
+        instructions
+      - per-persona navigation grouping (Guides for <persona>)
+      - generation is idempotent and deterministic
+  - id: e2e-from-journeys
+    description: >-
+      tests[] gains optional flow reference; journey tests emit Playwright e2e skeletons alongside
+      existing Vitest output.
+    must_have:
+      - >-
+        tests with flow referencing a journey emit a valid Playwright .spec.ts under
+        tests/auto-generated/e2e/
+      - "output path derives from exact feature $id — collision-free (issue #37 class)"
+      - tests without flow ref continue to generate Vitest specs unchanged
+  - id: help-composition-replaces-subtraction
+    description: >-
+      Feature pages in help docs are composed from summary, intent, and public journey guides; the
+      subtraction filter is deprecated but stays functional for system-level pages.
+    must_have:
+      - help feature pages contain no contracts/tests/implementation sections
+      - help feature pages embed the journey guides relevant to public personas
+      - existing --audience help still runs and produces a valid site (non-feature pages unchanged)
+      - no user-visible regression for projects with no personas defined
+  - id: backward-compatible
+    description: >-
+      Projects that never declare personas get byte-identical generated output to the previous
+      version.
+    must_have:
+      - all existing generators unchanged when no personas/journey actors present
+      - schema changes are additive and optional-only
+      - existing .usm files validate with no edits required
+tests:
+  - expect:
+      - assertion: usm validate rejects unknown persona reference in flow actor
+      - assertion: usm validate accepts persona id, system, and agent actors
+    id: persona-validation
+    setup:
+      spec_with_flow_actor_referencing_undeclared_persona: true
+  - expect:
+      - assertion: user-docs guide page exists with flow name as task title
+      - assertion: persona steps rendered as instructions, system steps as system statements
+      - assertion: developer feature page unchanged in shape and content
+    id: journey-renders-guide
+    setup:
+      feature_with_persona_actor_flow: true
+  - expect:
+      - assertion: no user-docs output for that flow
+      - assertion: developer doc and Vitest generation identical to pre-change output
+    id: pipeline-flows-unchanged
+    setup:
+      feature_with_flows_without_actor: true
+  - expect:
+      - assertion: Playwright .spec.ts generated under tests/auto-generated/e2e/ with valid syntax
+      - assertion: >-
+          no output path collision between two features defining the same journey id (exact $id
+          parsing, issue #37 class)
+      - assertion: tests without flow reference still produce Vitest specs only
+    id: e2e-specs-from-journeys
+    setup:
+      journey_with_linked_tests: true
+  - expect:
+      - assertion: help feature page contains journey guide content and no contracts/tests sections
+      - assertion: help docs build succeeds for a project with zero personas (regression guard)
+    id: help-page-composition
+    setup:
+      public_feature_with_journeys: true
+  - expect:
+      - assertion: second run produces byte-identical output
+      - assertion: no orphan files from removed flows
+    id: idempotent-generation
+    setup:
+      generate_run_twice: true
+decisions:
+  - decision: Implement the full composition model in one feature — no phased rollout
+    id: single-vision-not-staged
+    rationale: >-
+      Staged approaches lose intent — the human explicitly rejected phases. Contracts encode the end
+      state (composition replaces subtraction for feature pages), so partial implementations fail
+      review instead of shipping half a vision. Roadmap entries are written in the same session as
+      the spec, not deferred.
+    status: accepted
+  - decision: "Personas stay minimal: id, name, description — no goals/frustrations/expertise yet"
+    id: minimal-personas
+    rationale: >-
+      Starts authoring via MCP tools without schema bloat; the composition generator only needs
+      identity and context today. Fields can be added additively later without migration.
+    status: accepted
+  - decision: >-
+      Step actor defaults to system; flows without a persona actor remain pipeline flows in
+      developer docs
+    id: actor-default-system
+    rationale: >-
+      Current flows (parse→generate→write) are genuinely pipeline steps. Making actor optional
+      preserves them untouched and keeps backward compatibility byte-exact.
+    status: accepted
+  - decision: E2E linkage via optional tests[].flow reference — not steps referencing tests
+    id: e2e-link-via-tests
+    rationale: >-
+      Assertions already live in tests[]; a flow reference ties them to journeys without duplicating
+      steps in two places. The journey provides the narrative, the linked tests provide the
+      assertions, one source each.
+    status: accepted
+  - decision: Deprecate (do not delete) the --audience help subtraction filter for feature pages
+    id: filter-deprecated-not-deleted
+    rationale: >-
+      System-level pages (getting started, references) still need filtering; feature pages switch to
+      composition. Keeping the filter functional avoids breaking consumers while the composed path
+      becomes the default for features.
+    status: accepted
+implementation:
+  primary: ""
+  test_code: ""
+  test_code_status: none
+see_also:
+  - usm/gen-docs-split
+  - usm/gen-testspecs
+  - usm/gen-feature-review
+  - usm/gen-roadmap

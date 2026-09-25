@@ -1622,16 +1622,14 @@ program
   .command("docs")
   .description("Docs site commands (requires VitePress)")
   .arguments("<action>")
-  .option("-p, --port <port>", "Dev server port (default: 5173)", "5173")
+  .option("-p, --port <port>", "Dev server port (strict: fails if taken). Omit to auto-select the next free port (default)")
   .option("-a, --audience <audience>", "Audience: developer (default) or help", "developer")
-  .option("--auto-port", "Auto-select next free port if the requested port is in use")
   .option("--restart", "Kill existing server and restart")
   .option("--watch", "Watch .usm/ files and auto-regenerate docs on change")
   .option("--open", "Open browser at the served URL")
   .action(async (action: string, options: {
-    port: string;
+    port?: string;
     audience: string;
-    autoPort?: boolean;
     restart?: boolean;
     watch?: boolean;
     open?: boolean;
@@ -1645,9 +1643,10 @@ program
       await docsBuild(root, audience);
     } else if (action === "serve") {
       await docsServe(root, {
-        port: parseInt(options.port, 10),
+        // Omitted --port => auto-port (probe from 5173 until free).
+        // Explicit --port N => strict (fails loudly if N is taken).
+        port: options.port ? parseInt(options.port, 10) : null,
         audience,
-        autoPort: options.autoPort,
         restart: options.restart,
         watch: options.watch,
         open: options.open,

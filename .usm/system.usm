@@ -318,6 +318,16 @@ roadmap:
     title: Marketing site
     description: "Next.js + shadcn landing page at usm.dev with spec-first workflow story"
     status: planned
+  - id: user-docs-composition
+    title: User docs composed from personas and journeys
+    description: "Personas and journey flows (actor/surface) as first-class spec data; user guides and Playwright e2e skeletons generated from the same journeys; help docs for feature pages composed instead of filtered"
+    status: planned
+    feature: usm/gen-user-docs
+  - id: help-docs-filter-deprecation
+    title: Deprecate subtraction-based help docs for feature pages
+    description: "Feature pages in --audience help switch to composed content; subtraction filter retained for system-level pages during one transition cycle"
+    status: planned
+    feature: usm/gen-docs-split
 
 principles:
   - key: structured-source-of-truth

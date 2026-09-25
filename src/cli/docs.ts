@@ -38,21 +38,32 @@ function readProjectName(root: string): string {
 
 /**
  * Check if a port is free by attempting to listen on it.
+ * VitePress binds "localhost", which resolves to ::1 (IPv6) or 127.0.0.1
+ * (IPv4) depending on the OS — so probe BOTH loopback addresses and only
+ * report free when both bind cleanly. Conservative by design: worst case
+ * we skip a usable port; we never collide with a live server.
+ * (Wildcard-:: probing is NOT sufficient — macOS allows a wildcard bind
+ * even when ::1:<port> is taken by another process.)
  * Returns true if the port is available, false if in use.
  */
 function isPortFree(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", () => {
-      server.close();
-      resolve(false);
+  const tryBind = (addr: string) =>
+    new Promise<boolean>((resolve) => {
+      const server = net.createServer();
+      server.once("error", () => {
+        server.close();
+        resolve(false);
+      });
+      server.once("listening", () => {
+        server.close();
+        resolve(true);
+      });
+      server.listen(port, addr);
     });
-    server.once("listening", () => {
-      server.close();
-      resolve(true);
-    });
-    server.listen(port, "127.0.0.1");
-  });
+  return (async () => {
+    if (!(await tryBind("::1"))) return false;
+    return tryBind("127.0.0.1");
+  })();
 }
 
 /**
@@ -1080,9 +1091,13 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
 }
 
 export interface DocsServeOptions {
-  port: number;
+  /**
+   * Port to serve on. Null = auto-select the next free port starting at
+   * 5173 (the default — concurrent instances never clash). An explicit
+   * port is strict: if taken, serve fails with a clear error.
+   */
+  port: number | null;
   audience?: Audience;
-  autoPort?: boolean;
   restart?: boolean;
   watch?: boolean;
   open?: boolean;
@@ -1093,7 +1108,7 @@ export interface DocsServeOptions {
  * Supports port checking, already-serving detection, watch mode, and graceful shutdown.
  */
 export async function docsServe(root: string, options: DocsServeOptions): Promise<void> {
-  const { port: requestedPort, audience = "developer", autoPort = false, restart = false, watch = false, open = false } = options;
+  const { port: requestedPort, audience = "developer", restart = false, watch = false, open = false } = options;
   await requireVitePress();
 
   // Determine docs root based on audience
@@ -1120,7 +1135,11 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
       // Give it a moment to release the port
       await new Promise((r) => setTimeout(r, 500));
     } else {
-      console.log(`Docs already served at http://localhost:${requestedPort} (PID ${existingPid}).`);
+      // Report the ACTUAL bound port (from the port file written at bind
+      // time), not the requested one — the server may have been started
+      // with a different --port. Announced URL must be the bound URL.
+      const actualPort = readPortFile(docsRoot) ?? requestedPort;
+      console.log(`Docs already served at http://localhost:${actualPort} (PID ${existingPid}).`);
       console.log("Use --restart to restart, or usm docs stop to stop.");
       return;
     }
@@ -1129,28 +1148,34 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
     removePidFile(docsRoot);
   }
 
-  // ── Port check ───────────────────────────────────────────────────────────
-  let port = requestedPort;
-  const portFree = await isPortFree(port);
-
-  if (!portFree) {
-    if (autoPort) {
-      const nextPort = await findFreePort(port);
-      if (nextPort === null) {
-        console.error(`No free port found between ${port} and ${port + 99}.`);
-        process.exit(1);
-      }
-      const processInfo = getPortProcess(port);
-      const processStr = processInfo ? ` by ${processInfo}` : "";
-      console.log(`Port ${port} is in use${processStr}, using port ${nextPort} instead.`);
-      port = nextPort;
-    } else {
-      const processInfo = getPortProcess(port);
-      const processStr = processInfo ? ` by ${processInfo}` : "";
-      console.error(`Port ${port} is in use${processStr}.`);
-      console.error(`Use --port N to pick a different port, --auto-port to auto-select, or --restart to restart an existing server.`);
+  // ── Port selection ───────────────────────────────────────────────────────
+  // Null port = auto: probe from 5173 until free (concurrent instances
+  // never clash). Explicit port = strict: fail loudly if taken.
+  // Either way, VitePress runs with --strictPort so the announced URL is
+  // always the bound URL (wrong-URL bug, 2026-09-25).
+  let port: number;
+  if (requestedPort === null) {
+    const nextPort = await findFreePort(5173);
+    if (nextPort === null) {
+      console.error("No free port found between 5173 and 5272.");
       process.exit(1);
     }
+    if (nextPort !== 5173) {
+      const processInfo = getPortProcess(5173);
+      const processStr = processInfo ? ` by ${processInfo}` : "";
+      console.log(`Port 5173 is in use${processStr}, using port ${nextPort} instead.`);
+    }
+    port = nextPort;
+  } else {
+    const portFree = await isPortFree(requestedPort);
+    if (!portFree) {
+      const processInfo = getPortProcess(requestedPort);
+      const processStr = processInfo ? ` by ${processInfo}` : "";
+      console.error(`Port ${requestedPort} is in use${processStr}.`);
+      console.error(`Omit --port to auto-select the next free port, or use --restart to restart an existing server.`);
+      process.exit(1);
+    }
+    port = requestedPort;
   }
 
   // ── Prepare docs ─────────────────────────────────────────────────────────
@@ -1187,7 +1212,10 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   console.log(`Docs route shape: /features/<area>/<slug> — the $system namespace is dropped (issue #34).`);
   console.log(`Starting dev server on port ${port}...`);
   console.log(`  http://localhost:${port}/`);
-  const child = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(port)], {
+  // --strictPort: if the port was taken between our pre-flight check and
+  // VitePress's bind, fail loudly instead of silently escalating to
+  // port+1 — otherwise the printed URL serves the WRONG project's docs.
+  const child = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(port), "--strictPort"], {
     stdio: "inherit",
     cwd: root,
     shell: process.platform === "win32",
