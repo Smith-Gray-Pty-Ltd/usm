@@ -93,6 +93,13 @@ export function generateMarkdown(
 ): GenerationResult {
   const root = monorepoRoot || process.cwd();
 
+  // Whether system.usm declares risks[] — decides whether per-service risks
+  // pages may link to /risks (the page only exists when risks are declared).
+  // Cheap disk read once per process, cached (freshness: schema-cached like
+  // validate.ts; risks change rarely and watch regen runs a fresh process
+  // via subprocess, so staleness window is bounded by process lifetime).
+  const systemHasRisks = systemRisksPresence(root);
+
   switch (file.$type) {
     case "system":
       return generateSystemMarkdown(file, root);
@@ -208,15 +215,34 @@ function serviceSlug(file: ServiceUsm): string {
   return file.$id.split("/").pop() || "unknown";
 }
 
-function generateServiceMarkdown(file: ServiceUsm, root: string): GenerationResult {
+// Memoized per-process: does system.usm declare risks[]? (Decides whether
+// per-service risks pages may link to /risks — the page only exists then.)
+let _systemRisksCache: { root: string; value: boolean } | null = null;
+function systemRisksPresence(root: string): boolean {
+  if (_systemRisksCache?.root === root) return _systemRisksCache.value;
+  let value = false;
+  try {
+    const sysPath = path.join(root, ".usm", "system.usm");
+    if (fs.existsSync(sysPath)) {
+      const sys = parseUsmFile(sysPath) as { risks?: unknown[] };
+      value = Array.isArray(sys.risks) && sys.risks.length > 0;
+    }
+  } catch {
+    // No/unparseable system file — no /risks page, links suppressed
+  }
+  _systemRisksCache = { root, value };
+  return value;
+}
+
+function generateServiceMarkdown(file: ServiceUsm, root: string, systemHasRisks = false): GenerationResult {
   const classification = classifyService(file);
   const slug = serviceSlug(file);
 
   switch (classification) {
     case "app":
-      return generateAppServiceDocs(file, root, slug);
+      return generateAppServiceDocs(file, root, slug, systemHasRisks);
     case "shared-service":
-      return generateSharedServiceDocs(file, root, slug);
+      return generateSharedServiceDocs(file, root, slug, systemHasRisks);
     case "package":
       return generatePackageDocs(file, root, slug);
     case "data":
@@ -547,7 +573,7 @@ function buildAreaOverviewContent(
 
 // ─── App Service Docs (Full Shape) ────────────────────────────────────────────
 
-function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
+function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string, systemHasRisks = false): GenerationResult {
   const appRoot = `${root}/apps/${slug}/.usm-workspace/docs`;
   const outputs: GenerationResult["outputs"] = [];
 
@@ -590,7 +616,7 @@ function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): G
   }
 
   // Risks + Roadmap
-  outputs.push({ path: `${appRoot}/risks.md`, content: buildRisksMd(file) });
+  outputs.push({ path: `${appRoot}/risks.md`, content: buildRisksMd(file, systemHasRisks) });
   outputs.push({ path: `${appRoot}/roadmap.md`, content: buildRoadmapMd(file) });
 
   // New USM-migrated content — rendered from service .usm fields
@@ -664,7 +690,7 @@ function generateAppServiceDocs(file: ServiceUsm, root: string, slug: string): G
 
 // ─── Shared Service Docs (Full Shape) ─────────────────────────────────────────
 
-function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string): GenerationResult {
+function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string, systemHasRisks = false): GenerationResult {
   const svcRoot = outPath(root, "docs", `shared-services/${slug}`);
   const outputs: GenerationResult["outputs"] = [];
 
@@ -697,7 +723,7 @@ function generateSharedServiceDocs(file: ServiceUsm, root: string, slug: string)
 
   // Risks + Roadmap (real generators — show "none defined" when empty, which
   // is informative, not a placeholder promising future content)
-  outputs.push({ path: `${svcRoot}/risks.md`, content: buildRisksMd(file) });
+  outputs.push({ path: `${svcRoot}/risks.md`, content: buildRisksMd(file, systemHasRisks) });
   outputs.push({ path: `${svcRoot}/roadmap.md`, content: buildRoadmapMd(file) });
 
   return { outputs };
@@ -1174,7 +1200,7 @@ function buildModulesDoc(file: ServiceUsm): string {
   return lines.join("\n");
 }
 
-function buildRisksMd(file: ServiceUsm): string {
+function buildRisksMd(file: ServiceUsm, systemHasRisks = false): string {
   const lines: string[] = [];
   lines.push("# Risks");
   lines.push("");
@@ -1187,8 +1213,13 @@ function buildRisksMd(file: ServiceUsm): string {
   } else {
     lines.push("No risks defined in this service's .usm file.");
     lines.push("");
-    lines.push("For platform-wide risks, see [Platform Risks](/risks).");
-    lines.push("");
+    // Link to the platform risks page ONLY if it will exist — system.usm
+    // with risks: [] produces no /risks page, and an unconditional link
+    // 404s (shared-services/*/risks.md → /risks, dead-link crawl 2026-09-26).
+    if (systemHasRisks) {
+      lines.push("For platform-wide risks, see [Platform Risks](/risks).");
+      lines.push("");
+    }
   }
 
   return lines.join("\n");

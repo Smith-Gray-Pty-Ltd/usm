@@ -176,12 +176,83 @@ function isProcessAlive(pid: number): boolean {
 export interface SidebarItem {
   text: string;
   link: string;
+  /** VitePress nested group — present when the item has children. */
+  collapsed?: boolean;
+  items?: SidebarItem[];
 }
 
 export interface SidebarGroup {
   text: string;
   collapsed?: boolean;
   items: (SidebarItem | SidebarGroup)[];
+}
+
+/**
+ * Copy the composed user-docs guides (usm/gen-user-docs output tree) into
+ * the docs tree so VitePress can serve them, and build sidebar items for
+ * them: one sub-group per persona (guides/<persona>/...), persona index as
+ * the group's first item. Clean-slate copy — removed journeys leave no
+ * orphans. Both audiences: help site includes guides for features that pass
+ * the help filter (the composition already excludes internal features).
+ *
+ * @returns SidebarItems ready for a "Guides" group (empty if no personas).
+ */
+function composeGuidesForSidebar(root: string, docsRoot: string, audience: Audience): SidebarItem[] {
+  const userDocsDir = outDir(root, "workspace") + "/user-docs";
+  if (!fs.existsSync(userDocsDir)) return [];
+  const targetRoot = path.join(docsRoot, "guides");
+
+  // Clean-slate copy. The user-docs tree layout is:
+  //   user-docs/<persona>.md                    (persona index)
+  //   user-docs/guides/<persona>/<journey>.md   (journey guides)
+  // A naive recursive copy of the whole tree into guides/ would double the
+  // nesting (guides/guides/<persona>/...). Map deliberately: persona indexes
+  // from the top level, journey guides from user-docs/guides/** → guides/**.
+  fs.rmSync(targetRoot, { recursive: true, force: true });
+  fs.mkdirSync(targetRoot, { recursive: true });
+  for (const entry of fs.readdirSync(userDocsDir, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".md")) {
+      fs.copyFileSync(path.join(userDocsDir, entry.name), path.join(targetRoot, entry.name));
+    } else if (entry.isDirectory() && entry.name === "guides") {
+      fs.cpSync(path.join(userDocsDir, "guides"), targetRoot, { recursive: true });
+    }
+  }
+
+  const items: SidebarItem[] = [];
+  // One persona index page per persona at guides/<persona>.md, each with its
+  // journey guide sub-pages nested beneath it (guides/<persona>/<journey>.md).
+  for (const entry of fs.readdirSync(targetRoot, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".md")) {
+      const personaSlug = entry.name.replace(/\.md$/, "");
+      const persona: SidebarItem = { text: titleFromPersonaSlug(personaSlug), link: `/guides/${personaSlug}` };
+      // Journey guides for this persona → nested group
+      const personaDir = path.join(targetRoot, "guides", personaSlug);
+      if (fs.existsSync(personaDir)) {
+        const journeyItems: SidebarItem[] = [];
+        for (const j of fs.readdirSync(personaDir, { withFileTypes: true })) {
+          if (j.isFile() && j.name.endsWith(".md")) {
+            const slug = j.name.replace(/\.md$/, "");
+            journeyItems.push({ text: titleFromPersonaSlug(slug), link: `/guides/${personaSlug}/${slug}` });
+          }
+        }
+        if (journeyItems.length > 0) {
+          (persona as SidebarItem & { collapsed?: boolean; items?: SidebarItem[] }).collapsed = true;
+          (persona as SidebarItem & { collapsed?: boolean; items?: SidebarItem[] }).items = journeyItems;
+        }
+      }
+      items.push(persona);
+    }
+  }
+  items.sort((a, b) => a.text.localeCompare(b.text));
+  void audience;
+  return items;
+}
+
+function titleFromPersonaSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => AREA_ACRONYMS[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 /**
@@ -412,6 +483,8 @@ function simplifyFeatureDoc(content: string): string {
   // Drop developer-heavy sections (contracts, tests, implementation, decisions…).
   const sectionsToRemove = [
     "## Contracts",
+    "## Guarantees", // contracts rendered as 'Guarantees' — Given/Then DSL leaks into help docs otherwise
+    "## Test specifications",
     "## Tests",
     "## Implementation",
     "## Decisions",
@@ -560,9 +633,16 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
   let helpPersonas: Persona[] | null = null;
   let copied = 0;
 
-  // Clean help root
+  // Clean help root — PRESERVE .vitepress/ (the running dev server's config
+  // + cache live there; rmSync-ing it killed config.mts mid-serve, which is
+  // the 404-in-other-repos generator: any help-docs regeneration while a
+  // help server ran destroyed nav and crashed VitePress). Everything else
+  // is regenerated wholesale below.
   if (fs.existsSync(helpRoot)) {
-    fs.rmSync(helpRoot, { recursive: true });
+    for (const entry of fs.readdirSync(helpRoot, { withFileTypes: true })) {
+      if (entry.name === ".vitepress") continue;
+      fs.rmSync(path.join(helpRoot, entry.name), { recursive: true, force: true });
+    }
   }
   fs.mkdirSync(helpRoot, { recursive: true });
 
@@ -620,6 +700,12 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
   }
 
   copyFiltered(docsRoot, helpRoot, "");
+
+  // Sidebar/nav may have changed (new/removed feature pages) — refresh the
+  // VitePress config. Idempotent: write-on-change only, so the running dev
+  // server restarts exactly when nav content changed.
+  writeConfigIfChanged(root, helpRoot, "help");
+
   return copied;
 }
 
@@ -673,11 +759,31 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
   const featuresRoot = path.join(docsRoot, "features");
   const sidebar: SidebarGroup[] = [];
 
+  // Dedup + dead-link guard: the same link must never appear twice in the
+  // nav (repeated items read as two different pages, one usually dead), and
+  // a link must never render to a page that does not exist on disk (404).
+  // Every item push below routes through pushItem.
+  const seenLinks = new Set<string>();
+
   function docExists(relPath: string): boolean {
     return (
       fs.existsSync(path.join(docsRoot, relPath + ".md")) ||
       fs.existsSync(path.join(docsRoot, relPath, "index.md"))
     );
+  }
+
+  function linkExists(link: string): boolean {
+    const rel = link.replace(/^\//, "").replace(/\/+$/, "");
+    if (!rel) return true; // home
+    return docExists(rel);
+  }
+
+  function pushItem(text: string, link: string, into: SidebarItem[]): void {
+    const key = link.replace(/\/+$/, "");
+    if (seenLinks.has(key)) return; // dedup — repeated nav items are a bug
+    if (!linkExists(link)) return; // never render a link to a missing page
+    seenLinks.add(key);
+    into.push({ text, link });
   }
 
   function pushIfAny(text: string, items: SidebarItem[], collapsed = false): void {
@@ -687,18 +793,25 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
 
   // ── 1. Getting Started ──────────────────────────────────────────────────────
   const gettingStarted: SidebarItem[] = [];
-  gettingStarted.push({ text: "Home", link: "/" });
+  pushItem("Home", "/", gettingStarted);
   if (docExists("getting-started")) {
-    gettingStarted.push({ text: "Getting Started", link: "/getting-started" });
+    pushItem("Getting Started", "/getting-started", gettingStarted);
   }
   if (audience === "developer" && docExists("agent-setup-guide")) {
-    gettingStarted.push({ text: "Agent Setup Guide", link: "/agent-setup-guide" });
+    pushItem("Agent Setup Guide", "/agent-setup-guide", gettingStarted);
   }
   // Editor setup guides — available for both audiences (help + developer)
   if (docExists("editor-setup/index")) {
-    gettingStarted.push({ text: "Editor Setup", link: "/editor-setup/" });
+    pushItem("Editor Setup", "/editor-setup/", gettingStarted);
   }
   pushIfAny("Getting Started", gettingStarted);
+
+  // ── 1b. Guides (usm/gen-user-docs) — composed from personas + journeys ─────
+  // Lives outside docsRoot (user-docs output tree), so VitePress serves it
+  // only if we symlink/copy it into the tree. Simpler: copy at config time —
+  // the tree is regenerated wholesale on each serve/watch tick.
+  const guides = composeGuidesForSidebar(root, docsRoot, audience);
+  pushIfAny("Guides", guides, true);
 
   if (!fs.existsSync(systemPath)) return sidebar;
   const system = parseUsmFile(systemPath) as SystemUsm;
@@ -1302,16 +1415,97 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   // --strictPort: if the port was taken between our pre-flight check and
   // VitePress's bind, fail loudly instead of silently escalating to
   // port+1 — otherwise the printed URL serves the WRONG project's docs.
-  const child = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(port), "--strictPort"], {
-    stdio: "inherit",
-    cwd: root,
-    shell: process.platform === "win32",
-  });
+  // ── Serve with bind-race retry ──────────────────────────────────────────
+  // --strictPort means the announced URL is always the bound URL. But there
+  // is a TOCTOU window: two servers starting concurrently both probe 5173
+  // free (neither has bound yet), the first binds, the second fails.
+  // In auto-port mode a bind failure retries with a fresh probe (up to 3
+  // attempts) instead of dying — concurrent `usm docs serve` startups then
+  // self-organize onto distinct ports. Explicit --port stays strict: one
+  // attempt, fail loudly.
+  const startChild = async (attemptPort: number): Promise<ReturnType<typeof spawn>> => {
+    console.log(`Starting dev server on port ${attemptPort}...`);
+    console.log(`  http://localhost:${attemptPort}/`);
+    const c = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(attemptPort), "--strictPort"], {
+      stdio: "pipe", // bind failure is detected programmatically for retry
+      cwd: root,
+      shell: process.platform === "win32",
+    });
+    return c;
+  };
 
-  // Write PID file
-  if (child.pid) {
-    writePidFile(docsRoot, child.pid);
-    writePortFile(docsRoot, port);
+  // Wait for either "ready to serve" (Local: line) or early bind failure.
+  function awaitBind(child: ReturnType<typeof spawn>): Promise<"ready" | "bind-failed"> {
+    return new Promise((resolve) => {
+      let out = "";
+      const onData = (d: Buffer | string) => {
+        out += String(d);
+        if (/Local:\s+http/.test(out)) {
+          cleanup();
+          resolve("ready");
+        } else if (/Port \d+ is already in use|EADDRINUSE/.test(out)) {
+          cleanup();
+          resolve("bind-failed");
+        }
+      };
+      const timer = setTimeout(() => { cleanup(); resolve("ready"); }, 20000); // assume slow start is fine
+      function cleanup() {
+        clearTimeout(timer);
+        child.stdout?.off("data", onData);
+        child.stderr?.off("data", onData);
+      }
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
+    });
+  }
+
+  let child: ReturnType<typeof spawn> | undefined;
+  if (requestedPort === null) {
+    let bound = false;
+    for (let attempt = 0; attempt < 3 && !bound; attempt++) {
+      const nextPort = await findFreePort(5173);
+      if (nextPort === null) {
+        console.error("No free port found between 5173 and 5272.");
+        process.exit(1);
+      }
+      if (nextPort !== 5173 && attempt === 0) {
+        const processInfo = getPortProcess(5173);
+        const processStr = processInfo ? ` by ${processInfo}` : "";
+        console.log(`Port 5173 is in use${processStr}, using port ${nextPort} instead.`);
+      }
+      child = await startChild(nextPort);
+      const outcome = await awaitBind(child);
+      if (outcome === "ready") {
+        bound = true;
+        if (child.pid) {
+          writePidFile(docsRoot, child.pid);
+          writePortFile(docsRoot, nextPort);
+        }
+        // Re-detect actual bound port for the "already serving" report path
+      } else {
+        console.log(`Bind race on port ${nextPort} (started concurrently with another server) — retrying…`);
+        removePidFile(docsRoot);
+      }
+    }
+    if (!bound) {
+      console.error("Could not bind after 3 attempts (ports churning). Run again in a moment.");
+      process.exit(1);
+    }
+  } else {
+    child = await startChild(port);
+    const outcome = await awaitBind(child);
+    if (outcome === "bind-failed") {
+      const processInfo = getPortProcess(port);
+      const processStr = processInfo ? ` by ${processInfo}` : "";
+      console.error(`Port ${port} is in use${processStr}.`);
+      console.error(`Omit --port to auto-select the next free port, or use --restart to restart an existing server.`);
+      removePidFile(docsRoot);
+      process.exit(1);
+    }
+    if (child.pid) {
+      writePidFile(docsRoot, child.pid);
+      writePortFile(docsRoot, port);
+    }
   }
 
   // ── Open browser ─────────────────────────────────────────────────────────
@@ -1343,7 +1537,7 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   // ── Graceful shutdown ────────────────────────────────────────────────────
   const cleanup = () => {
     if (watchCleanup) watchCleanup();
-    if (child.pid && isProcessAlive(child.pid)) {
+    if (child?.pid && isProcessAlive(child.pid)) {
       try { process.kill(child.pid, "SIGTERM"); } catch { /* ignore */ }
     }
     removePidFile(docsRoot);
@@ -1352,9 +1546,13 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   process.on("SIGINT", () => { cleanup(); process.exit(0); });
   process.on("SIGTERM", () => { cleanup(); process.exit(0); });
 
-  // Keep the process alive
+  // Keep the process alive; pipe VitePress output through now that binding
+  // is settled (stdio was "pipe" for bind detection).
+  const settled = child; // non-null past the bind/retry block
+  settled?.stdout?.pipe(process.stdout);
+  settled?.stderr?.pipe(process.stderr);
   await new Promise<void>((resolve) => {
-    child.on("close", () => {
+    settled?.on("close", () => {
       removePidFile(docsRoot);
       resolve();
     });
@@ -1475,6 +1673,15 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     return () => {};
   }
 
+  // Trees whose config.mts must refresh on regeneration: both audiences —
+  // either may be served concurrently (hot reload on different ports).
+  const docsDir = outDir(root, "docs");
+  const helpDir = outDir(root, "help_docs");
+  const watchTrees: Array<[string, string]> = [
+    ["developer", docsDir],
+    ["help", helpDir],
+  ];
+
   let pendingChanges = 0;
 
   const regenerate = async () => {
@@ -1483,19 +1690,36 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
     pendingChanges = 0;
 
     try {
-      // Run generate in-process via a subprocess call to the built CLI
+      // Run generate in-process via a subprocess call to the built CLI.
+      // Full generate (NOT --only docs): a .usm edit can change anything —
+      // feature pages, sidebar (system.usm index), reference pages, and the
+      // help-docs stream. Regenerating only the developer markdown left the
+      // served config.mts (sidebar/nav) and the help tree stale, so agents
+      // believed changes applied while nav links 404ed (freshness contract).
       const { execSync } = await import("node:child_process");
       const cliPath = path.join(root, "dist", "cli", "index.js");
       const fallbackPath = path.join(root, "src", "cli", "index.ts");
-      let cmd: string;
+      let cliCmd: string;
       if (fs.existsSync(cliPath)) {
-        cmd = `node "${cliPath}" generate --only docs`;
+        cliCmd = `node "${cliPath}"`;
       } else if (fs.existsSync(fallbackPath)) {
-        cmd = `npx tsx "${fallbackPath}" generate --only docs`;
+        cliCmd = `npx tsx "${fallbackPath}"`;
       } else {
         throw new Error("Could not find CLI entrypoint (dist or src)");
       }
-      execSync(cmd, { cwd: root, stdio: "pipe", timeout: 30000 });
+      const cmds = [
+        `${cliCmd} generate`,
+        `${cliCmd} generate --only help-docs`,
+      ];
+      for (const cmd of cmds) {
+        execSync(cmd, { cwd: root, stdio: "pipe", timeout: 60000 });
+      }
+      // Refresh config.mts for whichever tree(s) are being served — sidebar
+      // must reflect the regenerated pages, or nav links 404.
+      for (const [aud, docsRoot] of watchTrees) {
+        if (!fs.existsSync(docsRoot)) continue;
+        writeConfigIfChanged(root, docsRoot, aud as Audience);
+      }
       console.log(`Regenerated docs (${count} file${count !== 1 ? "s" : ""} changed)`);
     } catch (err) {
       console.error("Watch regeneration failed:", (err as Error).message);
@@ -1514,6 +1738,26 @@ function startWatchMode(root: string, _docsRoot: string, _audience: Audience): (
   const stop = watchUsmDir(usmDir, trackedRegen);
   console.log("Watching .usm/ for changes (recursive)...");
   return stop;
+}
+
+/**
+ * Rewrite .vitepress/config.mts only when its content changes.
+ * VitePress auto-restarts its dev server when config.mts changes, which is
+ * how the served sidebar/nav picks up regenerated pages — but a byte-write
+ * on every watch tick would restart-loop. Content comparison makes this
+ * idempotent: write-on-change only.
+ */
+function writeConfigIfChanged(root: string, docsRoot: string, audience: Audience): boolean {
+  const configDir = path.join(docsRoot, ".vitepress");
+  fs.mkdirSync(configDir, { recursive: true });
+  const configPath = path.join(configDir, "config.mts");
+  const next = generateVitePressConfig(root, docsRoot, audience);
+  if (fs.existsSync(configPath) && fs.readFileSync(configPath, "utf-8") === next) {
+    return false; // unchanged — do not touch, VitePress keeps running
+  }
+  fs.writeFileSync(configPath, next, "utf-8");
+  console.log(`Refreshed .vitepress/config.mts (${audience}) — VitePress will reload nav`);
+  return true;
 }
 
 /**

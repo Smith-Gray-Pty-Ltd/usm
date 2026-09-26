@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-docs
 $type: feature
 $version: 1
-$last_updated: "2026-09-25"
+$last_updated: "2026-09-26"
 status: built
 summary: >
   usm docs serve and usm docs build — serves generated docs locally via VitePress dev server with
@@ -193,10 +193,25 @@ contracts:
       - Feature status (planned, active, deprecated) shown as badge
       - Services listed in sidebar from system.usm services[]
   - id: hot-reload-on-usm-change
-    description: Editing a .usm file must trigger regeneration and browser update
+    description: >-
+      Editing a .usm file must trigger regeneration and browser update — of the FULL docs surface,
+      not just developer markdown. Nav (config.mts) and the help-docs stream are part of the served
+      contract.
     must_have:
       - File watcher monitors .usm/ directory recursively
-      - Only affected markdown regenerated (not full rebuild)
+      - "Regeneration covers BOTH streams: developer docs AND help-docs tree"
+      - >-
+        VitePress config.mts (sidebar/nav) refreshed on regeneration — write-on-change (idempotent),
+        so the running server reloads nav exactly when it changed
+      - >-
+        Concurrent server startups self-organize: bind-race in auto-port mode retries with a fresh
+        probe (3 attempts) instead of failing
+      - >-
+        generate --only help-docs preserves .vitepress/ across the tree rebuild (config.mts must not
+        be deleted mid-serve)
+      - >-
+        Sidebar renders zero dead links (every link resolves to a file on disk) and zero repeated
+        links (dedup guard)
       - VitePress HMR updates browser within 1 second
       - Console shows which file changed and was regenerated
   - id: build-produces-static-output

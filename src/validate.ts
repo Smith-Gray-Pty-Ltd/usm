@@ -1,7 +1,7 @@
    
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
-import type { ValidationResult, UsmFile, SystemUsm, Persona } from "./types.js";
+import type { ValidationResult, UsmFile } from "./types.js";
 
 // Lazy-loaded schema — avoids fs at import time
 let _ajv: Ajv | null = null;

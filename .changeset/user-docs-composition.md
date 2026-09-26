@@ -24,6 +24,9 @@ Restores the founding vision — user documentation COMPOSED from spec data
   Projects with zero personas get byte-identical help output
 - USM dogfoods: personas + annotated flows in its own spec; the
   gen-user-docs spec's flows carry actor/surface
+- fix(mcp): validate.ts cache-busts the schema on file mtime/size —
+  long-running MCP servers previously validated against a snapshot from
+  before an upgrade until manually restarted
 
 396 tests passing across 22 files (13 new acceptance tests covering the
 spec's six contract blocks).
