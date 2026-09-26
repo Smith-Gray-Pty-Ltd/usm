@@ -129,6 +129,20 @@ function readPackageVersion(): string {
   }
 }
 
+/**
+ * Does a generated page exist in this repo's docs tree? Consumers differ
+ * (docs-source/ optional, cli/mcp references only when such features are
+ * specced) — cross-page links must check before linking (dead-link
+ * discipline applies to page content, not just sidebars).
+ */
+function hasPage(rel: string, root: string): boolean {
+  const docsDir = outPath(root, "docs", "");
+  return (
+    fs.existsSync(path.join(docsDir, rel + ".md")) ||
+    fs.existsSync(path.join(docsDir, rel, "index.md"))
+  );
+}
+
 function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult {
   // Clean, scannable technical reference homepage (VitePress home layout).
   // Derived from system.usm. Marketing content lives on usm.dev, not here.
@@ -149,7 +163,15 @@ function generateSystemMarkdown(file: SystemUsm, root: string): GenerationResult
   lines.push("This site is **fully generated** from `.usm` files. Edit the source of truth, not the markdown.");
   lines.push(":::");
   lines.push("");
-  lines.push(`Start with **[Getting Started](/getting-started)** or browse the sidebar →`);
+  // Only link pages that exist in THIS repo's generated tree — consumers
+  // without docs-source/ have no getting-started page, and a dead link on
+  // the homepage is the first thing a new user clicks (found in the
+  // consumer-repo test, 2026-09-26).
+  if (hasPage("getting-started", root)) {
+    lines.push(`Start with **[Getting Started](/getting-started)** or browse the sidebar →`);
+  } else {
+    lines.push(`Browse the sidebar →`);
+  }
 
   return {
     outputs: [
@@ -1833,12 +1855,15 @@ export function generateCliReference(root: string): GenerationResult {
     }
   }
 
-  // Next steps
+  // Next steps — only link pages this repo actually generates (consumers
+  // without cli/mcp features or docs-source/ have no cli-reference,
+  // mcp-reference, or getting-started; dead links on a new user's first
+  // click are the worst possible onboarding, consumer-repo test 2026-09-26)
   lines.push("## Next steps");
   lines.push("");
   lines.push("- [Schema Reference](/schema-reference) — understand every `.usm` field");
-  lines.push("- [MCP Tools](/mcp-reference) — agent tools for the spec-first workflow");
-  lines.push("- [Getting Started](/getting-started) — first-run walkthrough");
+  if (hasPage("mcp-reference", root)) lines.push("- [MCP Tools](/mcp-reference) — agent tools for the spec-first workflow");
+  if (hasPage("getting-started", root)) lines.push("- [Getting Started](/getting-started) — first-run walkthrough");
   lines.push("- [Configuration Reference](/config-reference) — `usmconfig.json` fields");
   lines.push("");
 
@@ -2205,10 +2230,10 @@ export function generateSchemaReference(root: string): GenerationResult {
 
   lines.push("## See also");
   lines.push("");
-  lines.push("- [CLI Reference](/cli-reference) — commands that create and validate these files");
-  lines.push("- [MCP Tools](/mcp-reference) — agent tools for reading/writing `.usm`");
-  lines.push("- [Getting Started](/getting-started) — first-run workflow");
-  lines.push("- [Agent Setup Guide](/agent-setup-guide) — wire USM into Cursor / Claude / Copilot");
+  if (hasPage("cli-reference", root)) lines.push("- [CLI Reference](/cli-reference) — commands that create and validate these files");
+  if (hasPage("mcp-reference", root)) lines.push("- [MCP Tools](/mcp-reference) — agent tools for reading/writing `.usm`");
+  if (hasPage("getting-started", root)) lines.push("- [Getting Started](/getting-started) — first-run workflow");
+  if (hasPage("agent-setup-guide", root)) lines.push("- [Agent Setup Guide](/agent-setup-guide) — wire USM into Cursor / Claude / Copilot");
   lines.push("");
 
   return {
