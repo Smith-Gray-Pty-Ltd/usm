@@ -439,6 +439,12 @@ const HELP_EXCLUDE_PATHS = [
   "risks.md",
   "architecture",
   "data",
+  // Internal tooling/audit pages — contributor-facing, not user journey
+  "code-navigator.md",
+  "orphan-files.md",
+  "spec-coverage.md",
+  // Internal architecture deep-dives (contributors read developer docs)
+  "design",
   // Internal/meta areas — USM describing its own generators, MCP tool build
   // specs, schema-development specs, and internal module docs. Consumers want
   // the reference pages (cli-reference, mcp-reference, schema-reference), not
@@ -831,13 +837,17 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
   }
 
   // ── 2. Design (13 section pages, only rendered ones) ───────────────────────
-  const designSections = getDesignSections(system, serviceFiles, featureFiles, dataFiles);
-  const designItems: SidebarItem[] = [];
-  for (const sectionId of designSections) {
-    const label = DESIGN_SECTION_LABELS[sectionId] || sectionId;
-    designItems.push({ text: label, link: `/design/${sectionId}` });
+  // Help audience skips it entirely — internal architecture deep-dives are
+  // contributor material (user journey only, per audience model 2026-09-26).
+  if (audience === "developer") {
+    const designSections = getDesignSections(system, serviceFiles, featureFiles, dataFiles);
+    const designItems: SidebarItem[] = [];
+    for (const sectionId of designSections) {
+      const label = DESIGN_SECTION_LABELS[sectionId] || sectionId;
+      designItems.push({ text: label, link: `/design/${sectionId}` });
+    }
+    pushIfAny("Design", designItems);
   }
-  pushIfAny("Design", designItems);
 
   // ── 3. Project Management ──────────────────────────────────────────────────
   const pmItems: (SidebarItem | SidebarGroup)[] = [];

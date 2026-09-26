@@ -2,11 +2,12 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-docs-split
 $type: feature
 $version: 1
-$last_updated: "2026-06-22"
+$last_updated: "2026-09-26"
 status: built
-summary: |
-  Split generated docs into help docs (public-facing, for visitors and new users) and developer docs (full technical detail, for the team). Adds visibility field to schema, --audience flag to docs serve/build, and filtered output for help docs.
-
+summary: >
+  Split generated docs into help docs (public-facing, for visitors and new users) and developer docs
+  (full technical detail, for the team). Adds visibility field to schema, --audience flag to docs
+  serve/build, and filtered output for help docs.
 $system: usm/system
 $service: usm/cli
 intent: |
@@ -15,7 +16,6 @@ intent: |
   deployment secrets they don't need. Developers see everything, which is
   correct. By splitting into help docs (public, simplified) and developer
   docs (full), each audience gets the right view from the same .usm source.
-
 decisions:
   - id: post-process-filtering
     decision: Generate full docs first, then filter for help audience
@@ -26,10 +26,12 @@ decisions:
       in the VitePress integration layer (docs.ts) where it belongs.
     alternatives:
       - option: Audience-aware generator (pass audience through to all render functions)
-        rejected_because: "Touches every render function, complex, hard to maintain"
+        rejected_because: Touches every render function, complex, hard to maintain
       - option: Separate generator functions for help vs developer
-        rejected_because: "Duplicates rendering logic, drifts over time"
-    consequences: "Full docs generated first (slight overhead), then filtered — but filtering is fast and the full docs are useful anyway"
+        rejected_because: Duplicates rendering logic, drifts over time
+    consequences: >-
+      Full docs generated first (slight overhead), then filtered — but filtering is fast and the
+      full docs are useful anyway
     status: accepted
   - id: visibility-field-optional
     decision: Add optional visibility field (public/internal) to features and services
@@ -46,9 +48,23 @@ decisions:
       test cases. They need to understand what the feature does (summary),
       why it exists (intent), and how it works (flows as steps). Contracts
       and tests are developer concerns.
-    consequences: "Help docs are shorter and more readable for non-developers"
+    consequences: Help docs are shorter and more readable for non-developers
     status: accepted
-
+  - id: docs-audience-model
+    decision: >-
+      Help docs = user journey only (USM adopters + downstream end users); developer docs =
+      contributors and James (everything). Help excludes internal tooling pages (code-navigator,
+      orphan-files, spec-coverage) and the entire design/ section; keeps getting-started, agent
+      setup, CLI/MCP/schema/config references, roadmap, language-support, feedback, and composed
+      guides. Dev docs unchanged (full detail).
+    rationale: >-
+      Confirmed with the human 2026-09-26: help audience is BOTH adopters of USM and end users of
+      downstream products; the user journey is the contract for help content. Internal tooling (code
+      navigator, orphan files, spec coverage) and architecture deep-dives (design/) are contributor
+      material and live only in developer docs. Statuses: help shows roadmap with shipped_in so
+      adopters see direction; planned/in-progress features stay excluded per
+      help-docs-only-built-features.
+    status: accepted
 flows:
   - id: generate-both-doc-sets
     name: Generate both help and developer docs
@@ -76,7 +92,6 @@ flows:
       - id: s6
         action: build
         target: VitePress build for the help docs directory
-
   - id: serve-help-docs
     name: Serve help docs locally
     description: |
@@ -95,34 +110,45 @@ flows:
       - id: s4
         action: serve
         target: VitePress dev server
-
 contracts:
   - id: help-docs-only-built-features
     description: Help docs only include features with status built (or visibility public)
     must_have:
-      - "Features with status planned or in-progress are excluded from help docs"
+      - Features with status planned or in-progress are excluded from help docs
       - "Features with visibility: public are included regardless of status"
       - "Features with visibility: internal are excluded from help docs"
   - id: help-docs-simplified-content
     description: Help docs feature pages show summary + intent + flows only
     must_have:
-      - "No contracts section in help docs"
-      - "No tests section in help docs"
-      - "No implementation section in help docs"
-      - "No decisions section in help docs (or simplified to decision + rationale only)"
+      - No contracts section in help docs
+      - No tests section in help docs
+      - No implementation section in help docs
+      - No decisions section in help docs (or simplified to decision + rationale only)
   - id: help-docs-no-sensitive-info
     description: Help docs exclude deployment details and operations runbooks
     must_have:
-      - "No deployment.md in help docs"
-      - "No operations section"
-      - "No build commands or secrets in help docs"
+      - No deployment.md in help docs
+      - No operations section
+      - No build commands or secrets in help docs
   - id: developer-docs-unchanged
     description: Developer docs remain exactly as before (full detail)
     must_have:
-      - "All features included (planned, in-progress, built)"
-      - "Full contracts, tests, decisions, implementation"
-      - "Deployment and operations pages"
-
+      - All features included (planned, in-progress, built)
+      - Full contracts, tests, decisions, implementation
+      - Deployment and operations pages
+  - id: help-docs-user-journey-only
+    description: >-
+      Help docs contain the user journey only — internal tooling pages (code-navigator,
+      orphan-files, spec-coverage) and the design/ architecture section are contributor material and
+      live exclusively in developer docs.
+    must_have:
+      - code-navigator.md, orphan-files.md, spec-coverage.md absent from help docs
+      - design/ section absent from help docs (sidebar group too)
+      - >-
+        getting-started, agent-setup-guide, CLI/MCP/schema/config references, roadmap,
+        language-support, feedback present in help docs
+      - composed user-docs guides present in help docs sidebar
+      - developer docs keep all of the above (full detail, unchanged)
 tests:
   - id: help-docs-exclude-planned
     setup:
@@ -154,13 +180,11 @@ tests:
       - assertion: .usm-workspace/docs/ has all features
       - assertion: .usm-workspace/docs/ has deployment.md
       - assertion: .usm-workspace/docs/ has full feature docs with contracts and tests
-
 implementation:
   primary: src/cli/docs.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/cli-docs"
-  - "usm/gen-markdown"
-  - "usm/gen-feature-review"
+  - usm/cli-docs
+  - usm/gen-markdown
+  - usm/gen-feature-review
