@@ -6,6 +6,11 @@ import type { ValidationResult, UsmFile, SystemUsm, Persona } from "./types.js";
 // Lazy-loaded schema — avoids fs at import time
 let _ajv: Ajv | null = null;
 let _schema: object | null = null;
+// Cache key = schema file mtime+size. Long-running processes (MCP servers
+// serve for days) must not validate against a schema snapshot from before
+// an upgrade — previously _schema was cached forever, so tools kept
+// rejecting new-schema fields until the server was manually restarted.
+let _schemaCacheKey: string | null = null;
 
 function getAjv(): Ajv {
   if (!_ajv) {
@@ -16,15 +21,17 @@ function getAjv(): Ajv {
 }
 
 function getSchema(): object {
-  if (!_schema) {
-     
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require("node:fs") as typeof import("node:fs");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const path = require("node:path") as typeof import("node:path");
-    const schemaPath = path.resolve(__dirname, "../schema/v1.json");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require("node:fs") as typeof import("node:fs");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require("node:path") as typeof import("node:path");
+  const schemaPath = path.resolve(__dirname, "../schema/v1.json");
+  const stat = fs.statSync(schemaPath);
+  const cacheKey = `${stat.mtimeMs}:${stat.size}`;
+  if (!_schema || _schemaCacheKey !== cacheKey) {
     const raw = fs.readFileSync(schemaPath, "utf-8");
     _schema = JSON.parse(raw);
+    _schemaCacheKey = cacheKey;
   }
   return _schema!;
 }

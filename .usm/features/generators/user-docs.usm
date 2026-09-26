@@ -2,15 +2,15 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-user-docs
 $type: feature
 $version: 1
-$last_updated: "2026-09-25"
+$last_updated: "2026-09-26"
 summary: >-
   Personas and journey flows (actor/surface per step) become first-class spec data; a new user-doc
   generator composes task-oriented user guides and Playwright e2e skeletons from persona journeys;
   help docs for feature pages are composed from persona/journey content instead of filtering
   developer docs. Backward compatible: flows without persona actors stay pipeline flows in the
   developer stream. Schema shipped: personas[] on system.usm, actor/surface on flows/steps;
-  tests[].flow already existed. Dogfooding note resolved: this spec's own flows are annotated
-  with actor/surface.
+  tests[].flow already existed. Dogfooding note resolved: this spec's own flows are annotated with
+  actor/surface.
 $system: usm/system
 $service: usm/cli
 intent: >-
@@ -21,7 +21,7 @@ intent: >-
   or UI interactions at all. This feature makes personas and journey flows first-class, generates
   user docs from them, derives Playwright e2e skeletons from the same journeys, and replaces
   subtraction-based help docs for feature pages with composition.
-status: in-progress
+status: built
 flows:
   - id: author-personas-journeys
     name: Author personas and journey flows
@@ -30,21 +30,23 @@ flows:
         actor: spec-author
         id: s1
         surface: spec
-        target: "personas[] to system.usm (id, name, description)"
+        target: personas[] to system.usm (id, name, description)
       - action: annotate
         actor: spec-author
         id: s2
         surface: spec
-        target: "flows with actor (flow-level or per-step) and optional surface, marking them as journeys"
+        target: flows with actor (flow-level or per-step) and optional surface, marking them as journeys
       - action: validate
         actor: agent
         id: s3
-        target: "schema: persona ids referenced by actor exist; unknown actors rejected (hard error in generate pass)"
+        target: >-
+          schema: persona ids referenced by actor exist; unknown actors rejected (hard error in
+          generate pass)
       - action: review
         actor: spec-author
         id: s4
         surface: browser
-        target: "composed user docs rendered live via usm docs serve"
+        target: composed user docs rendered live via usm docs serve
   - id: generate-user-docs
     name: Generate user documentation from personas and journeys
     steps:
@@ -231,7 +233,7 @@ decisions:
 implementation:
   primary: src/generators/userDocs.ts
   test_code: tests/userDocs.test.ts
-  test_code_status: generated
+  test_code_status: manual
 see_also:
   - usm/gen-docs-split
   - usm/gen-testspecs
