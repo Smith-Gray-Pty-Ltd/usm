@@ -197,17 +197,18 @@ export interface SidebarGroup {
  *
  * @returns SidebarItems ready for a "Guides" group (empty if no personas).
  */
-function composeGuidesForSidebar(root: string, docsRoot: string, audience: Audience): SidebarItem[] {
-  const userDocsDir = outDir(root, "workspace") + "/user-docs";
-  if (!fs.existsSync(userDocsDir)) return [];
+/**
+ * Copy the user-docs guides into a docs tree (no nav built). Called from
+ * both composeGuidesForSidebar (serve/build config time) and the generate
+ * pass (usm generate — keeps the served tree fresh between serves).
+ */
+export function copyGuidesIntoDocs(root: string, docsRoot: string): void {
+  const userDocsDir = path.join(root, ".usm-workspace", "user-docs");
   const targetRoot = path.join(docsRoot, "guides");
-
-  // Clean-slate copy. The user-docs tree layout is:
-  //   user-docs/<persona>.md                    (persona index)
-  //   user-docs/guides/<persona>/<journey>.md   (journey guides)
-  // A naive recursive copy of the whole tree into guides/ would double the
-  // nesting (guides/guides/<persona>/...). Map deliberately: persona indexes
-  // from the top level, journey guides from user-docs/guides/** → guides/**.
+  if (!fs.existsSync(userDocsDir)) {
+    fs.rmSync(targetRoot, { recursive: true, force: true });
+    return;
+  }
   fs.rmSync(targetRoot, { recursive: true, force: true });
   fs.mkdirSync(targetRoot, { recursive: true });
   for (const entry of fs.readdirSync(userDocsDir, { withFileTypes: true })) {
@@ -217,6 +218,15 @@ function composeGuidesForSidebar(root: string, docsRoot: string, audience: Audie
       fs.cpSync(path.join(userDocsDir, "guides"), targetRoot, { recursive: true });
     }
   }
+}
+
+function composeGuidesForSidebar(root: string, docsRoot: string, audience: Audience): SidebarItem[] {
+  const userDocsDir = outDir(root, "workspace") + "/user-docs";
+  if (!fs.existsSync(userDocsDir)) return [];
+  const targetRoot = path.join(docsRoot, "guides");
+
+  // Copy handled by copyGuidesIntoDocs (same mapping, shared with generate)
+  copyGuidesIntoDocs(root, docsRoot);
 
   const items: SidebarItem[] = [];
   // One persona index page per persona at guides/<persona>.md, each with its
@@ -613,16 +623,26 @@ function stripDeadLinks(content: string, dirPath: string): string {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Markdown table row: | text | [link](path) | ... — skip if link target missing
+    // Markdown link: [text](target) — drop the line (table row/list item)
+    // when the target does not resolve within the help tree.
+    // Handles: absolute (/x/y), relative (./x, ../x, guides/x), with or
+    // without .md suffix (VitePress serves both; resolve .md on disk).
     const linkMatch = line.match(/\[([^\]]*)\]\(([^)]+)\)/);
     if (linkMatch) {
       const target = linkMatch[2];
-      // Only check relative .md links (not http URLs or anchors)
-      if (!target.startsWith("http") && !target.startsWith("#") && target.endsWith(".md")) {
-        const targetPath = path.resolve(dirPath, target);
-        if (!fs.existsSync(targetPath)) {
-          // Skip this line (table row or list item with a dead link)
-          continue;
+      if (!target.startsWith("http") && !target.startsWith("#") && !target.startsWith("mailto:")) {
+        const withoutAnchor = target.split("#")[0];
+        const candidates = [
+          withoutAnchor,
+          withoutAnchor.endsWith(".md") ? withoutAnchor : withoutAnchor + ".md",
+          withoutAnchor.endsWith("/index.md") ? withoutAnchor : withoutAnchor.replace(/\/?$/, "/index.md"),
+        ];
+        const exists = candidates.some((c) => {
+          const resolved = path.resolve(dirPath, c);
+          return fs.existsSync(resolved);
+        });
+        if (!exists) {
+          continue; // dead link — skip this line
         }
       }
     }
@@ -1273,6 +1293,12 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
   }
 
   // Step 5: Generate VitePress config
+  // Guides copy first (usm/gen-user-docs): composeGuidesForSidebar copies the
+  // user-docs tree into docsRoot/guides and builds nav for it. Running it at
+  // BUILD time (not only serve time) keeps the served tree fresh whenever
+  // docs are regenerated — a stale copy served dead relative links (the
+  // guides/guides doubling).
+  composeGuidesForSidebar(root, docsRoot, audience);
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
   const configContent = generateVitePressConfig(root, docsRoot, audience);
@@ -1410,6 +1436,8 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   }
 
   // ── Generate VitePress config ─────────────────────────────────────────────
+  // Guides copy first (see docsBuild Step 5 note) — serve-time freshness.
+  composeGuidesForSidebar(root, docsRoot, audience);
   const configDir = path.join(docsRoot, ".vitepress");
   fs.mkdirSync(configDir, { recursive: true });
   const configContent = generateVitePressConfig(root, docsRoot, audience);

@@ -161,7 +161,10 @@ export function generateUserDocs(
     indexLines.push("| Guide | Feature |");
     indexLines.push("|-------|---------|");
     for (const j of journeys) {
-      indexLines.push(`| [${j.flow.name}](guides/${persona.id}/${j.flow.id}.md) | ${j.featureName} |`);
+      // Absolute, extension-less link: this index is served at /guides/<persona>/,
+      // and a relative link with .md resolves to /guides/guides/<persona>/… —
+      // the doubled-path 404. VitePress routes on extension-less absolute paths.
+      indexLines.push(`| [${j.flow.name}](/guides/${persona.id}/${j.flow.id}) | ${j.featureName} |`);
     }
     indexLines.push("");
     outputs.push({

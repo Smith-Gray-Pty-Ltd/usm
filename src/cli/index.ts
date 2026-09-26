@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { outDir } from "../outputPaths.js";
+import { copyGuidesIntoDocs } from "./docs.js";
 import fs from "node:fs";
 import path from "node:path";
 import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile, splitImplementationPaths as splitImplementationPathsUtil } from "../parse.js";
@@ -1120,6 +1121,17 @@ program
         },
         // User docs composed from personas + journeys (target: docs)
         { name: "user-docs", target: "docs", fn: () => generateUserDocs(systemFile, featureFiles, root) },
+        // Copy guides into both served trees (target: docs) so the sites
+        // stay fresh between builds/serves — a stale copy served dead links
+        {
+          name: "guides-copy",
+          target: "docs",
+          fn: () => {
+            copyGuidesIntoDocs(root, outDir(root, "docs"));
+            copyGuidesIntoDocs(root, outDir(root, "help_docs"));
+            return { outputs: [] };
+          },
+        },
       ];
 
       for (const agg of aggregatorGenerators) {
