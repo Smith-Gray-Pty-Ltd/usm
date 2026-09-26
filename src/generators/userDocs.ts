@@ -56,6 +56,7 @@ function effectiveActor(flow: Flow, step: FlowStep): string {
 export function collectJourneys(
   features: FeatureUsm[],
   personas: Persona[],
+  indexNames?: Map<string, string>,
 ): Map<string, Journey[]> {
   const personaIds = new Set(personas.map((p) => p.id));
   const personaById = new Map(personas.map((p) => [p.id, p]));
@@ -71,7 +72,13 @@ export function collectJourneys(
       });
       const journey: Journey = {
         featureId: feature.$id,
-        featureName: feature.command ?? feature.$id.split("/").pop() ?? feature.$id,
+        // Display name: index entry name (human) > command > id slug
+        featureName:
+          indexNames?.get(feature.$id) ??
+          indexNames?.get(feature.$id.split("/").pop() ?? "") ??
+          feature.command ??
+          feature.$id.split("/").pop() ??
+          feature.$id,
         flow,
         personaId,
         persona: personaById.get(personaId)!,
@@ -89,13 +96,17 @@ export function collectJourneys(
 function renderStep(flow: Flow, step: FlowStep, _personaName: string): string {
   const actor = effectiveActor(flow, step);
   const surface = step.surface ? ` (${step.surface})` : "";
+  const action = step.action.trim();
   if (!RESERVED.has(actor)) {
-    // persona instruction
-    const action = step.action.charAt(0).toUpperCase() + step.action.slice(1);
-    return `- **${action}**${surface}${step.target ? `: ${step.target}` : ""}`;
+    // persona instruction: imperative verb, capitalized
+    const imperative = action.charAt(0).toUpperCase() + action.slice(1);
+    return `- **${imperative}**${surface}${step.target ? ` — ${step.target}` : ""}`;
   }
-  // system/agent step — "the system will …"
-  return `- The system ${step.action}${surface}${step.target ? `: ${step.target}` : ""}`;
+  // system/agent step — third-person present tense ("The system validates…").
+  // Spec actions are written as imperatives ("validate", "parse"); naively
+  // joining them produced "The system validate:" (ungrammatical).
+  const third = /^\S+s$/.test(action) ? action : `${action}s`; // naive: append s
+  return `- The system ${third}${surface}${step.target ? ` — ${step.target}` : ""}`;
 }
 
 /** Compose one guide page for a journey. */
@@ -138,13 +149,13 @@ export function generateUserDocs(
   systemFile: { personas?: Persona[] },
   features: FeatureUsm[],
   root: string,
-  userDocsDir?: string,
+  indexNames?: Map<string, string>,
 ): GenerationResult {
   const personas = systemFile.personas ?? [];
   if (personas.length === 0) return { outputs: [] };
 
-  const base = path.join(root, userDocsDir ?? ".usm-workspace/user-docs");
-  const byPersona = collectJourneys(features, personas);
+  const base = path.join(root, ".usm-workspace/user-docs");
+  const byPersona = collectJourneys(features, personas, indexNames);
 
   const outputs: GenerationResult["outputs"] = [];
 

@@ -133,8 +133,8 @@ describe("usm/gen-user-docs", () => {
     it("persona steps are instructions, system steps are system statements", () => {
       const journey = collectJourneys([journeyFeature], [persona]).get("site-owner")![0]!;
       const md = renderJourneyGuide(journey, persona);
-      expect(md).toContain("**Click** (ui): Publish button"); // persona step
-      expect(md).toContain("- The system save draft (ui)"); // system step
+      expect(md).toContain("**Click** (ui) — Publish button"); // persona step (em-dash separator)
+      expect(md).toContain("- The system save drafts (ui)"); // system step (third-person tense)
     });
 
     it("developer feature page shape unchanged (title + sections still generated)", () => {

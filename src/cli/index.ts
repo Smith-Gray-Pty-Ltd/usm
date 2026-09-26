@@ -1120,7 +1120,25 @@ program
           fn: () => generateE2eSpecs(featureFiles, root, journeysByFeature(root, systemFile, featureFiles)),
         },
         // User docs composed from personas + journeys (target: docs)
-        { name: "user-docs", target: "docs", fn: () => generateUserDocs(systemFile, featureFiles, root) },
+        {
+          name: "user-docs",
+          target: "docs",
+          fn: () => {
+            const indexNames = new Map<string, string>();
+            for (const entry of systemFile.index ?? []) {
+              // Key by index id AND ref path AND ref slug — feature lookups
+              // come in as $id ("usm/gen-user-docs"), $id slug
+              // ("gen-user-docs"), or ref; cover all three.
+              indexNames.set(entry.id, entry.name);
+              if (entry.ref) {
+                indexNames.set(entry.ref, entry.name);
+                const slug = entry.ref.split("/").pop()?.replace(".usm", "") ?? "";
+                if (slug) indexNames.set(slug, entry.name);
+              }
+            }
+            return generateUserDocs(systemFile, featureFiles, root, indexNames);
+          },
+        },
         // Copy guides into both served trees (target: docs) so the sites
         // stay fresh between builds/serves — a stale copy served dead links
         {

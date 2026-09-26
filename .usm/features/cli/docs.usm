@@ -97,7 +97,7 @@ flows:
         target: .vitepress/config.ts with sidebar and nav from system.usm index
       - id: s4
         action: start
-        target: VitePress dev server on configurable port (default 5173)
+        target: VitePress dev server (auto-port default; explicit --port strict)
       - id: s5
         action: watch
         target: .usm/ directory for file changes
@@ -176,12 +176,18 @@ flows:
         target: docs/api/openapi.yaml from features with routes
 contracts:
   - id: serve-starts-on-configurable-port
-    description: usm docs serve must start on a configurable port with sensible default
+    description: >-
+      usm docs serve selects its port by audience need: auto-port by default (concurrent instances
+      never clash), explicit --port strict.
     must_have:
-      - Default port is 5173 (VitePress default)
-      - "--port flag overrides default"
+      - >-
+        Omitting --port auto-selects the next free port starting at 5173 and logs which port was
+        chosen
+      - "Explicit --port N is strict: fails loudly with a clear, actionable error if N is taken"
+      - Bind-race in auto-port mode retries with a fresh probe (3 attempts) instead of failing
+      - Announced URL always equals the bound URL (VitePress --strictPort)
       - Server accessible at http://localhost:<port>
-      - Clear console output with URL and QR code for mobile review
+      - Clear console output with URL for review
   - id: sidebar-matches-system-index
     description: VitePress sidebar must enumerate every feature page in every area uniformly
     must_have:
@@ -314,8 +320,8 @@ usage:
     description: Build static help docs site
 options:
   - flag: "--port <port>"
-    description: Dev server port
-    default: "5173"
+    description: "Dev server port (strict: fails if taken)"
+    default: "auto — next free port from 5173"
   - flag: "--audience <audience>"
     description: "Audience: developer (full) or help (public, filtered)"
     default: developer

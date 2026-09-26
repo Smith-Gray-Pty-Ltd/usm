@@ -104,6 +104,11 @@ index:
     ref: .usm/features/generators/roadmap.usm
     status: in-progress
     tags: [generator, roadmap, schema]
+  - id: gen-user-docs
+    name: User Docs Composition (Personas & Journeys)
+    ref: .usm/features/generators/user-docs.usm
+    status: in-progress
+    tags: [generator, personas, user-docs, e2e]
   - id: gen-docs-split
     name: Docs Split (Help vs Developer)
     ref: .usm/features/generators/docs-split.usm
