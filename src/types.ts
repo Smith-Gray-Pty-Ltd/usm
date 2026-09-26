@@ -108,6 +108,7 @@ export interface SystemUsm extends UsmCommon {
   nextjs_breaking_changes?: string;
   principles?: Principle[];
   roles?: Role[];
+  personas?: Persona[];
   auth_schemes?: AuthScheme[];
   local_development?: LocalDevelopment;
   feedback?: FeedbackPolicy;
@@ -212,6 +213,18 @@ export interface Role {
   name: string;
   description: string;
   needs?: string[];
+}
+
+/**
+ * Persona (usm/gen-user-docs) — a user archetype that performs journey
+ * flows. Flows reference a persona by id via their actor field; flows with
+ * persona actors are journeys: they compose into user docs and emit e2e
+ * skeletons. Flows without a persona actor are pipelines.
+ */
+export interface Persona {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface MandatoryReadingItem {
@@ -487,6 +500,10 @@ export interface ServiceInfrastructure {
 export interface FlowStep {
   id: string;
   action: string; // Free-form verb: navigate, click, fill, observe, submit, get, post, etc.
+  /** Who performs this step: a persona id, or 'system'/'agent'. Overrides the flow-level actor. */
+  actor?: string;
+  /** Where the step happens: ui, cli, api, spec, browser, or a screen name. */
+  surface?: string;
   target?: string;
   expect?: Record<string, unknown>[];
 }
@@ -495,6 +512,12 @@ export interface Flow {
   id: string;
   name: string;
   description?: string;
+  /**
+   * Who performs this flow: a persona id (declared in system.usm personas[]),
+   * or 'system'/'agent'. Flows referencing a persona are journeys — they
+   * render in user docs and emit e2e skeletons. Default: pipeline (system).
+   */
+  actor?: string;
   steps: FlowStep[];
 }
 

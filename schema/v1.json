@@ -424,6 +424,30 @@
             "additionalProperties": false
           }
         },
+        "personas": {
+          "type": "array",
+          "description": "User personas — archetypes that perform journey flows. Flows reference a persona by id via their actor field; journeys with persona actors are composed into user documentation and e2e skeletons.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*$",
+                "description": "Kebab-case persona identifier — referenced by flow/step actor fields"
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable persona name (e.g. 'Site Owner', 'New Contributor')"
+              },
+              "description": {
+                "type": "string",
+                "description": "Who this persona is, their goal, and context for doc tone"
+              }
+            },
+            "required": ["id", "name", "description"],
+            "additionalProperties": false
+          }
+        },
         "local_development": {
           "type": "object",
           "description": "Local development workflow — commands, quirks, log locations, and external services required to run the platform on a developer's machine.",
@@ -1145,6 +1169,10 @@
               "description": {
                 "type": "string"
               },
+              "actor": {
+                "type": "string",
+                "description": "Who performs this flow: a persona id declared in system.usm personas[], or 'system'/'agent'. Flows referencing a persona are journeys — they compose into user docs and e2e skeletons. Flows without an actor are pipelines (developer docs only). Step-level actor overrides this default."
+              },
               "steps": {
                 "type": "array",
                 "items": {
@@ -1156,6 +1184,14 @@
                     "action": {
                       "type": "string",
                       "description": "Action type: navigate, click, fill, observe, authenticate, setup, submit, get, post, put, patch, delete, drag, select, send, parse, receive, wait, or any descriptive verb"
+                    },
+                    "actor": {
+                      "type": "string",
+                      "description": "Who performs this step: a persona id or 'system'/'agent'. Overrides the flow-level actor for this step."
+                    },
+                    "surface": {
+                      "type": "string",
+                      "description": "Where the step happens: ui, cli, api, spec, browser, or a screen name"
                     },
                     "target": {
                       "type": "string"

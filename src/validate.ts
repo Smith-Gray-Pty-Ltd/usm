@@ -1,7 +1,7 @@
    
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
-import type { ValidationResult, UsmFile } from "./types.js";
+import type { ValidationResult, UsmFile, SystemUsm, Persona } from "./types.js";
 
 // Lazy-loaded schema — avoids fs at import time
 let _ajv: Ajv | null = null;
@@ -100,7 +100,46 @@ export function validateUsm(file: UsmFile): ValidationResult {
     });
   }
 
+  // ── Actor reference check (usm/gen-user-docs) ────────────────────────────
+  // Flows live on feature files; personas are declared in system.usm. A
+  // single-file validate cannot see across files, so the actor-vs-persona
+  // check runs in the CLI generate pass (hard error on typo'd persona).
+  // `usm validate` stays single-file; RESERVED_ACTORS is exported for that
+  // cross-file walker (collectUnknownActors).
+  void RESERVED_ACTORS;
+
   return { valid: true, warnings: warnings.length > 0 ? warnings : undefined };
+}
+
+/** Reserved actor names that never reference a persona. */
+export const RESERVED_ACTORS: ReadonlySet<string> = new Set(["system", "agent"]);
+
+/**
+ * Walk flows[] collecting actor values that resolve to neither a declared
+ * persona nor a reserved word. Step-level actor overrides the flow-level
+ * default; a flow with no actor at all is a pipeline (no checks needed).
+ */
+export function collectUnknownActors(
+  file: Record<string, unknown>,
+  personaIds: Set<string>,
+  reserved: ReadonlySet<string>,
+): Array<{ path: string; message: string }> {
+  const errors: Array<{ path: string; message: string }> = [];
+  const flows = (file.flows as Array<Record<string, unknown>> | undefined) || [];
+  for (const flow of flows) {
+    const flowId = (flow.id as string) || "?";
+    const flowActor = flow.actor as string | undefined;
+    const steps = (flow.steps as Array<Record<string, unknown>> | undefined) || [];
+    for (const step of steps) {
+      const actor = (step.actor as string | undefined) ?? flowActor;
+      if (!actor || personaIds.has(actor) || reserved.has(actor)) continue;
+      errors.push({
+        path: `/flows/${flowId}/steps/${(step.id as string) || "?"}/actor`,
+        message: `actor '${actor}' is not a declared persona (declared: ${[...personaIds].join(", ") || "none"}) or reserved word (system, agent)`,
+      });
+    }
+  }
+  return errors;
 }
 
 /**

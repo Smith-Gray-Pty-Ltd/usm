@@ -372,6 +372,16 @@ principles:
       - Generators must read .usm files — never write docs from other docs
       - Each generator is independent and composable
 
+personas:
+  - id: spec-author
+    name: Spec Author
+    description: |
+      Writes and reviews feature specs; wants the browser preview of specs and composed user docs to be always current.
+  - id: platform-builder
+    name: Platform Builder
+    description: |
+      Extends USM's generators; wants structured contracts as acceptance criteria and e2e skeletons to build against.
+
 roles:
   - name: Human Developer
     description: |

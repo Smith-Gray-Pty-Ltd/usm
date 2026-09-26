@@ -40,6 +40,8 @@ import {
   generatePerAppTestSpecs,
 } from "../generators/markdown.js";
 import { generateReferencePages } from "../generators/referencePages.js";
+import { generateUserDocs, collectJourneys } from "../generators/userDocs.js";
+import { collectUnknownActors, RESERVED_ACTORS } from "../validate.js";
 import {
   generateAllAppAgentsMd,
   generateRootAgentsMd,
@@ -51,6 +53,7 @@ import {
 import {
   generateAllTestSpecs,
   generateAggregatedSpecs,
+  generateE2eSpecs,
 } from "../generators/testSpecs.js";
 import {
   generateArchitectureDiagram,
@@ -1056,6 +1059,24 @@ program
     // ─── Pass 3: Aggregator generators (per-service docs) ─────────────────
     const systemFile = systemFiles[0];
     if (systemFile) {
+      // ── Cross-file persona/actor validation (usm/gen-user-docs) ────────
+      // Feature flows may reference personas declared in system.usm. A typo'd
+      // persona id would silently drop the journey from user docs, so unknown
+      // actors are a HARD error here (single-file `usm validate` cannot see
+      // across files). Only enforced when the system declares personas.
+      if ((systemFile.personas?.length ?? 0) > 0) {
+        const personaIds = new Set(systemFile.personas!.map((p) => p.id));
+        for (const feat of featureFiles) {
+          const unknown = collectUnknownActors(feat as unknown as Record<string, unknown>, personaIds, RESERVED_ACTORS);
+          if (unknown.length > 0) {
+            for (const err of unknown) {
+              console.error(fail(`${feat.$id}${err.path} — ${err.message}`));
+            }
+            process.exit(1);
+          }
+        }
+      }
+
       const aggregatorGenerators: Array<{ name: string; target: string; fn: () => GenerationResult }> = [
         // Cross-cutting platform docs (target: docs)
         { name: "risks", target: "docs", fn: () => generateRisksDoc(systemFile, root) },
@@ -1090,6 +1111,15 @@ program
         // Test specs (target: tests)
         { name: "test-specs-per-feature", target: "tests", fn: () => generateAllTestSpecs(featureFiles, root) },
         { name: "test-specs-aggregated", target: "tests", fn: () => generateAggregatedSpecs(featureFiles, root) },
+        // E2e skeletons from journeys (target: tests — same target family,
+        // separate output tree tests/auto-generated/e2e/)
+        {
+          name: "e2e-specs",
+          target: "tests",
+          fn: () => generateE2eSpecs(featureFiles, root, journeysByFeature(root, systemFile, featureFiles)),
+        },
+        // User docs composed from personas + journeys (target: docs)
+        { name: "user-docs", target: "docs", fn: () => generateUserDocs(systemFile, featureFiles, root) },
       ];
 
       for (const agg of aggregatorGenerators) {
@@ -1736,3 +1766,28 @@ program
   });
 
 program.parse();
+
+/**
+ * Classify flows into journeys for e2e generation (usm/gen-user-docs):
+ * feature $id → set of flow ids whose effective actor references a persona
+ * declared in system.usm. Flows without a persona actor are pipelines and
+ * stay Vitest-only.
+ */
+function journeysByFeature(
+  _root: string,
+  systemFile: SystemUsm | undefined,
+  features: FeatureUsm[],
+): Map<string, ReadonlySet<string>> | undefined {
+  const personas = systemFile?.personas ?? [];
+  if (personas.length === 0) return new Map(); // no personas → nothing is a journey
+  const journeys = collectJourneys(features, personas);
+  const result = new Map<string, Set<string>>();
+  for (const [_personaId, journeyList] of journeys) {
+    for (const j of journeyList) {
+      const set = result.get(j.featureId) ?? new Set<string>();
+      set.add(j.flow.id);
+      result.set(j.featureId, set);
+    }
+  }
+  return result;
+}

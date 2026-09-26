@@ -3,6 +3,8 @@ import path from "node:path";
 import net from "node:net";
 import { spawn, execSync } from "node:child_process";
 import { parseUsmFile, isFeatureFile, findAllUsmFiles } from "../parse.js";
+import { collectJourneys, RESERVED } from "../generators/userDocs.js";
+import type { Persona } from "../types.js";
 import { outDir } from "../outputPaths.js";
 import type { SystemUsm, FeatureUsm, ServiceUsm, DataUsm } from "../types.js";
 import { getDesignSections, DESIGN_SECTION_LABELS } from "../generators/technicalDesign.js";
@@ -440,6 +442,81 @@ function simplifyFeatureDoc(content: string): string {
 }
 
 /**
+ * Compose journey guide content onto a simplified feature page
+ * (usm/gen-user-docs): feature pages in help docs EMBED the journey guides
+ * relevant to their flows, composed from personas — not filtered from
+ * developer content. The subtraction filter above still handles the
+ * developer-section removal and remains authoritative for system-level
+ * pages; this adds the composed user-doc stream to feature pages.
+ *
+ * @param usmPath — the feature's .usm source path (flows come from here)
+ * @param personas — personas declared in system.usm (may be empty)
+ * @returns content with a "## Step-by-step guides" section appended, or
+ *   the original content when the feature has no persona journeys.
+ */
+function composeJourneyGuidesIntoFeaturePage(
+  content: string,
+  usmPath: string,
+  personas: Persona[],
+): string {
+  if (personas.length === 0) return content;
+  try {
+    const parsed = parseUsmFile(usmPath);
+    if (!isFeatureFile(parsed)) return content;
+    const feature = parsed as FeatureUsm;
+    const journeys = collectJourneys([feature], personas);
+    if (journeys.size === 0) return content;
+
+    const lines: string[] = [];
+    lines.push("## Step-by-step guides");
+    lines.push("");
+    for (const [personaId, journeyList] of journeys) {
+      const persona = personas.find((p) => p.id === personaId);
+      if (!persona) continue;
+      for (const journey of journeyList) {
+        lines.push(`### ${journey.flow.name}`);
+        lines.push("");
+        lines.push(`**For:** ${persona.name}`);
+        lines.push("");
+        for (const step of journey.flow.steps) {
+          const actor = step.actor ?? journey.flow.actor ?? "system";
+          const surface = step.surface ? ` (${step.surface})` : "";
+          if (RESERVED.has(actor)) {
+            lines.push(`- The system ${step.action}${surface}${step.target ? `: ${step.target}` : ""}`);
+          } else {
+            const action = step.action.charAt(0).toUpperCase() + step.action.slice(1);
+            lines.push(`- **${action}**${surface}${step.target ? `: ${step.target}` : ""}`);
+          }
+        }
+        lines.push("");
+      }
+    }
+    const composed = lines.join("\n");
+    return content.trimEnd() + "\n\n" + composed;
+  } catch {
+    return content;
+  }
+}
+
+
+/**
+ * Load personas declared in system.usm for help-doc composition
+ * (usm/gen-user-docs). Empty array when none are declared — the composed
+ * section is then skipped and help output stays byte-identical (contract:
+ * no regression for projects with no personas).
+ */
+function loadHelpPersonas(root: string): Persona[] {
+  try {
+    const systemPath = path.join(root, ".usm", "system.usm");
+    if (!fs.existsSync(systemPath)) return [];
+    const parsed = parseUsmFile(systemPath);
+    return ((parsed as SystemUsm).personas ?? []) as Persona[];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Copy and filter docs from docsRoot into helpRoot for the help audience.
  * - Excludes developer-only pages (deployment, TOGAF, ArchiMate, testing, API)
  * - Excludes features that aren't built (unless visibility: public)
@@ -479,6 +556,8 @@ function stripDeadLinks(content: string, dirPath: string): string {
 }
 
 export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: string): number {
+  // usm/gen-user-docs: personas loaded lazily on first feature page
+  let helpPersonas: Persona[] | null = null;
   let copied = 0;
 
   // Clean help root
@@ -504,10 +583,11 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
         copyFiltered(srcPath, dstPath, relPath);
       } else if (entry.name.endsWith(".md") || entry.name.endsWith(".yaml")) {
         // For feature docs, check if the feature should be included in help docs
+        let usmPath: string | null = null;
         if (relPath.startsWith("features/") && entry.name !== "index.md") {
           // Look up the .usm source to check status/visibility
           const usmRelPath = relPath.replace(/\.md$/, ".usm");
-          const usmPath = path.join(root, ".usm", "features", usmRelPath.replace(/^features\//, ""));
+          usmPath = path.join(root, ".usm", "features", usmRelPath.replace(/^features\//, ""));
           if (fs.existsSync(usmPath)) {
             if (!shouldIncludeInHelpDocs(usmPath)) {
               continue; // Skip this feature
@@ -521,6 +601,12 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
         // Simplify feature docs (remove contracts, tests, implementation, decisions)
         if (relPath.startsWith("features/") && entry.name !== "index.md") {
           content = simplifyFeatureDoc(content);
+          // usm/gen-user-docs: compose journey guides onto feature pages
+          // (personas come from system.usm; parse once per run, lazily)
+          if (helpPersonas === null) helpPersonas = loadHelpPersonas(root);
+          if (helpPersonas.length > 0 && usmPath && fs.existsSync(usmPath)) {
+            content = composeJourneyGuidesIntoFeaturePage(content, usmPath, helpPersonas);
+          }
         }
 
         // Strip links to pages that don't exist in the help-docs tree

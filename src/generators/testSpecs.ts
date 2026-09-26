@@ -317,3 +317,105 @@ function inferSlugFromPath(sourceFilePath: string, root: string): string {
   const relFromFeatures = path.relative(usmFeaturesDir, sourceFilePath);
   return relFromFeatures.replace(/\.usm$/, "");
 }
+
+// ─── E2E skeletons from journeys (usm/gen-user-docs) ─────────────────────────
+
+/**
+ * Generate Playwright e2e skeletons for a feature's journey flows with
+ * linked tests[]. One .spec.ts per feature under tests/auto-generated/e2e/,
+ * path derived from the feature's exact $id (collision-free, issue #37
+ * class). Tests WITHOUT a flow reference never appear here — they continue
+ * to generate Vitest specs unchanged.
+ *
+ * @param journeysByFeature — feature $id → set of journey flow ids. When a
+ *   flow is NOT in the set it is a pipeline: linked tests stay Vitest-only.
+ */
+export function generateE2eSpecs(
+  features: FeatureUsm[],
+  root: string,
+  journeysByFeature?: Map<string, ReadonlySet<string>>,
+): GenerationResult {
+  const outputs: GenerationResult["outputs"] = [];
+
+  for (const feat of features) {
+    const linked = (feat.tests ?? []).filter((t) => {
+      if (!t.flow) return false;
+      const flowId = typeof t.flow === "string" ? t.flow : t.flow.ref;
+      if (!flowId) return false;
+      // No classification map = caller asserts journeys upstream; emit all
+      // flow-linked tests. With a map, only journey flows emit e2e specs.
+      if (journeysByFeature) {
+        const set = journeysByFeature.get(feat.$id);
+        if (!set || !set.has(flowId)) return false;
+      }
+      return true;
+    });
+    if (linked.length === 0) continue;
+
+    const lines: string[] = [];
+    lines.push("/**");
+    lines.push(` * E2E skeleton for ${feat.$id} — AUTO-GENERATED from .usm flows/tests.`);
+    lines.push(" * Do not edit; edit the feature .usm spec and re-run `usm generate --only tests`.");
+    lines.push(" *");
+    lines.push(" * Journey steps provide the narrative; linked tests[] provide the assertions.");
+    lines.push(" * Fill in selectors/locators where marked TODO.");
+    lines.push(" */");
+    lines.push("");
+    lines.push('import { test, expect } from "@playwright/test";');
+    lines.push("");
+
+    for (const t of linked) {
+      const flowRef = t.flow;
+      const flowId = typeof flowRef === "string" ? flowRef : flowRef!.ref;
+      const flow = (feat.flows ?? []).find((f) => f.id === flowId);
+      const testId = toValidId(t.id);
+
+      lines.push(`test.describe('${toValidId(flowId)}', () => {`);
+      lines.push(`  test('${testId}', async ({ page }) => {`);
+
+      if (flow) {
+        let steps = flow.steps;
+        // Honour steps_until: emit only up to (and including) that step id
+        const stepsUntil = typeof flowRef === "object" ? flowRef.steps_until : undefined;
+        if (stepsUntil) {
+          const idx = flow.steps.findIndex((s) => s.id === stepsUntil);
+          if (idx >= 0) steps = flow.steps.slice(0, idx + 1);
+        }
+        for (const step of steps) {
+          const actorNote = step.actor ? ` [actor: ${step.actor}]` : "";
+          lines.push(`    // step ${step.id}: ${step.action}${actorNote}${step.target ? ` — ${step.target}` : ""}`);
+          lines.push(`    // TODO: fill in locator/action for '${step.action}'`);
+        }
+      }
+
+      for (const exp of t.expect) {
+        const desc = formatExpectAsComment(exp as Record<string, unknown>);
+        if (desc) lines.push(`    // expect: ${desc}`);
+      }
+
+      lines.push("  });");
+      lines.push("});");
+      lines.push("");
+    }
+
+    const featureSlug = inferFeatureSlugFromId(feat.$id);
+    outputs.push({
+      path: outPath(root, "tests", `auto-generated/e2e/${featureSlug}.spec.ts`),
+      content: lines.join("\n"),
+    });
+  }
+
+  // Collision guard — same invariant as Vitest specs (issue #37 class)
+  const seen = new Map<string, string>();
+  for (const output of outputs) {
+    const existing = seen.get(output.path);
+    if (existing !== undefined && existing !== output.content) {
+      throw new Error(
+        `e2e-spec output collision: ${output.path} generated with differing content from two features`,
+      );
+    }
+    seen.set(output.path, output.content);
+  }
+
+  return { outputs };
+}

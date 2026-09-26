@@ -8,9 +8,9 @@ summary: >-
   generator composes task-oriented user guides and Playwright e2e skeletons from persona journeys;
   help docs for feature pages are composed from persona/journey content instead of filtering
   developer docs. Backward compatible: flows without persona actors stay pipeline flows in the
-  developer stream. NOTE: flow steps are drafted with actor semantics embedded in action text
-  because the current schema lacks actor/surface — those fields are added by this feature, after
-  which the flows are re-annotated (dogfooding).
+  developer stream. Schema shipped: personas[] on system.usm, actor/surface on flows/steps;
+  tests[].flow already existed. Dogfooding note resolved: this spec's own flows are annotated
+  with actor/surface.
 $system: usm/system
 $service: usm/cli
 intent: >-
@@ -21,60 +21,77 @@ intent: >-
   or UI interactions at all. This feature makes personas and journey flows first-class, generates
   user docs from them, derives Playwright e2e skeletons from the same journeys, and replaces
   subtraction-based help docs for feature pages with composition.
-status: planned
+status: in-progress
 flows:
   - id: author-personas-journeys
     name: Author personas and journey flows
     steps:
-      - action: author adds
+      - action: add
+        actor: spec-author
         id: s1
-        target: "personas[] to system.usm (id, name, description) — surface: spec"
-      - action: author annotates
+        surface: spec
+        target: "personas[] to system.usm (id, name, description)"
+      - action: annotate
+        actor: spec-author
         id: s2
-        target: "flows with actor (flow-level or per-step) and optional surface, marking them as journeys — surface: spec"
-      - action: agent validates
+        surface: spec
+        target: "flows with actor (flow-level or per-step) and optional surface, marking them as journeys"
+      - action: validate
+        actor: agent
         id: s3
-        target: "schema: persona ids referenced by actor exist; unknown actors rejected"
-      - action: author reviews
+        target: "schema: persona ids referenced by actor exist; unknown actors rejected (hard error in generate pass)"
+      - action: review
+        actor: spec-author
         id: s4
-        target: "composed user docs rendered live via usm docs serve — surface: browser"
+        surface: browser
+        target: "composed user docs rendered live via usm docs serve"
   - id: generate-user-docs
     name: Generate user documentation from personas and journeys
     steps:
-      - action: agent parses
+      - action: parses
+        actor: agent
         id: s1
         target: personas from system.usm, journey flows across all feature specs
-      - action: agent composes
+      - action: composes
+        actor: agent
         id: s2
         target: per-persona guide sections; each journey becomes a task-oriented guide page
-      - action: agent renders
+      - action: renders
+        actor: agent
         id: s3
         target: persona steps as instructions, system/agent steps as 'the system will …' statements
-      - action: agent writes
+      - action: writes
+        actor: agent
         id: s4
         target: user-docs output tree; developer stream untouched
   - id: generate-e2e-specs
     name: Generate e2e specs from journeys
     steps:
-      - action: agent selects
+      - action: selects
+        actor: agent
         id: s1
-        target: journey flows with linked tests[] entries (optional tests[].flow reference)
-      - action: agent emits
+        target: journey flows with linked tests[] entries (tests[].flow reference)
+      - action: emits
+        actor: agent
         id: s2
         target: Playwright .spec.ts skeletons per journey under tests/auto-generated/e2e/
-      - action: agent preserves
+      - action: preserves
+        actor: agent
         id: s3
         target: existing Vitest generation for non-journey tests
   - id: help-docs-composed
     name: Compose help docs from user content
     steps:
-      - action: agent composes
+      - action: composes
+        actor: agent
         id: s1
-        target: feature pages in help docs from summary, intent, and public journey guides
-      - action: agent retains
+        target: feature pages in help docs from summary, intent, and journey guides
+      - action: retains
+        actor: agent
         id: s2
         target: subtraction filter for non-feature (system-level) help pages only
-      - action: agent deprecates
+      - action: deprecates
+        actor: agent
         id: s3
         target: subtraction path for feature pages, kept functional for one transition cycle
 contracts:
@@ -212,9 +229,9 @@ decisions:
       becomes the default for features.
     status: accepted
 implementation:
-  primary: ""
-  test_code: ""
-  test_code_status: none
+  primary: src/generators/userDocs.ts
+  test_code: tests/userDocs.test.ts
+  test_code_status: generated
 see_also:
   - usm/gen-docs-split
   - usm/gen-testspecs
