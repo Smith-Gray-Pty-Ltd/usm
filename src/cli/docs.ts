@@ -794,9 +794,9 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
   // ── 1. Getting Started ──────────────────────────────────────────────────────
   const gettingStarted: SidebarItem[] = [];
   pushItem("Home", "/", gettingStarted);
-  if (docExists("getting-started")) {
-    pushItem("Getting Started", "/getting-started", gettingStarted);
-  }
+  // The group is titled "Getting Started" — a same-named item inside it is
+  // redundant (repeated nav text). The page itself is linked from the
+  // homepage hero; group-name-as-page-title suffices.
   if (audience === "developer" && docExists("agent-setup-guide")) {
     pushItem("Agent Setup Guide", "/agent-setup-guide", gettingStarted);
   }
