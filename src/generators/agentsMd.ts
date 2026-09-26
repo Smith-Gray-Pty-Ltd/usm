@@ -1,6 +1,6 @@
 import type { ServiceUsm, SystemUsm, GenerationResult } from "../types.js";
 import fs from "node:fs";
-import { generateFeedbackProtocol } from "./rulesFiles.js";
+import { generateFeedbackProtocol, USM_UPSTREAM_TRACKER } from "./rulesFiles.js";
 
 // ─── Smart Merge ────────────────────────────────────────────────────────────
 
@@ -263,6 +263,20 @@ export function generateRootAgentsMd(
   lines.push("3. **Conventional commits**: `feat(scope): description`, `fix(scope): description`.");
   lines.push("4. **Never stop a running dev server.**");
   lines.push("5. **Never commit without passing lint AND typecheck.**");
+  lines.push("");
+
+  // USM reference — where authoritative USM docs live (same for every
+  // consumer; zero dogfood). Agents in consumer repos otherwise have no
+  // pointer to USM's reference site and guess at URLs.
+  lines.push("## USM Reference");
+  lines.push("");
+  lines.push("This repo's `.usm/` files are the source of truth for THIS system. For questions about the USM tool itself:");
+  lines.push("");
+  lines.push("- **Spec context for this repo**: use MCP tools first (`usm_list`, `usm_read`, `usm_search`, `usm_query`) — do not guess file paths");
+  lines.push("- **Tool reference** (CLI commands, MCP tools, schema): <https://docs.usm.dev>");
+  lines.push("- **User docs / getting started**: <https://usm.dev>");
+  lines.push("- **Schema**: <https://usm.dev/schema/v1.json>");
+  lines.push(`- **Bugs in the USM tool itself**: ${USM_UPSTREAM_TRACKER} (not this repo's tracker)`);
   lines.push("");
 
   // USM Spec-First Workflow — teaches agents how to use USM in this project

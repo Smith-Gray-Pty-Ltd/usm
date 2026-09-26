@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-agentsmd
 $type: feature
 $version: 1
-$last_updated: "2026-09-24"
+$last_updated: "2026-09-26"
 summary: >-
   AGENTS.md generator — produces AI agent context files with USM-augmented system descriptions,
   smart-merged with existing hand-written content.
@@ -34,6 +34,20 @@ contracts:
       - Content outside markers preserved exactly
       - If no markers exist, insert after first H1 heading
       - "Repeated runs are byte-identical — no trailing-newline accumulation (issue #32)"
+  - id: agents-md-reference-pointer
+    description: >-
+      AGENTS.md includes a compact USM reference block so agents in consumer repos know where
+      authoritative USM documentation lives — without injecting dogfood content into the repo's own
+      docs.
+    must_have:
+      - >-
+        USM section lists: docs.usm.dev (tool reference), usm.dev (user docs), schema URL, and the
+        upstream tracker
+      - >-
+        Instructs agents to prefer MCP tools (usm_list/usm_read/usm_search) for spec context, USM
+        site for tool reference
+      - Zero repo-specific dogfood content in the block — same links for every consumer
+      - Idempotent and marker-preserved like the rest of the generated section
 tests:
   - id: agents-md-with-markers
     setup:
