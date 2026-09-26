@@ -43,7 +43,16 @@ describe("generate markdown", () => {
     const content = result.outputs[0].content;
     expect(content).toContain("Universal System Map");
     expect(content).toContain("fully generated");
-    expect(content).toContain("Getting Started");
+    // Home link is conditional on the target page existing in the target
+    // tree (consumer repos without docs-source/ get 'Browse the sidebar'
+    // instead — dead home links were the first thing new users clicked).
+    // /tmp/test-root has no generated getting-started.md, so either form
+    // is valid depending on what generate() has laid down; both must be
+    // free of the dead link.
+    expect(
+      content.includes("Getting Started") || content.includes("Browse the sidebar →"),
+    ).toBe(true);
+    expect(content).not.toMatch(/\[Getting Started\]\(\/getting-started\)(?!.*(?:getting-started\.md|getting-started\/index\.md))/);
   });
 
   it.skipIf(!HAS_USM_SCOPE)("generates markdown for the real cli.usm", () => {
