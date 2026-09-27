@@ -317,7 +317,7 @@ roadmap:
   - id: help-reference-expansion
     title: Help docs reference expansion
     description: "CLI reference, usage examples, options, and prerequisites rendered in help docs from spec data"
-    status: in-progress
+    status: shipped
     feature: usm/gen-help-reference
     shipped_in: "0.8.2"
   - id: agent-authoring-tools
@@ -339,8 +339,9 @@ roadmap:
   - id: user-docs-composition
     title: User docs composed from personas and journeys
     description: "Personas and journey flows (actor/surface) as first-class spec data; user guides and Playwright e2e skeletons generated from the same journeys; help docs for feature pages composed instead of filtered"
-    status: planned
+    status: shipped
     feature: usm/gen-user-docs
+    shipped_in: "0.9.0"
   - id: help-docs-filter-deprecation
     title: Deprecate subtraction-based help docs for feature pages
     description: "Feature pages in --audience help switch to composed content; subtraction filter retained for system-level pages during one transition cycle"
