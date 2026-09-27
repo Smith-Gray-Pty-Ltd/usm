@@ -605,7 +605,14 @@ program
       // ── --check: report only, exit non-zero if stale ─────────────────────
       if (options.check) {
         if (report.stale || report.recommendedMissing.length > 0) {
-          console.log(info("Run 'usm upgrade' to set up missing capabilities."));
+          // Actionable for the never-aligned case (#46): absent usm_version
+          // reads as permanently stale unless the consumer knows --apply is
+          // the opt-in act.
+          if (report.projectVersion === "0.0.0") {
+            console.log(info("Project never aligned with USM — run 'usm upgrade --apply' to record alignment (then 'usm generate')."));
+          } else {
+            console.log(info("Run 'usm upgrade --apply' to set up missing capabilities and align, or 'usm upgrade' interactively."));
+          }
           process.exit(1);
         }
         return;
@@ -618,8 +625,16 @@ program
         for (const a of result.applied) console.log(ok(`${a.id}: ${a.message}`));
         for (const f of result.failed) console.error(fail(`${f.id}: ${f.message}`));
         if (result.versionBumped) {
-          console.log(`\n${ok(`Project version bumped to ${metric(report.installedVersion)}.`)}`);
-          console.log(info("Run 'usm generate' to refresh rules files and docs."));
+          if (result.applied.length > 0) {
+            console.log(`\n${ok(`Project version bumped to ${metric(report.installedVersion)}.`)}`);
+            console.log(info("Run 'usm generate' to refresh rules files and docs."));
+          } else {
+            // Already-aligned stamp (issue #46): capabilities were all
+            // configured; --apply recorded alignment. Say so explicitly.
+            console.log(`\n${ok(`All capabilities already configured — project aligned at USM ${metric(report.installedVersion)}.`)}`);
+          }
+        } else if (result.failed.length > 0) {
+          console.error(fail("No changes applied — usm_version left untouched."));
         }
         process.exit(result.failed.length > 0 ? 1 : 0);
       }

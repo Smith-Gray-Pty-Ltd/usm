@@ -169,6 +169,12 @@ export async function applyUpgrade(
   let toApply: CapabilityStatus[];
   if (targets.length > 0) {
     toApply = report.missing.filter((s) => targets.includes(s.capability.id));
+    // An explicit target that matches nothing is a usage error — record it
+    // so the CLI can fail loudly instead of "succeeding" with no changes.
+    const unknownTargets = targets.filter((t) => !report.missing.some((s) => s.capability.id === t));
+    if (unknownTargets.length > 0) {
+      return { applied: [], failed: unknownTargets.map((t) => ({ id: t, message: `capability '${t}' not found or already configured` })), versionBumped: false, systemPath };
+    }
   } else {
     toApply = report.recommendedMissing;
   }
@@ -185,9 +191,13 @@ export async function applyUpgrade(
     }
   }
 
-  // Bump version if anything was applied
+  // Bump version if anything was applied, or if there was nothing left to
+  // set up — a project whose capabilities are all already configured IS
+  // aligned; --apply records that alignment instead of silently exiting 0
+  // with usm_version still absent (issue #46). Failures without applied
+  // setups still leave the version untouched.
   let versionBumped = false;
-  if (applied.length > 0) {
+  if (applied.length > 0 || (failed.length === 0 && toApply.length === 0)) {
     versionBumped = bumpVersion(systemPath, installed);
   }
 

@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/upgrade
 $type: feature
 $version: 1
-$last_updated: "2026-07-16"
+$last_updated: "2026-09-27"
 status: built
 summary: >-
   usm upgrade — detect stale USM projects and guide users through adopting new optional capabilities
@@ -132,34 +132,48 @@ flows:
         action: suggest
         target: run 'usm generate' to refresh rules files and docs with the new capabilities
 contracts:
-  - id: version-compared
-    description: >-
+  - description: >-
       Upgrade reads the installed package.json version and system.usm.version and reports stale or
       up-to-date.
+    id: version-compared
     must_have:
       - Installed version resolved from the USM package.json (not the project's)
       - Absent system.usm.version treated as 0.0.0 (stale)
       - Stale vs up-to-date clearly reported
-  - id: capabilities-detected
-    description: >-
+      - >-
+        --check message for a never-aligned project is actionable: names 'usm upgrade --apply' as
+        the opt-in act (issue #46)
+  - description: >-
       Every registry capability is checked; missing and recommended ones are reported with a setup
       hint.
+    id: capabilities-detected
     must_have:
       - All registry entries run through detect()
       - Missing recommended capabilities surfaced prominently
       - Each missing capability shows its setup hint
-  - id: setup-non-destructive
-    description: Setup never overwrites an existing block.
+  - description: Setup never overwrites an existing block.
+    id: setup-non-destructive
     must_have:
       - detect() returns true → capability skipped entirely
       - No existing config field is overwritten
-  - id: version-bumped-on-completion
-    description: After a successful apply, system.usm.version is set to the installed version.
+  - description: >-
+      After a successful apply, system.usm.usm_version is set to the installed version — including
+      the already-aligned case (issue #46).
+    id: version-bumped-on-completion
     must_have:
-      - version field written only after setup succeeds
+      - usm_version field written only after setup succeeds
       - Resulting system.usm validates against the schema
-  - id: non-interactive-safe
-    description: Non-interactive modes work without prompts and are CI-safe.
+      - >-
+        --apply with nothing left to set up (capabilities already configured) still stamps
+        usm_version when stale — recording alignment, not silently doing nothing
+      - >-
+        Requested targets that fail to apply exit non-zero in every path (explicit-targets and
+        recommended-missing alike)
+      - >-
+        The already-aligned stamp is reported ('aligned at <version>') so the change is visible, not
+        silent
+  - description: Non-interactive modes work without prompts and are CI-safe.
+    id: non-interactive-safe
     must_have:
       - "--apply runs all recommended missing capabilities with defaults, no prompts"
       - "--check reports only and exits non-zero if stale"
