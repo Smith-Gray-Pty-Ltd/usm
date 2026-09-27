@@ -1,5 +1,151 @@
 # Changelog
 
+## 0.9.0
+
+### Minor Changes
+
+- 5afe7c4: **feat: configurable output paths; reference docs hardened with tests**
+
+  Completes `usm/cli-config-outputs` and `usm/gen-roadmap`:
+
+  - Output locations (docs, help-docs, togaf, archimate, openapi, tests)
+    are now configurable via `usmconfig.json` `outputs` section — all
+    generators route through `outDir()`/`outPath()`; defaults unchanged
+    (`.usm-workspace/…`)
+  - Reference pages (CLI, MCP, config, schema) covered by contract tests
+    generated from this repo's own specs and JSON schemas
+  - Roadmap generation covered by tests: non-empty generation, feature
+    links, sidebar dead-link + case guards, mermaid boot script
+
+  Completes `usm/gen-help-reference` contract tests as well.
+  383 tests passing across 21 files.
+
+- 1dddf98: **feat: personas, journey flows, composed user docs, e2e skeletons**
+
+  Restores the founding vision — user documentation COMPOSED from spec data
+  (never filtered from developer content):
+
+  - Schema: `personas[]` on system.usm (id, name, description); `actor` +
+    `surface` on flows and steps. Flows referencing a persona are journeys;
+    flows without an actor stay pipelines (developer stream, byte-identical
+    output for existing projects)
+  - New generator: per-persona guide pages + per-journey guides — persona
+    steps render as instructions, system/agent steps as "the system will …"
+  - E2E: journey flows with linked `tests[].flow` emit Playwright skeletons
+    under `tests/auto-generated/e2e/` (collision-free, exact-$id paths);
+    tests without a flow reference continue as Vitest-only
+  - Cross-file validation: a flow actor that references an undeclared
+    persona is a hard error in `usm generate` (typo protection — a typo'd
+    persona would silently drop the journey)
+  - Help docs: feature pages embed composed "Step-by-step guides" sections;
+    the subtraction filter remains authoritative for system-level pages.
+    Projects with zero personas get byte-identical help output
+  - USM dogfoods: personas + annotated flows in its own spec; the
+    gen-user-docs spec's flows carry actor/surface
+  - fix(mcp): validate.ts cache-busts the schema on file mtime/size —
+    long-running MCP servers previously validated against a snapshot from
+    before an upgrade until manually restarted
+
+  396 tests passing across 22 files (13 new acceptance tests covering the
+  spec's six contract blocks).
+
+### Patch Changes
+
+- 5e7eb3f: **fix(docs): freshness, dead links, and concurrent serve — the 404 class**
+
+  Agents reported changes as applied while served sites 404ed. Three root
+  causes, all fixed:
+
+  - **Watch regeneration was partial**: it ran `generate --only docs`,
+    leaving the sidebar (config.mts) and the help-docs tree stale — the
+    agent saw "Regenerated docs (1 file changed)" while nav links 404ed.
+    Watch now runs full generate (both streams) and refreshes config.mts
+    for both trees, write-on-change (idempotent; VitePress reloads nav
+    exactly when it changed).
+  - **`generate --only help-docs` deleted `.vitepress/` mid-serve**: the
+    tree rebuild rmSync'd config.mts out from under a running help server —
+    the single biggest 404 generator. `.vitepress/` is now preserved across
+    the rebuild, and the filter refreshes config at the end.
+  - **Concurrent startups raced the bind**: two servers probing 5173
+    simultaneously — first binds, second dies (strictPort). Auto-port mode
+    now retries with a fresh probe (3 attempts) on bind failure; explicit
+    `--port` stays strict.
+
+  Also: sidebar has a dedup + dead-link guard (zero repeated links, zero
+  links to non-existent files), user-docs guides are wired into both sites'
+  sidebars ("Guides" group, nested per persona), per-service risks pages no
+  longer link to a `/risks` page that does not exist (system.usm without
+  risks), and help feature pages no longer leak the Given/Then test DSL
+  (`Guarantees`/`Test specifications` stripped for help audience).
+
+  Verified: full link crawl of both trees — 152 dev + 81 help pages, **0
+  dead links, 0 duplicate nav items**; concurrent serve self-organized to
+  distinct ports (5177/5176), both HTTP 200, surviving a help-docs
+  regeneration mid-serve.
+
+- 5ffa8b4: **fix(docs): link discipline, audience model polish, agents reference**
+
+  Post-audit hardening of the docs pipeline:
+
+  - Sidebar: dropped the redundant "Getting Started" item inside the
+    "Getting Started" group; dedup + dead-link guards on every push
+  - Dead links in page _content_: full-link discipline — relative,
+    `.md`-suffixed, and absolute links all resolve; help-roadmap links to
+    excluded pages strip; guides index links are absolute and
+    extension-less (the /guides/guides/… doubling cannot recur)
+  - Guides copy runs at generate time (both trees fresh between serves);
+    bind-race retry proven live (concurrent servers self-organize ports)
+  - AGENTS.md: USM Reference block (docs.usm.dev / dev-docs.usm.dev /
+    schema / upstream) with correct site labels; consumer repos get zero
+    dogfood content and zero dead home links
+  - CLI reference: `--port` documented as auto-port default (explicit
+    strict); guide prose grammar (third-person system steps, em-dash
+    separators); feature display names resolve via system.usm index
+  - gen-user-docs spec/roadmap bookkeeping: status, index entry, prose fixes
+
+- 0604694: **fix(docs): help docs = user journey only (audience model)**
+
+  Confirmed audience model: help docs serve USM adopters and downstream end
+  users (the user journey); developer docs serve contributors with full
+  detail. Help now excludes contributor-facing content:
+
+  - code-navigator, orphan-files, spec-coverage → developer docs only
+  - entire design/ architecture section → developer docs only (sidebar
+    group and files)
+  - help keeps: getting-started, agent setup, CLI/MCP/schema/config
+    references, roadmap (with shipped_in), language-support, feedback,
+    and the composed persona guides
+
+  Recorded as decision `docs-audience-model` + contract
+  `help-docs-user-journey-only` on usm/gen-docs-split. Help tree: 81 → 68
+  files, sidebar now Getting Started → Guides → Project Management →
+  Features → CLI → Developers → Help. Link crawl: 0 dead, 0 dup both sites.
+
+- 0be48e9: **fix(docs): default to auto-port selection; strict explicit ports**
+
+  Many USM projects run docs servers concurrently on one machine, and port
+  clashes were the real pain: VitePress silently escalated to port+1 when
+  its bind raced the pre-flight check, so the announced URL served the
+  WRONG project's docs (agents then verified the wrong server).
+
+  - Omitting `--port` now auto-selects the next free port from 5173
+    (auto-port is the default; `--auto-port` flag removed)
+  - Explicit `--port N` is strict: fails loudly if taken
+  - VitePress always runs with `--strictPort`: announced URL == bound URL
+  - Port probe checks BOTH `::1` and `127.0.0.1` — VitePress binds
+    localhost (`::1` on macOS), invisible to a 127.0.0.1-only probe;
+    a wildcard-`::` probe passes even when `::1` is taken
+  - "already served" message reads the bound port from the port file,
+    not the requested one
+
+- 0be48e9: **docs: roadmap and feature status reconciliation**
+
+  Corrected drift between shipped reality and spec/roadmap state:
+  `usm/cli-docs` and `usm/gen-feature-review` marked built (shipped in
+  0.1.0), `usm/mkt-language-tabs` set in-progress, and missing roadmap
+  entries added for in-flight `usm/cli-config-outputs` and
+  `usm/gen-help-reference`.
+
 ## 0.8.1
 
 ### Patch Changes
