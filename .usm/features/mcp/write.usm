@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/mcp-write
 $type: feature
 $version: 1
-$last_updated: "2026-09-24"
+$last_updated: "2026-09-27"
 status: built
 summary: >
   MCP write tools — let agents author and update .usm feature specs as part of the spec-first
@@ -57,71 +57,83 @@ decisions:
       the system
     status: accepted
 flows:
-  - id: draft-feature-from-discussion
-    name: Draft a feature spec from human discussion
-    description: |
-      Agent and human discuss a feature in chat. Agent calls draft_feature with
-      structured fields derived from the discussion. Tool validates, generates
-      YAML + markdown preview. Agent shows markdown to human for review.
+  - description: >-
+      The spec-first loop the write tools exist for: the human and agent discuss a feature, the
+      agent drafts and shows the markdown, and the human reviews before anything is written.
+    id: draft-feature-from-discussion
+    name: Draft and approve a feature spec
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: receive
         target: structured feature fields (summary, intent, flows, contracts, tests)
-      - id: s2
+      - actor: agent
+        id: s2
         action: validate
         target: fields against v1 JSON schema
-      - id: s3
+      - actor: agent
+        id: s3
         action: generate
         target: YAML string and markdown preview
-      - id: s4
+      - actor: agent
+        id: s4
         action: return
         target: structured response with yaml, markdown, validation_status
-      - id: s5
-        action: observe
-        target: agent shows markdown to human, human approves or requests changes
-      - id: s6
+      - actor: spec-author
+        id: s5
+        action: review
+        surface: chat
+        target: the markdown preview the agent shows — approve or request changes
+      - actor: agent
+        id: s6
         action: write
         target: if approved, agent calls write_feature to persist the .usm file
   - id: update-feature-status
-    name: Update feature status after implementation
-    description: |
-      After the agent implements the feature in code, it updates the .usm file
-      to reflect the new status and implementation paths.
+    name: Update status pipeline
+    description: "System pipeline behind update_feature_status: transition enforcement and atomic persistence."
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: get
         target: feature $id or file path
-      - id: s2
+      - actor: agent
+        id: s2
         action: update
         target: status field (e.g., planned → built)
-      - id: s3
+      - actor: agent
+        id: s3
         action: update
         target: implementation.primary with code file path
-      - id: s4
+      - actor: agent
+        id: s4
         action: update
         target: implementation.test_code and test_code_status if tests written
-      - id: s5
+      - actor: agent
+        id: s5
         action: validate
         target: updated file against schema
-      - id: s6
+      - actor: agent
+        id: s6
         action: write
         target: persisted .usm file with $last_updated bumped
   - id: update-feature-fields
-    name: Update arbitrary fields on an existing feature
-    description: |
-      Agent partially updates a feature spec — e.g., adding a flow, revising a
-      contract, or updating tests based on what was actually built.
+    name: Update fields pipeline
+    description: "System pipeline behind update_feature: merge provided fields, validate, persist."
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: get
         target: feature $id or file path
-      - id: s2
+      - actor: agent
+        id: s2
         action: merge
         target: provided fields into existing feature object
-      - id: s3
+      - actor: agent
+        id: s3
         action: validate
         target: merged result against schema
-      - id: s4
+      - actor: agent
+        id: s4
         action: write
         target: persisted .usm file if valid, error if not
 contracts:

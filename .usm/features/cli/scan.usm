@@ -2,94 +2,144 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-scan
 $type: feature
 $version: 1
-$last_updated: "2026-06-19"
-summary: The usm scan command reads usmconfig.json, scans the codebase, and generates .usm files for services, packages, data, and features.
-
+$last_updated: "2026-09-27"
+summary: >-
+  The usm scan command reads usmconfig.json, scans the codebase, and generates .usm files for
+  services, packages, data, and features.
 $system: usm/system
 $service: usm/cli
 command: scan
-intent: |
-  After init creates the config, scan detects the actual structure — services from package.json, routes from app/ directories, data from Prisma schemas — and writes .usm files. Smart-merge preserves human edits on re-scan.
-
+intent: >
+  After init creates the config, scan detects the actual structure — services from package.json,
+  routes from app/ directories, data from Prisma schemas — and writes .usm files. Smart-merge
+  preserves human edits on re-scan.
 flows:
   - id: run-scan
-    name: Run usm scan
-    description: User runs usm scan to generate .usm files from the codebase
+    name: Scan pipeline (codebase detection)
+    description: >-
+      System pipeline behind usm scan: read config, detect structure, write and smart-merge .usm
+      files.
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: get
         target: usmconfig.json
         expect:
           - valid: true
-      - id: s2
+      - actor: agent
+        id: s2
         action: parse
         target: package.json in matched service directories
-      - id: s3
+      - actor: agent
+        id: s3
         action: parse
         target: app/*/app directories for Next.js routes
-      - id: s4
+      - actor: agent
+        id: s4
         action: generate
         target: .usm/services/*.usm, .usm/features/*.usm, .usm/data/*.usm
-      - id: s5
+      - actor: agent
+        id: s5
         action: update
         target: .usm/system.usm index with new findings
-
+  - id: first-scan
+    name: Generate specs from the codebase
+    description: >-
+      First scan: an adopter runs usm scan after init and gets .usm files for every detected
+      service, route, and data source.
+    steps:
+      - actor: adopter
+        id: s1
+        action: run
+        surface: cli
+        target: usm scan in the repo root after init created usmconfig.json
+      - actor: adopter
+        id: s2
+        action: review
+        surface: cli
+        target: console output — services, routes, and data sources matched against expectations
+      - actor: adopter
+        id: s3
+        action: inspect
+        surface: spec
+        target: generated .usm files in .usm/ for gaps or wrong detections
+  - id: re-scan-after-edits
+    name: Re-scan after enriching specs
+    description: >-
+      A spec author re-runs usm scan after editing .usm files and confirms smart-merge kept their
+      work.
+    steps:
+      - actor: spec-author
+        id: s1
+        action: edit
+        surface: spec
+        target: summaries, intent, decisions, contracts in .usm files
+      - actor: spec-author
+        id: s2
+        action: run
+        surface: cli
+        target: usm scan again
+      - actor: spec-author
+        id: s3
+        action: verify
+        surface: spec
+        target: >-
+          human-edited fields survived the merge; only mechanical fields ($last_updated, paths)
+          changed
 contracts:
   - id: scan-preserves-edits
-    description: Smart-merge preserves human-edited fields (summary, intent, decisions, flows, contracts, tests) on re-scan
+    description: >-
+      Smart-merge preserves human-edited fields (summary, intent, decisions, flows, contracts,
+      tests) on re-scan
     must_have:
-      - "PRESERVE_FIELDS are kept if non-default"
-      - "UPDATE_FIELDS ($last_updated, paths, port, depends_on) are overwritten"
+      - PRESERVE_FIELDS are kept if non-default
+      - UPDATE_FIELDS ($last_updated, paths, port, depends_on) are overwritten
       - "--force bypasses merge"
-
 tests:
-  - id: scan-creates-files
-    setup:
-      config_exists: true
-    expect:
+  - expect:
       - assertion: .usm/services/*.usm files created for each matched app
       - assertion: .usm/features/*.usm files created from route extraction
-  - id: scan-smart-merge
+    flow: first-scan
+    id: scan-creates-files
     setup:
-      existing_usm_with_human_edits: true
-    expect:
+      config_exists: true
+  - expect:
       - assertion: human-edited summary preserved
       - assertion: mechanical fields like $last_updated updated
-
+    flow: re-scan-after-edits
+    id: scan-smart-merge
+    setup:
+      existing_usm_with_human_edits: true
 usage:
-  - command: "usm scan"
-    description: "Scan with defaults (smart merge)"
-  - command: "usm scan --force"
-    description: "Overwrite all existing .usm files"
-  - command: "usm scan --routes"
-    description: "Only extract routes, skip service/package detection"
-  - command: "usm scan --merge overwrite"
-    description: "Overwrite mechanical fields, preserve human edits"
-
+  - command: usm scan
+    description: Scan with defaults (smart merge)
+  - command: usm scan --force
+    description: Overwrite all existing .usm files
+  - command: usm scan --routes
+    description: Only extract routes, skip service/package detection
+  - command: usm scan --merge overwrite
+    description: Overwrite mechanical fields, preserve human edits
 options:
   - flag: "--root <root>"
-    description: "Repo root directory"
-    default: "."
+    description: Repo root directory
+    default: .
   - flag: "--config <path>"
-    description: "Path to usmconfig.json"
-    default: "usmconfig.json"
+    description: Path to usmconfig.json
+    default: usmconfig.json
   - flag: "--force"
-    description: "Overwrite existing .usm files (bypasses merge)"
+    description: Overwrite existing .usm files (bypasses merge)
     default: "false"
   - flag: "--routes"
-    description: "Only extract routes (skip service/package/data detection)"
+    description: Only extract routes (skip service/package/data detection)
     default: "false"
   - flag: "--merge <strategy>"
     description: "Merge strategy: smart, skip, or overwrite"
-    default: "smart"
-
+    default: smart
 prerequisites:
-  - "Run 'usm init' first to create usmconfig.json"
-
+  - Run 'usm init' first to create usmconfig.json
 implementation:
   primary: src/scan/structural.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/cli-init"
+  - usm/cli-init

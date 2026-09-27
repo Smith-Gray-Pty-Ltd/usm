@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-docs
 $type: feature
 $version: 1
-$last_updated: "2026-09-26"
+$last_updated: "2026-09-27"
 status: built
 summary: >
   usm docs serve and usm docs build — serves generated docs locally via VitePress dev server with
@@ -77,103 +77,146 @@ decisions:
     status: accepted
 flows:
   - id: docs-serve
-    name: Start docs dev server
-    description: |
-      User runs usm docs serve. USM generates markdown from .usm files into
-      docs/, generates VitePress config (sidebar, nav) from system.usm index,
-      starts VitePress dev server with hot reload. When .usm files change,
-      affected markdown regenerates and VitePress HMR updates the browser.
+    name: Docs serve pipeline
+    description: "System pipeline behind usm docs serve: generate docs, config, and watch for spec changes."
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: check
-        target: VitePress installed in project (optional peer dep)
         expect:
           - installed: true
-      - id: s2
+        target: VitePress installed in project (optional peer dep)
+      - actor: agent
+        id: s2
         action: generate
         target: markdown docs from .usm files into docs/ directory (unified structure)
-      - id: s3
+      - actor: agent
+        id: s3
         action: generate
         target: .vitepress/config.ts with sidebar and nav from system.usm index
-      - id: s4
+      - actor: agent
+        id: s4
         action: start
         target: VitePress dev server (auto-port default; explicit --port strict)
-      - id: s5
+      - actor: agent
+        id: s5
         action: watch
         target: .usm/ directory for file changes
-      - id: s6
+      - actor: agent
+        id: s6
         action: regenerate
         target: affected markdown when .usm file changes
-      - id: s7
+      - actor: agent
+        id: s7
         action: observe
         target: VitePress HMR updates browser automatically
   - id: docs-build
-    name: Build static docs site
-    description: |
-      User runs usm docs build. USM generates markdown + VitePress config,
-      then runs vitepress build to produce a static site in docs/.vitepress/dist/
-      ready for Cloudflare Pages or any static host.
+    name: Docs build pipeline
+    description: "System pipeline behind usm docs build: generate then produce a deployable static site."
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: generate
         target: markdown docs from .usm files into docs/ directory
-      - id: s2
+      - actor: agent
+        id: s2
         action: generate
         target: .vitepress/config.ts with sidebar and nav
-      - id: s3
+      - actor: agent
+        id: s3
         action: build
         target: vitepress build docs/ → static HTML in docs/.vitepress/dist/
-      - id: s4
+      - actor: agent
+        id: s4
         action: observe
         target: output directory ready for deployment
   - id: generate-vitepress-config
-    name: Generate VitePress sidebar and nav config
-    description: |
-      Generate .vitepress/config.ts from system.usm index and feature directory
-      structure. Sidebar groups mirror .usm/features/ subdirectories. Feature
-      status shown as badge in nav. Services listed from system.usm services[].
+    name: VitePress config pipeline
+    description: >-
+      System pipeline: generate .vitepress/config.ts from system.usm index and feature directory
+      structure.
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: parse
         target: system.usm for identity, services[], index[]
-      - id: s2
+      - actor: agent
+        id: s2
         action: scan
         target: .usm/features/ subdirectories for grouping (cli, generators, mcp, schema)
-      - id: s3
+      - actor: agent
+        id: s3
         action: map
         target: each index entry to a sidebar item with link, label, status badge
-      - id: s4
+      - actor: agent
+        id: s4
         action: generate
         target: .vitepress/config.ts with sidebar tree, nav bar, theme config
-      - id: s5
+      - actor: agent
+        id: s5
         action: write
         target: docs/.vitepress/config.ts
   - id: unified-output-structure
-    name: Generate docs into unified docs/ directory
-    description: |
-      The generate command writes all output to a single docs/ directory with
-      a clear hierarchy: services/, features/<area>/, architecture/, cross-cutting
-      (risks, roadmap, decisions). This replaces the current scattered output
-      across .agents-workspace/docs/ and apps/*/.agents-workspace/docs/.
+    name: Unified docs output pipeline
+    description: >-
+      System pipeline: write all generated docs into a single docs/ directory with a clear
+      hierarchy.
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: generate
         target: docs/index.md from system.usm (overview, stats, principles)
-      - id: s2
+      - actor: agent
+        id: s2
         action: generate
         target: docs/services/<service>.md from each service .usm
-      - id: s3
+      - actor: agent
+        id: s3
         action: generate
         target: docs/features/<area>/<feature>.md from each feature .usm
-      - id: s4
+      - actor: agent
+        id: s4
         action: generate
         target: docs/architecture/ (diagrams, data models, dependencies)
-      - id: s5
+      - actor: agent
+        id: s5
         action: generate
         target: docs/risks.md, docs/roadmap.md, docs/decisions/ from system.usm
-      - id: s6
+      - actor: agent
+        id: s6
         action: generate
         target: docs/api/openapi.yaml from features with routes
+  - description: >-
+      The spec-first review loop: a spec author starts the dev server, edits specs, and sees changes
+      render live within a second.
+    id: review-specs-live
+    name: Review specs in the live preview
+    steps:
+      - actor: spec-author
+        id: s1
+        action: run
+        surface: cli
+        target: usm docs serve and note the announced URL
+      - actor: spec-author
+        id: s2
+        action: review
+        surface: browser
+        target: feature pages with sidebar navigation and status badges
+      - actor: spec-author
+        id: s3
+        action: edit
+        surface: spec
+        target: a .usm file and save
+      - actor: spec-author
+        id: s4
+        action: verify
+        surface: browser
+        target: the change rendered within 1 second via hot reload — including composed guides and nav
+      - actor: spec-author
+        id: s5
+        action: build
+        surface: cli
+        target: usm docs build for deployment when review is done
 contracts:
   - id: serve-starts-on-configurable-port
     description: >-
@@ -251,64 +294,67 @@ contracts:
         dropped
       - "MCP write tools return docs_url/docs_path so agents return correct links (issue #34)"
 tests:
-  - id: serve-starts-and-accessible
-    setup:
-      vitepress_installed: true
-      usm_files_present: true
-    expect:
+  - expect:
       - assertion: server starts on port 5173
       - assertion: http://localhost:5173 returns rendered HTML
       - assertion: sidebar visible with feature list
-  - id: serve-custom-port
-    setup:
-      vitepress_installed: true
-      port_flag: "--port 3000"
-    expect:
-      - assertion: server starts on port 3000
-      - assertion: console output shows correct URL
-  - id: sidebar-reflects-all-features
-    setup:
-      system_usm_with_27_features: true
-    expect:
-      - assertion: sidebar contains all 27 features from index
-      - assertion: features grouped by directory (cli, generators, mcp, schema)
-      - assertion: planned features show badge
-  - id: hot-reload-on-edit
-    setup:
-      dev_server_running: true
-    expect:
-      - assertion: editing a .usm file triggers regeneration
-      - assertion: browser updates within 1 second
-      - assertion: only affected markdown file regenerated
-  - id: build-produces-static-site
+    flow: review-specs-live
+    id: serve-starts-and-accessible
     setup:
       vitepress_installed: true
       usm_files_present: true
-    expect:
+  - expect:
+      - assertion: server starts on port 3000
+      - assertion: console output shows correct URL
+    id: serve-custom-port
+    setup:
+      vitepress_installed: true
+      port_flag: "--port 3000"
+  - expect:
+      - assertion: sidebar contains all 27 features from index
+      - assertion: features grouped by directory (cli, generators, mcp, schema)
+      - assertion: planned features show badge
+    id: sidebar-reflects-all-features
+    setup:
+      system_usm_with_27_features: true
+  - expect:
+      - assertion: editing a .usm file triggers regeneration
+      - assertion: browser updates within 1 second
+      - assertion: only affected markdown file regenerated
+    flow: review-specs-live
+    id: hot-reload-on-edit
+    setup:
+      dev_server_running: true
+  - expect:
       - assertion: docs/.vitepress/dist/ directory created
       - assertion: index.html present
       - assertion: all pages rendered as static HTML
-  - id: vitepress-missing-error
+    flow: review-specs-live
+    id: build-produces-static-site
     setup:
-      vitepress_not_installed: true
-    expect:
+      vitepress_installed: true
+      usm_files_present: true
+  - expect:
       - assertion: clear error message about missing VitePress
       - assertion: install command shown in output
       - assertion: exit code 1
-  - id: unified-structure-paths
+    id: vitepress-missing-error
     setup:
-      generate_run: true
-    expect:
+      vitepress_not_installed: true
+  - expect:
       - assertion: docs/services/cli.md exists
       - assertion: docs/features/mcp/write.md exists
       - assertion: docs/features/generators/feature-review.md exists
       - assertion: no files in apps/*/.agents-workspace/docs/
-  - id: sidebar-includes-index-bearing-areas
+    id: unified-structure-paths
     setup:
-      feature_area_with_index_md: true
-    expect:
+      generate_run: true
+  - expect:
       - assertion: each feature page in the area appears in the sidebar
       - assertion: the area index is still reachable
+    id: sidebar-includes-index-bearing-areas
+    setup:
+      feature_area_with_index_md: true
 usage:
   - command: usm docs serve
     description: Start VitePress dev server with live reload
@@ -321,7 +367,7 @@ usage:
 options:
   - flag: "--port <port>"
     description: "Dev server port (strict: fails if taken)"
-    default: "auto — next free port from 5173"
+    default: auto — next free port from 5173
   - flag: "--audience <audience>"
     description: "Audience: developer (full) or help (public, filtered)"
     default: developer

@@ -3,208 +3,310 @@ $id: usm/system
 $type: system
 $version: 1
 $last_updated: "2026-06-23"
-version: "0.1.0"
-summary: |
-  Universal System Map — a structured source of truth for agentic systems. A single .usm/ directory describes apps, services, features, flows, contracts, and decisions in YAML validated by a JSON Schema, and generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md, and Vitest specs.
-
+version: 0.1.0
+summary: >
+  Universal System Map — a structured source of truth for agentic systems. A single .usm/ directory
+  describes apps, services, features, flows, contracts, and decisions in YAML validated by a JSON
+  Schema, and generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md, and Vitest specs.
 identity:
   name: USM
   domain: usm.dev
   contact: james@smith-gray.com
   repository: https://github.com/Smith-Gray-Pty-Ltd/usm
-
 index:
   - id: cli-init
     name: Init Command
     ref: .usm/features/cli/init.usm
     status: active
-    tags: [cli, config]
+    tags:
+      - cli
+      - config
   - id: cli-scan
     name: Scan Command
     ref: .usm/features/cli/scan.usm
     status: active
-    tags: [cli, scanner]
+    tags:
+      - cli
+      - scanner
   - id: cli-validate
     name: Validate Command
     ref: .usm/features/cli/validate.usm
     status: active
-    tags: [cli, schema]
+    tags:
+      - cli
+      - schema
   - id: cli-generate
     name: Generate Command
     ref: .usm/features/cli/generate.usm
     status: active
-    tags: [cli, docs]
+    tags:
+      - cli
+      - docs
   - id: cli-enrich
     name: Enrich Command
     ref: .usm/features/cli/enrich.usm
     status: active
-    tags: [cli, llm]
+    tags:
+      - cli
+      - llm
   - id: cli-scaffold
     name: Scaffold Command
     ref: .usm/features/cli/scaffold.usm
     status: active
-    tags: [cli, templates]
+    tags:
+      - cli
+      - templates
   - id: cli-scaffold-project
     name: Scaffold Project Command
     ref: .usm/features/cli/scaffold-project.usm
     status: active
-    tags: [cli, project-setup]
+    tags:
+      - cli
+      - project-setup
   - id: cli-docs
     name: Docs Serve & Build
     ref: .usm/features/cli/docs.usm
     status: planned
-    tags: [cli, docs, vitepress, dev-server]
+    tags:
+      - cli
+      - docs
+      - vitepress
+      - dev-server
   - id: gen-markdown
     name: Markdown Generator
     ref: .usm/features/generators/markdown.usm
     status: active
-    tags: [generator, docs]
+    tags:
+      - generator
+      - docs
   - id: gen-mermaid
     name: Mermaid Generator
     ref: .usm/features/generators/mermaid.usm
     status: active
-    tags: [generator, diagrams]
+    tags:
+      - generator
+      - diagrams
   - id: gen-openapi
     name: OpenAPI Generator
     ref: .usm/features/generators/openapi.usm
     status: active
-    tags: [generator, api]
+    tags:
+      - generator
+      - api
   - id: gen-archimate
     name: ArchiMate Generator
     ref: .usm/features/generators/archimate.usm
     status: active
-    tags: [generator, enterprise-arch]
+    tags:
+      - generator
+      - enterprise-arch
   - id: gen-togaf
     name: TOGAF Generator
     ref: .usm/features/generators/togaf.usm
     status: active
-    tags: [generator, enterprise-arch]
+    tags:
+      - generator
+      - enterprise-arch
   - id: gen-agentsmd
     name: AGENTS.md Generator
     ref: .usm/features/generators/agentsMd.usm
     status: active
-    tags: [generator, agent-context]
+    tags:
+      - generator
+      - agent-context
   - id: gen-testspecs
     name: Test Specs Generator
     ref: .usm/features/generators/testSpecs.usm
     status: active
-    tags: [generator, testing]
+    tags:
+      - generator
+      - testing
   - id: gen-feature-review
     name: Feature Review Markdown Generator
     ref: .usm/features/generators/feature-review.usm
     status: planned
-    tags: [generator, markdown, spec-first]
+    tags:
+      - generator
+      - markdown
+      - spec-first
   - id: gen-rules-files
     name: Rules Files Generator
     ref: .usm/features/generators/rules-files.usm
     status: built
-    tags: [generator, agent-rules, plugin]
+    tags:
+      - generator
+      - agent-rules
+      - plugin
   - id: gen-roadmap
     name: Roadmap Generator
     ref: .usm/features/generators/roadmap.usm
     status: in-progress
-    tags: [generator, roadmap, schema]
+    tags:
+      - generator
+      - roadmap
+      - schema
   - id: gen-user-docs
     name: User Docs Composition (Personas & Journeys)
     ref: .usm/features/generators/user-docs.usm
     status: in-progress
-    tags: [generator, personas, user-docs, e2e]
+    tags:
+      - generator
+      - personas
+      - user-docs
+      - e2e
   - id: gen-docs-split
     name: Docs Split (Help vs Developer)
     ref: .usm/features/generators/docs-split.usm
     status: built
-    tags: [generator, docs, audience]
+    tags:
+      - generator
+      - docs
+      - audience
   - id: gen-help-reference
     name: Help Docs Reference Expansion
     ref: .usm/features/generators/help-reference.usm
     status: built
-    tags: [generator, docs, reference, schema]
+    tags:
+      - generator
+      - docs
+      - reference
+      - schema
   - id: cli-config-outputs
     name: Configurable Outputs + Command Convention
     ref: .usm/features/cli/config-outputs.usm
     status: built
-    tags: [cli, config, commands]
+    tags:
+      - cli
+      - config
+      - commands
   - id: cli-multi-lang-scan
     name: Multi-Language Scanner Support
     ref: .usm/features/cli/multi-lang-scan.usm
     status: planned
-    tags: [cli, scanner, multi-language, python, go, rust]
+    tags:
+      - cli
+      - scanner
+      - multi-language
+      - python
+      - go
+      - rust
   - id: mkt-language-tabs
     name: Marketing Language Tabs
     ref: .usm/features/generators/mkt-language-tabs.usm
     status: planned
-    tags: [marketing, website, languages, tabs]
+    tags:
+      - marketing
+      - website
+      - languages
+      - tabs
   - id: mcp-list
     name: MCP List Tool
     ref: .usm/features/mcp/list.usm
     status: active
-    tags: [mcp, discovery]
+    tags:
+      - mcp
+      - discovery
   - id: mcp-read
     name: MCP Read Tool
     ref: .usm/features/mcp/read.usm
     status: active
-    tags: [mcp, data]
+    tags:
+      - mcp
+      - data
   - id: mcp-search
     name: MCP Search Tool
     ref: .usm/features/mcp/search.usm
     status: active
-    tags: [mcp, search]
+    tags:
+      - mcp
+      - search
   - id: mcp-validate
     name: MCP Validate Tool
     ref: .usm/features/mcp/validate.usm
     status: active
-    tags: [mcp, schema]
+    tags:
+      - mcp
+      - schema
   - id: mcp-contracts
     name: MCP Contracts Tool
     ref: .usm/features/mcp/contracts.usm
     status: active
-    tags: [mcp, contracts]
+    tags:
+      - mcp
+      - contracts
   - id: mcp-flows
     name: MCP Flows Tool
     ref: .usm/features/mcp/flows.usm
     status: active
-    tags: [mcp, flows]
+    tags:
+      - mcp
+      - flows
   - id: mcp-references
     name: MCP References Tool
     ref: .usm/features/mcp/references.usm
     status: active
-    tags: [mcp, impact-analysis]
+    tags:
+      - mcp
+      - impact-analysis
   - id: mcp-summary
     name: MCP Summary Tool
     ref: .usm/features/mcp/summary.usm
     status: active
-    tags: [mcp, overview]
+    tags:
+      - mcp
+      - overview
   - id: mcp-write
     name: MCP Write Tools
     ref: .usm/features/mcp/write.usm
     status: built
-    tags: [mcp, authoring, spec-first]
+    tags:
+      - mcp
+      - authoring
+      - spec-first
   - id: agent-feedback
     name: Agent Feedback Protocol
     ref: .usm/features/mcp/agent-feedback.usm
     status: planned
-    tags: [mcp, agents, feedback, policy, schema, cross-cutting]
+    tags:
+      - mcp
+      - agents
+      - feedback
+      - policy
+      - schema
+      - cross-cutting
   - id: upgrade
     name: Project Upgrade
     ref: .usm/features/cli/upgrade.usm
     status: planned
-    tags: [cli, upgrade, capabilities, versioning]
+    tags:
+      - cli
+      - upgrade
+      - capabilities
+      - versioning
   - id: vitepress-schema-polish
     name: VitePress Docs + Schema Polish
     ref: .usm/features/docs-and-schema-improvements/vitepress-schema-polish.usm
     status: in-progress
-    tags: [docs, vitepress, schema, help-docs, generators]
+    tags:
+      - docs
+      - vitepress
+      - schema
+      - help-docs
+      - generators
   - id: schema-v1
     name: V1 JSON Schema
     ref: .usm/features/schema/v1.usm
     status: active
-    tags: [schema, validation]
+    tags:
+      - schema
+      - validation
   - id: data-usmconfig
     name: USM Config Shape
     ref: .usm/data/usm-config.usm
     status: active
-    tags: [config, data]
-
+    tags:
+      - config
+      - data
 services:
   - id: cli
     name: USM CLI
@@ -212,30 +314,27 @@ services:
   - id: mcp
     name: USM MCP Server
     ref: .usm/services/mcp.usm
-
 apis: []
 data:
   - id: usm-config
     name: USM Config
     ref: .usm/data/usm-config.usm
-
 infrastructure:
   cloud: cloudflare
   region: global
   dns: usm.dev
   ssl: cloudflare-managed
-
 deployment:
   environments:
     - name: dev
-      url: "http://localhost:5173"
+      url: http://localhost:5173
       type: local
-      notes: "usm docs serve — VitePress dev server"
+      notes: usm docs serve — VitePress dev server
     - name: production
-      url: "https://usm.dev"
+      url: https://usm.dev
       type: cloudflare-pages
-      build_command: "cd web && npm ci && npm run build"
-      output_directory: "web/out"
+      build_command: cd web && npm ci && npm run build
+      output_directory: web/out
       project_name: usm-dev
       secrets:
         - CLOUDFLARE_API_TOKEN
@@ -245,10 +344,12 @@ deployment:
         (.github/workflows/marketing.yml) on push to main when web/ changes.
         Cloudflare Pages — free tier.
     - name: help-docs
-      url: "https://docs.usm.dev"
+      url: https://docs.usm.dev
       type: cloudflare-pages
-      build_command: "pnpm install && pnpm build && usm generate && usm generate --only help-docs && usm docs build --audience help"
-      output_directory: ".usm-workspace/help-docs/.vitepress/dist"
+      build_command: >-
+        pnpm install && pnpm build && usm generate && usm generate --only help-docs && usm docs
+        build --audience help
+      output_directory: .usm-workspace/help-docs/.vitepress/dist
       project_name: usm-docs
       secrets:
         - CLOUDFLARE_API_TOKEN
@@ -257,7 +358,6 @@ deployment:
         Help docs (VitePress, filtered for public audience). Deployed via
         GitHub Actions (.github/workflows/docs.yml) on push to main.
         Cloudflare Pages — free tier.
-
 operations:
   deployment_setup: |
     One-time Cloudflare Pages setup:
@@ -266,128 +366,158 @@ operations:
     3. Create Pages project 'usm-dev' connected to GitHub repo
     4. Set build output directory: .usm-workspace/docs/.vitepress/dist
     5. Add custom domain usm.dev (CNAME auto-added by Cloudflare)
-  monitoring: "Cloudflare Pages dashboard — build status and deploy logs"
-  alerts: "GitHub Actions workflow failure notifications"
-
+  monitoring: Cloudflare Pages dashboard — build status and deploy logs
+  alerts: GitHub Actions workflow failure notifications
 roadmap:
   - id: vitepress-docs
     title: VitePress docs integration
-    description: "usm docs serve and usm docs build with auto-generated sidebar, angle bracket escaping, and index page"
+    description: >-
+      usm docs serve and usm docs build with auto-generated sidebar, angle bracket escaping, and
+      index page
     status: shipped
     target_date: "2026-06-22"
     feature: usm/cli-docs
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: review-quality-markdown
     title: Review-quality feature markdown
-    description: "Flows as numbered steps, contracts as checklists, tests as Given/When/Then, decisions with alternatives"
+    description: >-
+      Flows as numbered steps, contracts as checklists, tests as Given/When/Then, decisions with
+      alternatives
     status: shipped
     target_date: "2026-06-22"
     feature: usm/gen-feature-review
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: empty-section-suppression
     title: Suppress empty sections in generated docs
-    description: "No more empty App Services, No UI pages documented, or No risks defined pages"
+    description: No more empty App Services, No UI pages documented, or No risks defined pages
     status: shipped
     target_date: "2026-06-22"
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: roles-schema
     title: Roles field in system schema
-    description: "Any project can describe who uses their system and what they need"
+    description: Any project can describe who uses their system and what they need
     status: shipped
     target_date: "2026-06-22"
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: adr-schema-enrichment
     title: ADR schema enrichment
-    description: "Alternatives and consequences fields on decisions for proper ADR-style recording"
+    description: Alternatives and consequences fields on decisions for proper ADR-style recording
     status: shipped
     target_date: "2026-06-22"
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: roadmap-improvements
     title: Roadmap with feature links and delivery tracking
-    description: "Roadmap items link to feature specs, show shipped_in version, sidebar dead links fixed, mermaid rendering"
+    description: >-
+      Roadmap items link to feature specs, show shipped_in version, sidebar dead links fixed,
+      mermaid rendering
     status: shipped
     feature: usm/gen-roadmap
-    shipped_in: "0.8.2"
+    shipped_in: 0.8.2
   - id: config-outputs
     title: Configurable output paths
-    description: "Generators read output paths from usmconfig.json — no hardcoded .usm-workspace layout"
+    description: Generators read output paths from usmconfig.json — no hardcoded .usm-workspace layout
     status: shipped
     feature: usm/cli-config-outputs
-    shipped_in: "0.8.2"
+    shipped_in: 0.8.2
   - id: help-reference-expansion
     title: Help docs reference expansion
-    description: "CLI reference, usage examples, options, and prerequisites rendered in help docs from spec data"
+    description: CLI reference, usage examples, options, and prerequisites rendered in help docs from spec data
     status: shipped
     feature: usm/gen-help-reference
-    shipped_in: "0.8.2"
+    shipped_in: 0.8.2
   - id: agent-authoring-tools
     title: MCP write tools
-    description: "draft_feature, update_feature_status — close the spec-first loop so agents can author .usm files"
+    description: >-
+      draft_feature, update_feature_status — close the spec-first loop so agents can author .usm
+      files
     status: shipped
     feature: usm/mcp-write
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: rules-file-generation
     title: Tool-specific rules files
-    description: "Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow instructions"
+    description: >-
+      Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow
+      instructions
     status: shipped
     feature: usm/gen-rules-files
-    shipped_in: "0.1.0"
+    shipped_in: 0.1.0
   - id: marketing-site
     title: Marketing site
-    description: "Next.js + shadcn landing page at usm.dev with spec-first workflow story"
+    description: Next.js + shadcn landing page at usm.dev with spec-first workflow story
     status: planned
   - id: user-docs-composition
     title: User docs composed from personas and journeys
-    description: "Personas and journey flows (actor/surface) as first-class spec data; user guides and Playwright e2e skeletons generated from the same journeys; help docs for feature pages composed instead of filtered"
+    description: >-
+      Personas and journey flows (actor/surface) as first-class spec data; user guides and
+      Playwright e2e skeletons generated from the same journeys; help docs for feature pages
+      composed instead of filtered
     status: shipped
     feature: usm/gen-user-docs
-    shipped_in: "0.9.0"
+    shipped_in: 0.9.0
   - id: help-docs-filter-deprecation
     title: Deprecate subtraction-based help docs for feature pages
-    description: "Feature pages in --audience help switch to composed content; subtraction filter retained for system-level pages during one transition cycle"
+    description: >-
+      Feature pages in --audience help switch to composed content; subtraction filter retained for
+      system-level pages during one transition cycle
     status: planned
     feature: usm/gen-docs-split
-
 principles:
   - key: structured-source-of-truth
     name: Structured Source of Truth
-    statement: Every system artifact is captured in YAML validated by a JSON Schema — no scattered, stale docs.
-    rationale: Agents and humans need a single, machine-checkable source. Free-form docs drift; schema-validated YAML stays consistent.
+    statement: >-
+      Every system artifact is captured in YAML validated by a JSON Schema — no scattered, stale
+      docs.
+    rationale: >-
+      Agents and humans need a single, machine-checkable source. Free-form docs drift;
+      schema-validated YAML stays consistent.
     implications:
       - All system descriptions must live in .usm/ YAML files
       - The v1 JSON Schema is the contract — no undocumented fields
   - key: agent-first
     name: Agent First
     statement: USM files are designed for AI agent consumption via MCP tools before human readability.
-    rationale: The MCP server exposes 12 tools (8 read + 4 write) that let agents navigate, search, reference, and author USM data without reading raw YAML.
+    rationale: >-
+      The MCP server exposes 12 tools (8 read + 4 write) that let agents navigate, search,
+      reference, and author USM data without reading raw YAML.
     implications:
       - Every .usm field must be parseable and queryable by agents
       - The MCP server must stay in sync with the schema
   - key: idempotent-generation
     name: Idempotent Generation
     statement: Scan and generate are safe to run repeatedly; smart-merge preserves human edits.
-    rationale: Re-running usm scan or usm generate should never destroy hand-written content. The smart-merge strategy preserves human-edited fields and updates mechanical ones.
+    rationale: >-
+      Re-running usm scan or usm generate should never destroy hand-written content. The smart-merge
+      strategy preserves human-edited fields and updates mechanical ones.
     implications:
       - Smart-merge distinguishes human-edited from scan-derived fields
-      - --force bypasses merge for intentional overwrite
+      - "--force bypasses merge for intentional overwrite"
   - key: one-source-many-outputs
     name: One Source, Many Outputs
-    statement: A single .usm/ directory generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md, and Vitest specs.
-    rationale: Maintaining 6+ doc formats independently is unsustainable. Derive all from one source so they stay in sync.
+    statement: >-
+      A single .usm/ directory generates markdown, Mermaid, OpenAPI, ArchiMate, TOGAF, AGENTS.md,
+      and Vitest specs.
+    rationale: >-
+      Maintaining 6+ doc formats independently is unsustainable. Derive all from one source so they
+      stay in sync.
     implications:
       - Generators must read .usm files — never write docs from other docs
       - Each generator is independent and composable
-
 personas:
-  - id: spec-author
+  - description: >-
+      Writes and reviews feature specs; wants the browser preview of specs and composed user docs to
+      be always current.
+    id: spec-author
     name: Spec Author
-    description: |
-      Writes and reviews feature specs; wants the browser preview of specs and composed user docs to be always current.
-  - id: platform-builder
+  - description: >-
+      Extends USM's generators; wants structured contracts as acceptance criteria and e2e skeletons
+      to build against.
+    id: platform-builder
     name: Platform Builder
-    description: |
-      Extends USM's generators; wants structured contracts as acceptance criteria and e2e skeletons to build against.
-
+  - description: >-
+      Setting up USM in their repo for the first time; wants a working init → scan → generate loop
+      with zero prior USM knowledge.
+    id: adopter
+    name: Adopter
 roles:
   - name: Human Developer
     description: |
@@ -395,42 +525,41 @@ roles:
       with an AI agent, reviews the generated markdown, and approves or requests
       changes before the agent builds.
     needs:
-      - "Readable feature specs with clear intent, flows, and contracts"
-      - "Checklist-format acceptance criteria for quick review"
-      - "Given/When/Then test format to verify coverage"
+      - Readable feature specs with clear intent, flows, and contracts
+      - Checklist-format acceptance criteria for quick review
+      - Given/When/Then test format to verify coverage
   - name: AI Agent
     description: |
       Reads .usm files via MCP tools to understand system context before
       implementing features. Drafts feature specs from human discussion.
     needs:
-      - "MCP tools to query system structure without reading raw YAML"
-      - "Write tools to draft and update feature specs"
-      - "Rules files that teach the spec-first workflow"
+      - MCP tools to query system structure without reading raw YAML
+      - Write tools to draft and update feature specs
+      - Rules files that teach the spec-first workflow
   - name: New Visitor
     description: |
       Finds USM on GitHub or npm and visits usm.dev to evaluate whether to use
       it in their project.
     needs:
-      - "Clear value proposition and workflow description"
-      - "Quick start guide"
-      - "Example feature specs"
+      - Clear value proposition and workflow description
+      - Quick start guide
+      - Example feature specs
   - name: Team Member
     description: |
       Joins a project that uses USM and needs to understand the system
       architecture, services, and feature inventory.
     needs:
-      - "System overview with architecture diagram"
-      - "Service descriptions with links to features"
-      - "Local development setup guide"
+      - System overview with architecture diagram
+      - Service descriptions with links to features
+      - Local development setup guide
   - name: Technical Lead
     description: |
       Reviews system design, tracks risks and roadmap, ensures architectural
       consistency across features.
     needs:
-      - "Cross-cutting views — decisions, risks, roadmap"
-      - "Architecture diagrams"
-      - "Feature status overview (planned vs built)"
-
+      - Cross-cutting views — decisions, risks, roadmap
+      - Architecture diagrams
+      - Feature status overview (planned vs built)
 reference_pages:
   - id: language-support
     title: Language Support
@@ -441,7 +570,9 @@ reference_pages:
     audience: public
     content:
       - type: paragraph
-        text: "Install USM, scan your codebase, configure your AI agent, and start the spec-first workflow."
+        text: >-
+          Install USM, scan your codebase, configure your AI agent, and start the spec-first
+          workflow.
       - type: heading
         level: 2
         text: "Step 1: Install"
@@ -453,18 +584,23 @@ reference_pages:
         text: "Step 2: Initialize and Scan"
       - type: code
         language: bash
-        source: "cd your-repo\nusm init          # Creates usmconfig.json\nusm scan          # Detects services, routes, data models"
+        source: |-
+          cd your-repo
+          usm init          # Creates usmconfig.json
+          usm scan          # Detects services, routes, data models
       - type: heading
         level: 2
         text: "Step 3: Generate Docs"
       - type: code
         language: bash
-        source: "usm generate      # Produces markdown, Mermaid, OpenAPI, test specs\nusm docs serve    # Preview docs at localhost:5173"
+        source: |-
+          usm generate      # Produces markdown, Mermaid, OpenAPI, test specs
+          usm docs serve    # Preview docs at localhost:5173
       - type: heading
         level: 2
         text: "Step 4: Start the MCP Server"
       - type: paragraph
-        text: "The MCP server lets your AI agent read the .usm system map."
+        text: The MCP server lets your AI agent read the .usm system map.
       - type: code
         language: bash
         source: usm mcp serve
@@ -480,15 +616,30 @@ reference_pages:
       - type: paragraph
         text: "Creates per-tool rules files — teaching your agent the spec-first workflow automatically:"
       - type: table
-        headers: ["Tool", "Detail file", "Always-on file (every request)"]
+        headers:
+          - Tool
+          - Detail file
+          - Always-on file (every request)
         rows:
-          - ["opencode", ".opencode/skills/usm-workflow/SKILL.md", ".opencode/usm-instructions.md (wired into opencode.json)"]
-          - ["Claude Code", "CLAUDE.md", ".claude/skills/usm-workflow/SKILL.md"]
-          - ["Cursor", ".cursor/rules/usm.mdc", ".cursor/rules/usm-always.mdc (alwaysApply)"]
-          - ["Copilot", ".github/copilot-instructions.md", ".github/instructions/usm-iron-rules.md"]
-          - ["Codex", "AGENTS.md", "— (no per-message mechanism)"]
+          - - opencode
+            - .opencode/skills/usm-workflow/SKILL.md
+            - .opencode/usm-instructions.md (wired into opencode.json)
+          - - Claude Code
+            - CLAUDE.md
+            - .claude/skills/usm-workflow/SKILL.md
+          - - Cursor
+            - .cursor/rules/usm.mdc
+            - .cursor/rules/usm-always.mdc (alwaysApply)
+          - - Copilot
+            - .github/copilot-instructions.md
+            - .github/instructions/usm-iron-rules.md
+          - - Codex
+            - AGENTS.md
+            - — (no per-message mechanism)
       - type: paragraph
-        text: "The always-on files carry short iron rules that re-anchor the workflow on every request — countering drift in long agent sessions."
+        text: >-
+          The always-on files carry short iron rules that re-anchor the workflow on every request —
+          countering drift in long agent sessions.
       - type: heading
         level: 2
         text: "Step 6: (Optional) Enrich with LLM"
@@ -496,9 +647,11 @@ reference_pages:
         text: "Scanned .usm files contain `TODO: describe` placeholders. Fill them with an LLM:"
       - type: code
         language: bash
-        source: "usm enrich --dry-run          # Preview changes\nusm enrich                     # Fill TODOs (requires LLM config)"
+        source: |-
+          usm enrich --dry-run          # Preview changes
+          usm enrich                     # Fill TODOs (requires LLM config)
       - type: paragraph
-        text: "Supports OpenAI, Anthropic, Ollama, and LiteLLM (any OpenAI-compatible model)."
+        text: Supports OpenAI, Anthropic, Ollama, and LiteLLM (any OpenAI-compatible model).
       - type: divider
       - type: heading
         level: 2
@@ -508,101 +661,171 @@ reference_pages:
         text: First-time setup
       - type: callout
         variant: tip
-        text: "Install USM in this repo: run `npm install -g @smithgray/usm`, then `usm init`, `usm scan`, and `usm generate`. Start the MCP server with `usm mcp serve`. Read the generated .usm files to understand the project structure. Going forward, before implementing any feature, draft a .usm spec first using the MCP write tools, show me the markdown for review, then build from the approved spec."
+        text: >-
+          Install USM in this repo: run `npm install -g @smithgray/usm`, then `usm init`, `usm
+          scan`, and `usm generate`. Start the MCP server with `usm mcp serve`. Read the generated
+          .usm files to understand the project structure. Going forward, before implementing any
+          feature, draft a .usm spec first using the MCP write tools, show me the markdown for
+          review, then build from the approved spec.
       - type: heading
         level: 3
         text: New feature
       - type: callout
         variant: tip
-        text: "I want to add [feature description]. Use USM to draft a feature spec first — call `usm_draft_feature` with the summary, intent, flows, and contracts. Show me the generated markdown. Once I approve, write the .usm file and implement the feature. Update the feature status to `built` when done."
+        text: >-
+          I want to add [feature description]. Use USM to draft a feature spec first — call
+          `usm_draft_feature` with the summary, intent, flows, and contracts. Show me the generated
+          markdown. Once I approve, write the .usm file and implement the feature. Update the
+          feature status to `built` when done.
       - type: heading
         level: 3
         text: Quick agent context
       - type: callout
         variant: tip
-        text: "Read the .usm system map before starting work. Use `usm_list` to see all files, `usm_search` to find relevant features, and `usm_read` to get details."
+        text: >-
+          Read the .usm system map before starting work. Use `usm_list` to see all files,
+          `usm_search` to find relevant features, and `usm_read` to get details.
       - type: heading
         level: 3
         text: Bug fix
       - type: callout
         variant: tip
-        text: "Fix [bug description]. First, search the .usm files with `usm_search` to find the relevant feature spec. Read it with `usm_read` to understand the contracts and tests. Fix the bug, then update the feature spec if the behavior changed."
+        text: >-
+          Fix [bug description]. First, search the .usm files with `usm_search` to find the relevant
+          feature spec. Read it with `usm_read` to understand the contracts and tests. Fix the bug,
+          then update the feature spec if the behavior changed.
       - type: divider
       - type: heading
         level: 2
         text: Available MCP Tools (18)
       - type: paragraph
-        text: "**Read (9):** `usm_list`, `usm_read`, `usm_search`, `usm_validate`, `usm_summary`, `usm_references`, `usm_get_contracts`, `usm_get_flows`, `usm_query`"
+        text: >-
+          **Read (9):** `usm_list`, `usm_read`, `usm_search`, `usm_validate`, `usm_summary`,
+          `usm_references`, `usm_get_contracts`, `usm_get_flows`, `usm_query`
       - type: paragraph
-        text: "**Write (9):** `usm_draft_feature`, `usm_write_feature`, `usm_update_feature`, `usm_update_feature_status`, `usm_report_feedback`, `usm_write_system`, `usm_write_service`, `usm_update_system`, `usm_update_service`"
+        text: >-
+          **Write (9):** `usm_draft_feature`, `usm_write_feature`, `usm_update_feature`,
+          `usm_update_feature_status`, `usm_report_feedback`, `usm_write_system`,
+          `usm_write_service`, `usm_update_system`, `usm_update_service`
       - type: heading
         level: 2
         text: Verify It's Working
       - type: code
         language: bash
-        source: "usm check                        # Validate all .usm files\nusm info .usm/system.usm         # Show system summary"
+        source: |-
+          usm check                        # Validate all .usm files
+          usm info .usm/system.usm         # Show system summary
       - type: heading
         level: 2
         text: Next Steps
       - type: paragraph
-        text: "- [CLI Reference](cli-reference.md) - [Configuration](config-reference.md) - [Schema Reference](schema-reference.md) - [MCP Tools](mcp-reference.md) - [Language Support](language-support.md)"
+        text: >-
+          - [CLI Reference](cli-reference.md) - [Configuration](config-reference.md) - [Schema
+          Reference](schema-reference.md) - [MCP Tools](mcp-reference.md) - [Language
+          Support](language-support.md)
   - id: getting-started
     title: Getting Started
     audience: public
     content:
       - type: callout
         variant: tip
-        text: "Install → `usm init` → `usm scan` → `usm generate` → `usm docs serve`. Everything below is copy-pasteable."
+        text: >-
+          Install → `usm init` → `usm scan` → `usm generate` → `usm docs serve`. Everything below is
+          copy-pasteable.
       - type: heading
         level: 2
         text: The first-run loop
       - type: mermaid
-        diagram: "sequenceDiagram\n  participant You\n  participant USM as usm CLI\n  participant Disk as .usm/ + docs\n  You->>USM: npm i -g @smithgray/usm\n  You->>USM: usm init\n  USM->>Disk: usmconfig.json\n  You->>USM: usm scan\n  USM->>Disk: .usm/**/*.usm\n  You->>USM: usm generate\n  USM->>Disk: docs, Mermaid, AGENTS.md, OpenAPI…\n  You->>USM: usm docs serve --audience help\n  USM-->>You: http://localhost:5173"
+        diagram: |-
+          sequenceDiagram
+            participant You
+            participant USM as usm CLI
+            participant Disk as .usm/ + docs
+            You->>USM: npm i -g @smithgray/usm
+            You->>USM: usm init
+            USM->>Disk: usmconfig.json
+            You->>USM: usm scan
+            USM->>Disk: .usm/**/*.usm
+            You->>USM: usm generate
+            USM->>Disk: docs, Mermaid, AGENTS.md, OpenAPI…
+            You->>USM: usm docs serve --audience help
+            USM-->>You: http://localhost:5173
       - type: heading
         level: 2
         text: Quick start
       - type: code
         language: bash
-        title: "1. Install"
-        source: "npm install -g @smithgray/usm\n# or: pnpm add -g @smithgray/usm\nusm --version"
+        title: 1. Install
+        source: |-
+          npm install -g @smithgray/usm
+          # or: pnpm add -g @smithgray/usm
+          usm --version
       - type: code
         language: bash
-        title: "2. Init + scan"
-        source: "cd your-project\nusm init                 # creates usmconfig.json\nusm scan                 # detects services, routes, data\n# Review .usm/ — this is your source of truth"
+        title: 2. Init + scan
+        source: |-
+          cd your-project
+          usm init                 # creates usmconfig.json
+          usm scan                 # detects services, routes, data
+          # Review .usm/ — this is your source of truth
       - type: code
         language: bash
-        title: "3. Generate + serve"
-        source: "usm generate\n# Install VitePress (optional but recommended for local docs preview)\nnpm install -D vitepress    # or: pnpm add -Dw vitepress (monorepo)\nusm docs serve --audience help\n# Open the printed localhost URL"
+        title: 3. Generate + serve
+        source: |-
+          usm generate
+          # Install VitePress (optional but recommended for local docs preview)
+          npm install -D vitepress    # or: pnpm add -Dw vitepress (monorepo)
+          usm docs serve --audience help
+          # Open the printed localhost URL
       - type: code
         language: bash
-        title: "4. Wire agents"
-        source: "usm mcp serve            # MCP for Cursor / Claude / Copilot\n# See Agent Setup Guide for IDE config"
+        title: 4. Wire agents
+        source: |-
+          usm mcp serve            # MCP for Cursor / Claude / Copilot
+          # See Agent Setup Guide for IDE config
       - type: heading
         level: 2
         text: Common first-run issues
       - type: callout
         variant: info
-        text: "**Node / package manager**: USM requires **Node ≥ 18**. Prefer pnpm 9+ in monorepos. If `usm` is not found after install, check your global bin is on `PATH`."
+        text: >-
+          **Node / package manager**: USM requires **Node ≥ 18**. Prefer pnpm 9+ in monorepos. If
+          `usm` is not found after install, check your global bin is on `PATH`.
       - type: callout
         variant: info
-        text: "**`usm docs serve` fails with \"VitePress is not installed\"**: VitePress is an optional peer dependency. Install it once: `pnpm add -D vitepress` or `npm install -D vitepress`."
+        text: >-
+          **`usm docs serve` fails with "VitePress is not installed"**: VitePress is an optional
+          peer dependency. Install it once: `pnpm add -D vitepress` or `npm install -D vitepress`.
       - type: callout
         variant: info
-        text: "**Validation warnings about `$version`**: A warning (not an error) means a file's `$version` differs from the schema version this USM understands. Run `usm upgrade` to adopt new optional capabilities."
+        text: >-
+          **Validation warnings about `$version`**: A warning (not an error) means a file's
+          `$version` differs from the schema version this USM understands. Run `usm upgrade` to
+          adopt new optional capabilities.
       - type: callout
         variant: info
-        text: "**Agents inventing `bugs.md` / ad-hoc tracking files**: Configure feedback policy with `usm feedback`. Default is `human-gate`: agents must ask before filing. Rules files forbid root-level ad-hoc trackers."
+        text: >-
+          **Agents inventing `bugs.md` / ad-hoc tracking files**: Configure feedback policy with
+          `usm feedback`. Default is `human-gate`: agents must ask before filing. Rules files forbid
+          root-level ad-hoc trackers.
       - type: heading
         level: 2
         text: Where to go next
       - type: table
-        headers: ["Page", "Why"]
+        headers:
+          - Page
+          - Why
         rows:
-          - ["[Schema Reference](/schema-reference)", "Field-by-field answers for every .usm type"]
-          - ["[CLI Reference](/cli-reference)", "Every command and flag"]
-          - ["[MCP Tools](/mcp-reference)", "Spec-first tools for agents"]
-          - ["[Agent Setup Guide](/agent-setup-guide)", "Cursor / Claude / Copilot wiring"]
-          - ["[Roadmap](/roadmap)", "What's shipping next"]
+          - - "[Schema Reference](/schema-reference)"
+            - Field-by-field answers for every .usm type
+          - - "[CLI Reference](/cli-reference)"
+            - Every command and flag
+          - - "[MCP Tools](/mcp-reference)"
+            - Spec-first tools for agents
+          - - "[Agent Setup Guide](/agent-setup-guide)"
+            - Cursor / Claude / Copilot wiring
+          - - "[Roadmap](/roadmap)"
+            - What's shipping next
   - id: code-navigator
     title: Code Navigator
     audience: internal

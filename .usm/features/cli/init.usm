@@ -2,79 +2,100 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-init
 $type: feature
 $version: 1
-$last_updated: "2026-06-19"
+$last_updated: "2026-09-27"
 summary: The usm init command analyzes the repo and generates a starter usmconfig.json.
-
 $system: usm/system
 $service: usm/cli
 command: init
-intent: |
-  New users need a config file that tells usm scan where to look. Init detects apps, packages, Prisma schemas, and Docker Compose services from the repo structure and writes a usmconfig.json so the next scan can work immediately.
-
+intent: >
+  New users need a config file that tells usm scan where to look. Init detects apps, packages,
+  Prisma schemas, and Docker Compose services from the repo structure and writes a usmconfig.json so
+  the next scan can work immediately.
 flows:
   - id: run-init
-    name: Run usm init
-    description: User runs usm init in the repo root to generate a usmconfig.json
+    name: Init pipeline (repo analysis)
+    description: "System pipeline behind usm init: analyze repo structure, write starter config."
     steps:
       - id: s1
         action: setup
+        actor: agent
         target: repo root directory
       - id: s2
         action: parse
+        actor: agent
         target: apps/* and packages/* directories for package.json
       - id: s3
         action: parse
+        actor: agent
         target: prisma schema files
       - id: s4
         action: generate
+        actor: agent
         target: usmconfig.json with services, shared, data, outputs sections
-
+  - id: first-run-init
+    name: Set up USM in a new repo
+    description: >-
+      First-run experience: an adopter initializes USM in their repository and reviews the generated
+      usmconfig.json without reading docs first.
+    steps:
+      - id: s1
+        action: run
+        actor: adopter
+        surface: cli
+        target: usm init in the repo root
+      - id: s2
+        action: review
+        actor: adopter
+        surface: cli
+        target: generated usmconfig.json — services match apps/*, shared and data paths detected correctly
+      - id: s3
+        action: correct
+        actor: adopter
+        surface: spec
+        target: >-
+          any misdetected services or missing shared packages by editing usmconfig.json before
+          running usm scan
 contracts:
   - id: init-creates-config
     description: usm init must create a valid usmconfig.json at the specified output path
     must_have:
       - "Config has version: '1'"
-      - "Config has name, services, shared, data, sources, outputs fields"
-      - "Config does not overwrite unless --force is passed"
-
+      - Config has name, services, shared, data, sources, outputs fields
+      - Config does not overwrite unless --force is passed
 tests:
-  - id: init-default
-    setup:
-      repo_with_apps: true
-    expect:
+  - expect:
       - assertion: usmconfig.json created with services matching apps/*
       - assertion: exit code 0
-  - id: init-no-overwrite
+    flow: first-run-init
+    id: init-default
     setup:
-      existing_config: true
-    expect:
+      repo_with_apps: true
+  - expect:
       - assertion: error thrown "File already exists"
       - assertion: exit code 1
-
+    id: init-no-overwrite
+    setup:
+      existing_config: true
 usage:
-  - command: "usm init"
-    description: "Analyze repo and generate usmconfig.json"
-  - command: "usm init --force"
-    description: "Overwrite existing usmconfig.json"
-
+  - command: usm init
+    description: Analyze repo and generate usmconfig.json
+  - command: usm init --force
+    description: Overwrite existing usmconfig.json
 options:
   - flag: "--root <root>"
-    description: "Repo root directory"
-    default: "."
+    description: Repo root directory
+    default: .
   - flag: "--output <path>"
-    description: "Output path for usmconfig.json"
-    default: "usmconfig.json"
+    description: Output path for usmconfig.json
+    default: usmconfig.json
   - flag: "--force"
-    description: "Overwrite existing usmconfig.json"
+    description: Overwrite existing usmconfig.json
     default: "false"
-
 prerequisites:
-  - "None — this is the first command to run"
-
+  - None — this is the first command to run
 implementation:
   primary: src/scan/init.ts
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/system"
+  - usm/system

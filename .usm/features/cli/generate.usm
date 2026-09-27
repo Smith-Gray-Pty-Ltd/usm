@@ -2,84 +2,118 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-generate
 $type: feature
 $version: 1
-$last_updated: "2026-06-19"
-summary: The usm generate command reads all .usm files and produces markdown, OpenAPI, Mermaid, ArchiMate, TOGAF, AGENTS.md, and Vitest test specs.
-
+$last_updated: "2026-09-27"
+summary: >-
+  The usm generate command reads all .usm files and produces markdown, OpenAPI, Mermaid, ArchiMate,
+  TOGAF, AGENTS.md, and Vitest test specs.
 $system: usm/system
 $service: usm/cli
 command: generate
-intent: |
-  After scanning and enriching, generate produces all output artifacts from the .usm source. It runs 6 passes: per-file markdown, area overviews, aggregator docs, surface tables, Mermaid diagrams, and TOGAF deliverables.
-
+intent: >
+  After scanning and enriching, generate produces all output artifacts from the .usm source. It runs
+  6 passes: per-file markdown, area overviews, aggregator docs, surface tables, Mermaid diagrams,
+  and TOGAF deliverables.
 flows:
   - id: run-generate
-    name: Run usm generate
-    description: User runs usm generate to produce all documentation
+    name: Generate pipeline (6 passes)
+    description: "System pipeline behind usm generate: parse all .usm files and write every derived artifact."
     steps:
-      - id: s1
+      - actor: agent
+        id: s1
         action: parse
         target: all .usm files in monorepo
-      - id: s2
+      - actor: agent
+        id: s2
         action: observe
         target: duplicate $id detection
-      - id: s3
+      - actor: agent
+        id: s3
         action: generate
         target: per-file markdown for each validated .usm
-      - id: s4
+      - actor: agent
+        id: s4
         action: generate
         target: aggregator docs (risks, roadmap, AGENTS.md, OpenAPI, test specs)
-      - id: s5
+      - actor: agent
+        id: s5
         action: generate
         target: surface tables injected into overview.md files
-      - id: s6
+      - actor: agent
+        id: s6
         action: generate
         target: Mermaid diagrams (architecture, ER, service deps)
-      - id: s7
+      - actor: agent
+        id: s7
         action: generate
         target: TOGAF ADM phase deliverables
-
+  - id: regenerate-outputs
+    name: Regenerate all docs from specs
+    description: >-
+      A spec author edits .usm files and regenerates every derived artifact, confirming the browser
+      preview stays current.
+    steps:
+      - actor: spec-author
+        id: s1
+        action: run
+        surface: cli
+        target: usm generate from the repo root
+      - actor: spec-author
+        id: s2
+        action: review
+        surface: browser
+        target: regenerated docs in the running usm docs serve preview — hot reload picks up changes
+      - actor: spec-author
+        id: s3
+        action: commit
+        surface: cli
+        target: regenerated artifacts only after lint and typecheck pass
+  - id: build-against-contracts
+    name: Build against generated test specs
+    steps:
+      - actor: platform-builder
+        id: s3
+        action: fill
+        surface: spec
+        target: >-
+          in the emitted e2e skeletons under tests/auto-generated/e2e/ for journeys, replacing TODO
+          markers with real locators
 contracts:
   - id: generate-from-source-only
     description: Generate must read .usm files directly — never derive docs from other docs
     must_have:
-      - "All outputs derived from parsed .usm data"
-      - "Duplicate $ids detected and warned"
+      - All outputs derived from parsed .usm data
+      - Duplicate $ids detected and warned
       - "--check mode compares without writing"
-
 tests:
-  - id: generate-produces-outputs
-    setup:
-      valid_usm_files: true
-    expect:
+  - expect:
       - assertion: markdown files written for each .usm
       - assertion: aggregator docs written if system.usm present
-  - id: generate-check-mode
+    flow: regenerate-outputs
+    id: generate-produces-outputs
+    setup:
+      valid_usm_files: true
+  - expect:
+      - assertion: reports up-to-date or out-of-date without writing
+    id: generate-check-mode
     setup:
       existing_outputs: true
-    expect:
-      - assertion: reports up-to-date or out-of-date without writing
-
 usage:
-  - command: "usm generate"
-    description: "Generate all docs from .usm files"
-  - command: "usm generate --check"
-    description: "Check if generated files are up to date (dry run)"
-
+  - command: usm generate
+    description: Generate all docs from .usm files
+  - command: usm generate --check
+    description: Check if generated files are up to date (dry run)
 options:
   - flag: "--check"
-    description: "Check if outputs are up to date without writing"
+    description: Check if outputs are up to date without writing
     default: "false"
   - flag: "--root <root>"
-    description: "Monorepo root directory"
-    default: "current directory"
-
+    description: Monorepo root directory
+    default: current directory
 prerequisites:
-  - ".usm files must exist (run 'usm init' and 'usm scan' first)"
-
+  - .usm files must exist (run 'usm init' and 'usm scan' first)
 implementation:
   primary: src/cli/index.ts (generate command)
   test_code: ""
   test_code_status: none
-
 see_also:
-  - "usm/cli-scan"
+  - usm/cli-scan
