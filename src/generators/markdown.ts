@@ -1921,6 +1921,13 @@ export function generateConfigReference(root: string): GenerationResult {
       lines.push(defDesc);
       lines.push("");
     }
+    if (defName === "outputs") {
+      // Help-docs emission gating (issue #44): consumers configure
+      // outputs.help_docs and reasonably expect plain `usm generate` to
+      // produce it — document which commands emit the tree.
+      lines.push("> **Help docs note:** the `help_docs` tree is a filtered copy of the developer docs. `usm generate` does **not** emit it — use `usm generate --only help-docs` (requires a prior `usm generate`) or `usm docs serve/build --audience help`. The `help_docs` directory must not be nested inside the `docs` directory.");
+      lines.push("");
+    }
     lines.push("| Field | Type | Description |");
     lines.push("|-------|------|-------------|");
     const defRequired = (defVal.required as string[]) || [];

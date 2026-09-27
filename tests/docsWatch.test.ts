@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { watchUsmDir } from "../src/cli/docs.js";
+import { watchUsmDir, filterForHelpAudience } from "../src/cli/docs.js";
 
 let tmpDir: string;
 
@@ -193,5 +193,60 @@ describe("watchUsmDir (docs watch mode — issue #25.3)", () => {
 
     await new Promise((r) => setTimeout(r, 800));
     expect(count.value).toBe(0);
+  });
+});
+
+// ─── Help-docs layout guard + path-honest reporting (issues #47, #44) ────────
+
+describe("filterForHelpAudience layout guard (issue #47)", () => {
+  let tmpDir: string;
+  let docsRoot: string;
+  let helpRoot: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "usm-helpguard-"));
+    docsRoot = path.join(tmpDir, "docs");
+    fs.mkdirSync(docsRoot, { recursive: true });
+    fs.writeFileSync(path.join(docsRoot, "README.md"), "# Docs\n");
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("rejects a helpRoot nested inside docsRoot before any filesystem mutation", () => {
+    helpRoot = path.join(docsRoot, "help");
+    expect(() => filterForHelpAudience(tmpDir, docsRoot, helpRoot)).toThrow(
+      /must not be inside the docs output/,
+    );
+    // Guard must run before mutations — nothing created, nothing deleted
+    expect(fs.existsSync(helpRoot)).toBe(false);
+  });
+
+  it("rejects helpRoot equal to docsRoot", () => {
+    expect(() => filterForHelpAudience(tmpDir, docsRoot, docsRoot)).toThrow(
+      /must not be inside the docs output/,
+    );
+  });
+
+  it("accepts a sibling layout and copies filtered content", () => {
+    helpRoot = path.join(tmpDir, "help-docs");
+    const count = filterForHelpAudience(tmpDir, docsRoot, helpRoot);
+    expect(count).toBe(1); // README.md
+    expect(fs.existsSync(path.join(helpRoot, "README.md"))).toBe(true);
+  });
+
+  it("copies a stray help/ dir inside the docs source verbatim (no recursion)", () => {
+    helpRoot = path.join(tmpDir, "help-docs");
+    const stray = path.join(docsRoot, "help");
+    fs.mkdirSync(stray, { recursive: true });
+    fs.writeFileSync(path.join(stray, "stray.md"), "leftover\n");
+    filterForHelpAudience(tmpDir, docsRoot, helpRoot);
+    // Copied once, depth 1 — no help/help/help/… self-copy
+    expect(fs.existsSync(path.join(helpRoot, "help", "stray.md"))).toBe(true);
+    expect(fs.existsSync(path.join(helpRoot, "help", "help"))).toBe(false);
+    // And a second run must not deepen it
+    filterForHelpAudience(tmpDir, docsRoot, helpRoot);
+    expect(fs.existsSync(path.join(helpRoot, "help", "help"))).toBe(false);
   });
 });

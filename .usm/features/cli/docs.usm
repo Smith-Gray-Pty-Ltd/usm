@@ -293,6 +293,53 @@ contracts:
         Startup output prints the route shape /features/<area>/<slug> with the $system namespace
         dropped
       - "MCP write tools return docs_url/docs_path so agents return correct links (issue #34)"
+  - description: >-
+      The help-docs tree is a filtered derivative of the developer docs tree; the two output roots
+      must be siblings (or at least the help root must not sit inside the docs root), because the
+      filter walks the source tree and must never copy its own destination.
+    id: help-tree-layout-is-sibling-safe
+    must_have:
+      - >-
+        filterForHelpAudience rejects a helpRoot that is inside docsRoot (or equal to it) with a
+        hard error naming both paths and the config keys to change (issue #47)
+      - >-
+        The guard runs before any filesystem mutation — a bad layout fails fast without creating or
+        deleting anything
+      - "No self-copy recursion is possible: copyFiltered never walks the help destination"
+      - Default sibling layout (.usm-workspace/docs + .usm-workspace/help-docs) unaffected
+      - >-
+        Configured nested layouts (e.g. docs: docs/ + help_docs: docs/help/) fail with an actionable
+        error instead of ENAMETOOLONG
+  - description: >-
+      Every help-docs emission point reports the path files were actually written to — never a
+      hardcoded default (issue #44).
+    id: help-output-path-honest
+    must_have:
+      - >-
+        generate --only help-docs success message names the resolved helpRoot (path.relative(root,
+        helpRoot)), not the hardcoded .usm-workspace/help-docs/
+      - Custom help_docs paths (e.g. docs/help/) are reflected in console output
+      - docs serve/build --audience help likewise reports the configured path
+  - description: >-
+      The help-docs tree is derived from already-generated developer docs; plain usm generate does
+      not emit it. This gating is documented where consumers configure it.
+    id: help-tree-derivation-gating-documented
+    must_have:
+      - >-
+        --only help-docs help text states it filters the developer docs tree and requires a prior
+        usm generate
+      - >-
+        config-reference documents which commands emit the help tree (generate --only help-docs,
+        docs serve/build --audience help) and that plain generate does not (issue #44)
+  - description: >-
+      usm docs build --audience help auto-runs the filter pass when the help tree is absent, instead
+      of erroring.
+    id: help-build-derives-if-missing
+    must_have:
+      - >-
+        docs build --audience help with no existing help tree runs the filter pass first and then
+        builds
+      - docs build --audience help with an existing tree still rebuilds it (no stale-tree builds)
 tests:
   - expect:
       - assertion: server starts on port 5173

@@ -852,7 +852,7 @@ program
   .command("generate")
   .description("Generate documentation from .usm files")
   .option("--check", "Check if generated files are up to date (dry run)")
-  .option("--only <target>", "Only generate a specific output: docs, help-docs, togaf, archimate, openapi, tests, rules, agents-md")
+  .option("--only <target>", "Only generate a specific output: docs, help-docs, togaf, archimate, openapi, tests, rules, agents-md. help-docs filters the ALREADY-GENERATED developer docs tree (run 'usm generate' first); plain generate does not emit it.")
   .option("-r, --root <root>", "Monorepo root directory", process.cwd())
   .action(async (options: { check: boolean; only?: string; root: string }) => {
     const root = path.resolve(options.root);
@@ -877,8 +877,12 @@ program
       const helpRoot = outDir(root, "help_docs");
       const spinner = startSpinner("Generating help docs...");
       console.log("Generating help docs (filtering developer docs)...");
+      // Path-honest reporting (issue #44): name the configured helpRoot, not
+      // the hardcoded default — custom help_docs paths (e.g. docs/help/) must
+      // show where files actually went.
       const count = filterForHelpAudience(root, docsRoot, helpRoot);
-      spinner.succeed(ok(`${metric(String(count))} file(s) written to ${dim(".usm-workspace/help-docs/")}`));
+      const relHelpRoot = path.relative(root, helpRoot) || helpRoot;
+      spinner.succeed(ok(`${metric(String(count))} file(s) written to ${dim(relHelpRoot + path.sep)}`));
       return;
     }
 

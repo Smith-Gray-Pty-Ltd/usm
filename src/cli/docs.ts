@@ -655,6 +655,21 @@ function stripDeadLinks(content: string, dirPath: string): string {
 }
 
 export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: string): number {
+  // Layout guard (issue #47): the filter walks the developer docs tree, so a
+  // help root nested inside the docs root would make the walk copy its own
+  // destination — docs/help/help/help/… unbounded, ENAMETOOLONG crash. The
+  // invariant everywhere else is siblings; enforce it before ANY filesystem
+  // mutation so a bad layout fails fast instead of self-copying.
+  const relHelp = path.relative(docsRoot, helpRoot);
+  if (relHelp === "" || (!relHelp.startsWith("..") && !path.isAbsolute(relHelp))) {
+    throw new Error(
+      `help_docs output (${path.relative(root, helpRoot)}) must not be inside the ` +
+        `docs output (${path.relative(root, docsRoot)}) — the help tree is a filtered ` +
+        `copy of the docs tree, so the two directories must be siblings. ` +
+        `Fix outputs.help_docs in usmconfig.json (e.g. help_docs: ".usm-workspace/help-docs/").`,
+    );
+  }
+
   // usm/gen-user-docs: personas loaded lazily on first feature page
   let helpPersonas: Persona[] | null = null;
   let copied = 0;
@@ -1262,11 +1277,21 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
 
   if (!fs.existsSync(docsRoot)) {
     if (audience === "help") {
-      console.error("No help docs found. Run 'usm generate --only help-docs' first.");
+      // Derive-if-missing: the help tree is a filtered copy of the developer
+      // docs — build it here rather than erroring, so `docs build --audience
+      // help` works on a fresh tree (issue #44 follow-up).
+      const devRoot = outDir(root, "docs");
+      if (!fs.existsSync(devRoot)) {
+        console.error("No developer docs found. Run 'usm generate' first.");
+        process.exit(1);
+      }
+      console.log("No help docs found — filtering developer docs first…");
+      const count = filterForHelpAudience(root, devRoot, docsRoot);
+      console.log(`Filtered ${count} file(s) into ${path.relative(root, docsRoot)}`);
     } else {
       console.error("No docs found. Run 'usm generate' first.");
+      process.exit(1);
     }
-    process.exit(1);
   }
 
   // For developer audience, consolidate + escape (help docs are pre-filtered)
@@ -1354,11 +1379,20 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
 
   if (!fs.existsSync(docsRoot)) {
     if (audience === "help") {
-      console.error("No help docs found. Run 'usm generate --only help-docs' first.");
+      // Derive-if-missing (serve): same contract as build — filter the dev
+      // tree rather than erroring (issue #44 follow-up).
+      const devRoot = outDir(root, "docs");
+      if (!fs.existsSync(devRoot)) {
+        console.error("No developer docs found. Run 'usm generate' first.");
+        process.exit(1);
+      }
+      console.log("No help docs found — filtering developer docs first…");
+      const count = filterForHelpAudience(root, devRoot, docsRoot);
+      console.log(`Filtered ${count} file(s) into ${path.relative(root, docsRoot)}`);
     } else {
       console.error("No docs found. Run 'usm generate' first.");
+      process.exit(1);
     }
-    process.exit(1);
   }
 
   // ── Already-serving detection ────────────────────────────────────────────
