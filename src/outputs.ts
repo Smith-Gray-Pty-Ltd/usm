@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { formatConfigErrors, validateConfigObject } from "./validateConfig.js";
+
 /**
  * Default output paths (relative to project root).
  * Used when usmconfig.json is missing or outputs section is absent.
@@ -22,20 +24,33 @@ export type OutputPaths = typeof DEFAULT_OUTPUTS;
 /**
  * Read output paths from usmconfig.json, merged with defaults.
  * Falls back to defaults if config is missing or outputs section is absent.
+ * Throws on an INVALID config (unknown/malformed keys) — silent fallback is
+ * exactly the failure mode this check exists to kill (issue #43): a config
+ * can look like it directs output somewhere it does not.
  *
  * @param root — project root directory
  * @returns object with all output paths (relative to root)
  */
 export function getOutputPaths(root: string): OutputPaths {
-  try {
-    const configPath = path.join(root, "usmconfig.json");
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
-      const outputs = (config.outputs || {}) as Record<string, string>;
-      return { ...DEFAULT_OUTPUTS, ...outputs };
+  const configPath = path.join(root, "usmconfig.json");
+  if (fs.existsSync(configPath)) {
+    // Parse errors surface verbatim (no silent catch)…
+    let config: Record<string, unknown>;
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+    } catch (err) {
+      throw new Error(
+        `usmconfig.json is not valid JSON: ${configPath}\n  ${(err as Error).message}`,
+        { cause: err },
+      );
     }
-  } catch {
-    // Fall back to defaults
+    // …and the whole file must validate against the packaged schema.
+    const { valid, errors } = validateConfigObject(config);
+    if (!valid) {
+      throw new Error(formatConfigErrors(configPath, errors).join("\n"));
+    }
+    const outputs = (config.outputs || {}) as Record<string, string>;
+    return { ...DEFAULT_OUTPUTS, ...outputs };
   }
   return { ...DEFAULT_OUTPUTS };
 }

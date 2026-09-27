@@ -206,12 +206,10 @@ export async function initConfig(options: InitOptions): Promise<UsmConfig> {
     data: dataRules,
     outputs: {
       usm_source: ".usm/",
-      design_docs: "docs/design/",
+      docs: ".usm-workspace/docs/",
       help_docs: "docs/help/",
-      api_docs: "docs/api/",
-      agent_context: ".usm-workspace/",
+      openapi: "docs/api/",
       tests: "tests/auto-generated/",
-      diagrams: "docs/diagrams/",
     },
     generation: {
       merge_with_existing: "smart",

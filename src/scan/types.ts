@@ -85,12 +85,14 @@ export interface UsmConfigFeatures {
 
 export interface UsmConfigOutputs {
   usm_source?: string;
-  design_docs?: string;
+  workspace?: string;
+  docs?: string;
   help_docs?: string;
-  api_docs?: string;
-  agent_context?: string;
+  archimate?: string;
+  togaf?: string;
+  openapi?: string;
   tests?: string;
-  diagrams?: string;
+  agents_md?: string;
 }
 
 export type MergeStrategy = "smart" | "overwrite" | "skip" | "fail";

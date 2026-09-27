@@ -30,6 +30,7 @@ import {
 import { extractRoutes, groupRoutesIntoFeatures } from "./routes.js";
 import { smartMerge } from "./merge.js";
 import { resolveDetectors, getDetectors, detectFramework } from "./detectors.js";
+import { formatConfigErrors, validateConfigObject } from "../validateConfig.js";
 import type { Detector } from "./detectors.js";
 import type { RouteFinding } from "./types.js";
 
@@ -461,15 +462,28 @@ function matchServiceDetector(
 }
 
 /**
- * Read and parse usmconfig.json.
+ * Read and parse usmconfig.json. Validates against the packaged schema
+ * (issue #43) — unknown/malformed keys are hard errors, never silent defaults.
  */
 function readConfig(configPath: string): UsmConfig {
   if (!fs.existsSync(configPath)) {
     throw new Error(`Config file not found: ${configPath}. Run 'usm init' first.`);
   }
 
-  const content = fs.readFileSync(configPath, "utf-8");
-  const config = JSON.parse(content) as UsmConfig;
+  let config: UsmConfig;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, "utf-8")) as UsmConfig;
+  } catch (err) {
+    throw new Error(
+      `usmconfig.json is not valid JSON: ${configPath}\n  ${(err as Error).message}`,
+      { cause: err },
+    );
+  }
+
+  const { valid, errors } = validateConfigObject(config);
+  if (!valid) {
+    throw new Error(formatConfigErrors(configPath, errors).join("\n"));
+  }
 
   if (!config.version || config.version !== "1") {
     throw new Error(`Invalid usmconfig version: ${config.version}. Expected "1".`);

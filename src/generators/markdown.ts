@@ -1895,6 +1895,15 @@ export function generateConfigReference(root: string): GenerationResult {
   lines.push("");
   lines.push("Fields in `usmconfig.json` — the configuration file that drives `usm init` and `usm scan`.");
   lines.push("");
+  // Namespace-confusion guard (issue #43): consumers invented config keys from
+  // spec-schema field names (agent_context), and chased a usm.yaml format that
+  // does not exist, because the two schemas share surface names. State the
+  // boundary plainly, up top.
+  lines.push("::: warning Two schemas, two artifacts");
+  lines.push("`usmconfig.json` is the **only** configuration format — there is no `usm.yaml`, and none is planned.");
+  lines.push("The schema at `https://usm.dev/schema/v1.json` describes **`.usm` spec files** (YAML), a different artifact. Do not derive config keys from spec-schema field names: for example, `agent_context` is a valid **system.usm** field, **not** a config key. Unknown config keys are rejected with an error at load time — validate configs in CI with `usm validate --config usmconfig.json`.");
+  lines.push(":::");
+  lines.push("");
 
   // Top-level fields
   lines.push("## Top-Level Fields");

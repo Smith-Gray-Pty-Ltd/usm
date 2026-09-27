@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile, splitImplementationPaths as splitImplementationPathsUtil } from "../parse.js";
 import { validateUsm, validateUsmFile } from "../validate.js";
+import { formatConfigErrors, validateConfigObject, validateConfigFile } from "../validateConfig.js";
 import { generate } from "../generate.js";
 import { findUsmFiles, findAllUsmFiles } from "../parse.js";
 import { runQuery, QueryParseError } from "../query/index.js";
@@ -782,9 +783,26 @@ scanCommand
 
 program
   .command("validate")
-  .description("Validate .usm files against the v1 schema")
-  .arguments("<files...>")
-  .action((files: string[]) => {
+  .description("Validate .usm files against the v1 schema (or --config <path> to validate usmconfig.json)")
+  .arguments("[files...]")
+  .option("--config <path>", "Validate a usmconfig.json file instead of .usm files")
+  .action((files: string[], options: { config?: string }) => {
+    // ── --config mode (issue #43): validate usmconfig.json for CI ──────────
+    if (options.config) {
+      const cfgPath = path.resolve(options.config);
+      const result = validateConfigFile(cfgPath);
+      if (result.parseError) {
+        console.error(fail(`usmconfig.json is not valid JSON: ${cfgPath}\n  ${result.parseError}`));
+        process.exit(1);
+      }
+      if (result.valid) {
+        console.log(ok(`${cfgPath} — valid against usmconfig-v1`));
+        process.exit(0);
+      }
+      console.error(fail(formatConfigErrors(cfgPath, result.errors).join("\n")));
+      process.exit(1);
+    }
+
     const allPaths: string[] = [];
 
     // If the user passes just ".usm/" or the root, scan all sub-.usm dirs
@@ -858,6 +876,24 @@ program
     const root = path.resolve(options.root);
     const onlyTarget = options.only;
     const runAll = !onlyTarget;
+
+    // ── Config gate (issue #43): invalid usmconfig.json is a HARD error
+    // before any side effect. Pass-level catches below report-and-continue
+    // by design (per-file resilience); the config is not per-file — bail here.
+    {
+      const configPath = path.join(root, "usmconfig.json");
+      if (fs.existsSync(configPath)) {
+        const cfgCheck = validateConfigFile(configPath);
+        if (cfgCheck.parseError) {
+          console.error(fail(`usmconfig.json is not valid JSON: ${configPath}\n  ${cfgCheck.parseError}`));
+          process.exit(1);
+        }
+        if (!cfgCheck.valid) {
+          console.error(fail(formatConfigErrors(configPath, cfgCheck.errors).join("\n")));
+          process.exit(1);
+        }
+      }
+    }
 
     // Validate --only target early (before any generation)
     const validTargets = ["docs", "help-docs", "togaf", "archimate", "openapi", "tests", "rules", "agents-md", "structurizr", "readme-facts"];
@@ -1552,8 +1588,20 @@ program
       let enrichConfig: EnrichmentConfig;
 
       if (fs.existsSync(configPath)) {
-        const configContent = fs.readFileSync(configPath, "utf-8");
-        const config = JSON.parse(configContent) as Record<string, unknown>;
+        let configContent: string;
+        let config: Record<string, unknown>;
+        try {
+          configContent = fs.readFileSync(configPath, "utf-8");
+          config = JSON.parse(configContent) as Record<string, unknown>;
+        } catch (err) {
+          console.error(fail(`usmconfig.json is not valid JSON: ${configPath}\n  ${(err as Error).message}`));
+          process.exit(1);
+        }
+        const cfgCheck = validateConfigObject(config);
+        if (!cfgCheck.valid) {
+          console.error(fail(formatConfigErrors(configPath, cfgCheck.errors).join("\n")));
+          process.exit(1);
+        }
         const enrichSection = config.enrichment as Partial<EnrichmentConfig> | undefined;
 
         if (enrichSection && enrichSection.enabled === false) {

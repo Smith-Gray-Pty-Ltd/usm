@@ -51,7 +51,12 @@ describe("usm/cli-config-outputs", () => {
       root = fs.mkdtempSync(path.join(os.tmpdir(), "usm-outputs-custom-"));
       fs.writeFileSync(
         path.join(root, "usmconfig.json"),
-        JSON.stringify({ outputs: { docs: "generated/site", tests: "generated/specs" } }),
+        JSON.stringify({
+          $schema: "https://usm.dev/schema/usmconfig-v1.json",
+          version: "1",
+          name: "t",
+          outputs: { docs: "generated/site", tests: "generated/specs" },
+        }),
         "utf-8",
       );
     });
@@ -73,7 +78,7 @@ describe("usm/cli-config-outputs", () => {
     });
   });
 
-  describe("malformed config falls back to defaults", () => {
+  describe("malformed config is a hard error (issue #43)", () => {
     let root: string;
     beforeAll(() => {
       root = fs.mkdtempSync(path.join(os.tmpdir(), "usm-outputs-bad-"));
@@ -81,8 +86,39 @@ describe("usm/cli-config-outputs", () => {
     });
     afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
-    it("docs still resolve to default", () => {
-      expect(outDir(root, "docs")).toBe(path.join(root, ".usm-workspace", "docs"));
+    it("docs resolution throws with the parse error, not silent defaults", () => {
+      expect(() => outDir(root, "docs")).toThrow(/not valid JSON/);
+    });
+  });
+
+  describe("unknown outputs keys are a hard error (issue #43)", () => {
+    let root: string;
+    beforeAll(() => {
+      root = fs.mkdtempSync(path.join(os.tmpdir(), "usm-outputs-unknown-"));
+      fs.writeFileSync(
+        path.join(root, "usmconfig.json"),
+        JSON.stringify({
+          $schema: "https://usm.dev/schema/usmconfig-v1.json",
+          version: "1",
+          name: "t",
+          outputs: { agent_context: ".usm-workspace/", api_docs: "docs/api/" },
+        }),
+        "utf-8",
+      );
+    });
+    afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+    it("docs resolution throws naming the unknown key", () => {
+      expect(() => outDir(root, "docs")).toThrow(/agent_context/);
+    });
+
+    it("the error includes the api_docs → openapi rename hint", () => {
+      try {
+        outDir(root, "docs");
+        expect.unreachable("outDir should have thrown");
+      } catch (err) {
+        expect((err as Error).message).toContain("openapi");
+      }
     });
   });
 });

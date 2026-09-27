@@ -1,0 +1,172 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/config-validation
+$type: feature
+$version: 1
+$last_updated: "2026-09-27"
+summary: >-
+  Validate usmconfig.json at load time against the packaged usmconfig-v1.json schema — unknown or
+  malformed keys are hard errors with actionable messages naming the supported set — and add `usm
+  validate --config <path>` so consumers can gate config correctness in CI with no side effects.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  A consumer config can look like it directs output to specific directories while every artifact
+  silently lands in .usm-workspace/ defaults. The schema has additionalProperties: false but nothing
+  validates the file — the loader spreads unknown keys no code path reads, with a silent catch
+  fallback to defaults. The safekeys repo shipped four invalid keys (agent_context, api_docs,
+  design_docs, diagrams) for its whole life with zero signal. Config correctness must be checkable
+  in CI and loud at load time, because output-location errors surface far from their cause. Origin
+  of the invented keys: namespace confusion — agent_context is a real system.usm spec-schema field,
+  not a config key, and the author extrapolated companions (issue #43, incl. usm.yaml red herring
+  from reading the spec schema).
+status: built
+flows:
+  - id: author-valid-config
+    name: Author and correct a usmconfig.json
+    description: >-
+      The adopter-onboarding loop the config exists for: init writes a config, the consumer tunes
+      output paths, and a typo fails loudly instead of silently misdirecting output.
+    steps:
+      - actor: adopter
+        id: s1
+        action: edit
+        surface: spec
+        target: usmconfig.json outputs section with repo-specific paths
+      - actor: adopter
+        id: s2
+        action: check
+        surface: cli
+        target: usm validate --config usmconfig.json before wiring it into CI
+      - actor: adopter
+        id: s3
+        action: fix
+        surface: spec
+        target: any reported key — unknown keys list the supported set; renamed keys show the modern name
+      - actor: adopter
+        id: s4
+        action: run
+        surface: cli
+        target: usm generate with the corrected config and confirm outputs land in the configured paths
+  - id: validate-config-at-load
+    name: Config validation pipeline
+    steps:
+      - actor: agent
+        id: s1
+        action: load
+        target: usmconfig.json from the repo root (all readers route through the shared loader)
+      - actor: agent
+        id: s2
+        action: validate
+        target: against the packaged usmconfig-v1.json schema; collect ALL violations, not just the first
+      - actor: agent
+        id: s3
+        action: report
+        target: structured errors with key path, supported keys for the section, and known rename hints
+      - actor: agent
+        id: s4
+        action: exit
+        target: hard error before any generation side effect when invalid
+contracts:
+  - id: config-validated-at-load
+    description: >-
+      Every place the CLI reads usmconfig.json validates it against the published usmconfig-v1.json
+      schema; unknown outputs.* keys (and other schema violations) are hard errors, never silent
+      defaults (issue #43).
+    must_have:
+      - >-
+        Unknown keys under outputs produce a hard error naming the key and the supported set
+        (workspace, docs, help_docs, archimate, togaf, openapi, tests, usm_source, agents_md)
+      - >-
+        Unknown keys at other config levels error with the same shape (key named, schema section
+        named)
+      - >-
+        All three readers (usm init, usm scan, usm generate) go through one validated loader — no
+        reader bypasses validation
+      - >-
+        A config that previously relied on silently-ignored keys now fails loudly at first use
+        instead of writing to the wrong output directory
+      - >-
+        Malformed JSON fails with the parse error, not silent defaults (the current silent catch is
+        removed)
+  - id: validate-config-flag
+    description: >-
+      usm validate gains a --config flag so consumers can gate config correctness in CI without side
+      effects.
+    must_have:
+      - >-
+        usm validate --config usmconfig.json reports valid/invalid with structured error paths, exit
+        0/1
+      - Same validation as the load-time check (single source of truth for the rule set)
+      - >-
+        No --config argument and no default usmconfig.json present → validate behaves exactly as
+        today (back-compat)
+  - id: errors-are-actionable
+    description: The load-time failure must tell the user exactly how to fix it, not just what broke.
+    must_have:
+      - Unknown-key error lists the valid keys for the section
+      - Error shows the offending config file path
+      - >-
+        A suggested replacement is included for known renamed keys where one exists (e.g. api_docs →
+        openapi)
+  - id: docs-break-namespace-confusion
+    description: >-
+      Docs prevent the two documented failure modes behind issue #43: inventing config keys from
+      spec-schema field names, and hunting for a YAML config format that does not exist.
+    must_have:
+      - >-
+        config-reference states usmconfig.json is the only configuration format; no usm.yaml exists
+        or is planned
+      - >-
+        config-reference states https://usm.dev/schema/v1.json is the schema for .usm spec files, a
+        different artifact — do not derive config keys from it
+      - >-
+        A note where the two schemas share names (e.g. agent_context is a system.usm field, not a
+        config key)
+  - id: backward-compatible
+    description: >-
+      Projects without a usmconfig.json, or with fully valid configs, behave byte-identically to
+      0.9.0.
+    must_have:
+      - No usmconfig.json → defaults used exactly as today (no new warnings)
+      - Valid config → identical output paths and identical generated artifacts
+      - The usmconfig-v1.json schema file itself gains no breaking changes
+tests:
+  - id: unknown-key-rejected
+    setup:
+      usmconfig_with_unknown_outputs_key: true
+    expect:
+      - assertion: >-
+          config with unknown outputs key (agent_context) fails at usm generate/init/scan load with
+          key name + supported set
+      - assertion: no generation side effects occur on invalid config
+      - assertion: known rename (api_docs) suggests openapi in the error
+    flow: validate-config-at-load
+  - id: validate-flag-ci
+    setup:
+      usmconfig_path_argument: true
+    expect:
+      - assertion: exit 0, structured report, no side effects on any file
+      - assertion: exit 1 with same errors as load-time validation for an invalid config
+    flow: author-valid-config
+  - id: valid-config-unchanged
+    setup:
+      valid_usmconfig: true
+    expect:
+      - assertion: byte-identical generate output vs 0.9.0 for the same valid config
+      - assertion: no usmconfig.json present → defaults, no warnings
+  - id: malformed-config-rejected
+    setup:
+      invalid_json_usmconfig: true
+    expect:
+      - assertion: parse error surfaced verbatim (not swallowed)
+      - assertion: exit non-zero
+see_also:
+  - usm/cli-generate
+  - usm/cli-init
+  - usm/cli-scan
+implementation:
+  primary: >-
+    src/validateConfig.ts; src/outputs.ts; src/outputPaths.ts; src/scan/structural.ts;
+    src/scan/init.ts; src/cli/index.ts
+  test_code: tests/validateConfig.test.ts; tests/outputPaths.test.ts
+  test_code_status: manual
