@@ -5,6 +5,7 @@ import { outDir } from "../outputPaths.js";
 import { copyGuidesIntoDocs } from "./docs.js";
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { parseUsmFile, parseUsmFileWithWarnings, isSystemFile, isServiceFile, isFeatureFile, splitImplementationPaths as splitImplementationPathsUtil } from "../parse.js";
 import { validateUsm, validateUsmFile } from "../validate.js";
 import { formatConfigErrors, validateConfigObject, validateConfigFile } from "../validateConfig.js";
@@ -1336,18 +1337,33 @@ program
     // patched (e.g. overview.md + surface tables) are compared as a whole.
     if (options.check) {
       let staleCount = 0;
+      let skippedCount = 0;
+      // Git-tracked set for the repo (if any). Outputs that are BOTH missing
+      // AND untracked are skipped, not failed: on a fresh clone they simply
+      // don't exist (gitignored build output like .usm-workspace/), so a CI
+      // drift gate could never pass (issue #42). Missing + tracked stays a
+      // hard fail — that's a real gap the generator should have filled.
+      const trackedOutputs = gitTrackedPaths(root);
       for (const outputPath of checkedPaths) {
         const expected = generatedByPath.get(outputPath);
         if (expected === undefined) continue;
         if (!fs.existsSync(outputPath)) {
-          console.log(fail(`${outputPath} ${dim("(missing)")}`));
-          staleCount++;
+          if (trackedOutputs && !trackedOutputs.has(path.relative(root, outputPath))) {
+            console.log(skip(`${outputPath} ${dim("(skipped: untracked)")}`));
+            skippedCount++;
+          } else {
+            console.log(fail(`${outputPath} ${dim("(missing)")}`));
+            staleCount++;
+          }
         } else if (fs.readFileSync(outputPath, "utf-8") === expected) {
           console.log(ok(`${outputPath} ${dim("(up to date)")}`));
         } else {
           console.log(fail(`${outputPath} ${dim("(out of date)")}`));
           staleCount++;
         }
+      }
+      if (skippedCount > 0) {
+        console.log(`\n${skip(`${skippedCount} output(s) absent and untracked — not checked. Run 'usm generate' locally if you want them produced.`)}`);
       }
       if (staleCount > 0) {
         console.log(`\n${fail(`${staleCount} output(s) out of date. Run 'usm generate' to refresh.`)}`);
@@ -1357,6 +1373,28 @@ program
   });
 
 // ─── roundtrip ─────────────────────────────────────────────────────────────────
+
+/**
+ * Set of git-tracked file paths (relative to `root`) for --check mode's
+ * untracked-skip rule (issue #42). Returns null when the directory is not a
+ * git work tree or git is unavailable — in that case --check keeps the old
+ * strict missing=stale behaviour (no silent weakening outside git).
+ */
+function gitTrackedPaths(root: string): Set<string> | null {
+  try {
+    const out = execSync(
+      "git ls-files -z",
+      { cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const set = new Set<string>();
+    for (const p of out.split("\0")) {
+      if (p) set.add(p);
+    }
+    return set;
+  } catch {
+    return null;
+  }
+}
 
 program
   .command("roundtrip")

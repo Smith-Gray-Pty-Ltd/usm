@@ -78,12 +78,16 @@ flows:
           in the emitted e2e skeletons under tests/auto-generated/e2e/ for journeys, replacing TODO
           markers with real locators
 contracts:
-  - id: generate-from-source-only
-    description: Generate must read .usm files directly — never derive docs from other docs
+  - description: Generate must read .usm files directly — never derive docs from other docs
+    id: generate-from-source-only
     must_have:
       - All outputs derived from parsed .usm data
       - Duplicate $ids detected and warned
       - "--check mode compares without writing"
+      - >-
+        Missing outputs outside git's tracked set are reported as (skipped: untracked) and do not
+        fail --check — CI on a fresh clone can pass; missing tracked outputs still fail (issue #42)
+      - The skip summary states the count and remedy (run usm generate) so absence is never silent
 tests:
   - expect:
       - assertion: markdown files written for each .usm
