@@ -151,3 +151,175 @@ describe("usm_update_feature", () => {
     expect(feature.see_also).toEqual(["usm/mcp-write"]);
   });
 });
+
+// ─── usm_update_system / usm_update_service merge semantics (issue #48) ──────
+
+const BASE_SYSTEM = `$schema: https://usm.dev/schema/v1.json
+$id: test-org/system
+$type: system
+$version: 1
+summary: Test system
+identity:
+  name: Test
+  domain: testing
+index: []
+services:
+  - id: svc-1
+    name: One
+    ref: apps/one
+    type: api
+  - id: svc-2
+    name: Two
+    ref: apps/two
+    type: api
+local_development:
+  package_manager: pnpm
+  known_quirks:
+    - id: q1
+      title: Existing quirk
+      description: keep me
+`;
+
+describe("usm_update_system merge semantics (issue #48)", () => {
+  let dir: string;
+  let file: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "usm-sys-update-"));
+    file = path.join(dir, "system.usm");
+    fs.writeFileSync(file, BASE_SYSTEM, "utf-8");
+  });
+
+  function readSystem() {
+    return parseUsmFile(file) as {
+      services?: Array<{ id: string; name: string }>;
+      local_development?: { package_manager?: string; known_quirks?: unknown[]; test_framework?: string };
+    };
+  }
+
+  it("merges a partial services array by id — existing entries survive", async () => {
+    const { updateSystemTool } = await import("../src/mcp/write.js");
+    const res = await updateSystemTool({
+      path: file,
+      fields: JSON.stringify({ services: [{ id: "svc-3", name: "Three", ref: "apps/three", type: "api" }] }),
+    });
+    const body = JSON.parse(res.content[0].text);
+    const system = readSystem();
+    expect((system.services ?? []).map((s) => s.id)).toEqual(["svc-1", "svc-2", "svc-3"]);
+    expect(body.merge_details.services).toMatchObject({ mode: "upsert-by-id", added: 1, updated: 0, preserved: 2 });
+  });
+
+  it("updates an existing service by id without duplicating", async () => {
+    const { updateSystemTool } = await import("../src/mcp/write.js");
+    await updateSystemTool({
+      path: file,
+      fields: JSON.stringify({ services: [{ id: "svc-1", name: "One Renamed", ref: "apps/one", type: "api" }] }),
+    });
+    const system = readSystem();
+    expect((system.services ?? []).length).toBe(2);
+    expect((system.services ?? []).find((s) => s.id === "svc-1")?.name).toBe("One Renamed");
+  });
+
+  it("supports replace for services when explicitly requested", async () => {
+    const { updateSystemTool } = await import("../src/mcp/write.js");
+    const res = await updateSystemTool({
+      path: file,
+      fields: JSON.stringify({ services: [{ id: "svc-x", name: "X", ref: "apps/x", type: "api" }] }),
+      replace: JSON.stringify(["services"]),
+    });
+    const body = JSON.parse(res.content[0].text);
+    expect(body.merge_details.services.mode).toBe("replaced");
+    const system = readSystem();
+    expect((system.services ?? []).map((s) => s.id)).toEqual(["svc-x"]);
+  });
+
+  it("deep-merges a partial local_development object — siblings survive", async () => {
+    const { updateSystemTool } = await import("../src/mcp/write.js");
+    const res = await updateSystemTool({
+      path: file,
+      fields: JSON.stringify({ local_development: { test_framework: "vitest" } }),
+    });
+    const body = JSON.parse(res.content[0].text);
+    const system = readSystem();
+    expect(system.local_development?.package_manager).toBe("pnpm");
+    expect(system.local_development?.test_framework).toBe("vitest");
+    expect((system.local_development?.known_quirks ?? []).length).toBe(1);
+    expect(body.merge_details.local_development.mode).toBe("deep-merged");
+  });
+});
+
+describe("usm_update_service merge semantics (issue #48)", () => {
+  let dir: string;
+  let file: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "usm-svc-update-"));
+    file = path.join(dir, "test-service.usm");
+    fs.writeFileSync(
+      file,
+      `$schema: https://usm.dev/schema/v1.json
+$id: test-org/my-service
+$type: service
+$version: 1
+summary: Test service
+$system: test-org/system
+name: My Service
+type: web-app
+runtime: node
+testing:
+  framework: vitest
+patterns: []
+`,
+      "utf-8",
+    );
+  });
+
+  function readService() {
+    return parseUsmFile(file) as {
+      testing?: { framework?: string; coverage_target?: string };
+      patterns?: Array<{ id: string; name: string }>;
+    };
+  }
+
+  it("deep-merges a partial testing object — framework survives", async () => {
+    const { updateServiceTool } = await import("../src/mcp/write.js");
+    const res = await updateServiceTool({
+      path: file,
+      fields: JSON.stringify({ testing: { coverage_target: "80%" } }),
+    });
+    const body = JSON.parse(res.content[0].text);
+    const svc = readService();
+    expect(svc.testing?.framework).toBe("vitest");
+    expect(svc.testing?.coverage_target).toBe("80%");
+    expect(body.merge_details.testing.mode).toBe("deep-merged");
+  });
+
+  it("merges patterns by id — appends new, preserves existing", async () => {
+    const { updateServiceTool } = await import("../src/mcp/write.js");
+    await updateServiceTool({
+      path: file,
+      fields: JSON.stringify({ patterns: [{ id: "p-1", name: "Existing", description: "first" }] }),
+    });
+    await updateServiceTool({
+      path: file,
+      fields: JSON.stringify({ patterns: [{ id: "p-2", name: "Second", description: "next" }] }),
+    });
+    const svc = readService();
+    expect((svc.patterns ?? []).map((p) => p.id)).toEqual(["p-1", "p-2"]);
+  });
+
+  it("modules merge by name (no id in schema)", async () => {
+    const { updateServiceTool } = await import("../src/mcp/write.js");
+    await updateServiceTool({
+      path: file,
+      fields: JSON.stringify({ modules: [{ name: "auth", purpose: "Auth handling" }] }),
+    });
+    await updateServiceTool({
+      path: file,
+      fields: JSON.stringify({ modules: [{ name: "billing", purpose: "Billing" }] }),
+    });
+    const svc = readService();
+    const modules = (svc as unknown as { modules?: Array<{ name: string }> }).modules ?? [];
+    expect(modules.map((m) => m.name)).toEqual(["auth", "billing"].slice(0, 2).map((n, i) => ["auth", "billing"][i]) as string[]).toEqual(["auth", "billing"]);
+  });
+});

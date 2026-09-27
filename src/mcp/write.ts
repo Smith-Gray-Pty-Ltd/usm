@@ -49,24 +49,51 @@ function atomicWrite(filePath: string, content: string): void {
 }
 
 /**
- * Feature fields whose values are arrays of objects keyed by `id`.
- * These merge by id on update (upsert) instead of being replaced wholesale —
- * a partial array passed with add-intent must never silently drop the
- * entries that weren't mentioned (issue #14).
+ * Fields whose values are arrays of objects with an identity key. These merge
+ * (upsert) on update instead of being replaced wholesale — a partial array
+ * passed with add-intent must never silently drop the entries that weren't
+ * mentioned (issue #14; extended to system/service fields for issue #48,
+ * where services 9→1 despite the tool text promising merge-by-id).
+ *
+ * Keyed by identity: `id` where the schema defines one, `name` otherwise
+ * (roles, modules). Merge key resolved per-item at runtime: prefer `id`,
+ * fall back to `name`.
  */
-const ID_BEARING_ARRAY_FIELDS = ["contracts", "flows", "tests", "decisions"];
+const ID_BEARING_ARRAY_FIELDS = [
+  // feature
+  "contracts", "flows", "tests", "decisions",
+  // system
+  "services", "index", "apis", "data", "auth_schemes", "personas", "design_pages", "roles",
+  // service
+  "modules", "patterns",
+];
+
+/** Object fields where a PARTIAL update means deep-merge, not replace (issue #48): */
+const DEEP_MERGE_OBJECT_FIELDS = new Set([
+  "local_development", "testing", "testing_details", "security", "infrastructure",
+  "deployment", "operations", "policies", "rbac", "dev", "prod", "identity", "feedback",
+]);
 
 interface MergeStats {
-  mode: "upsert-by-id" | "replaced" | "set";
+  mode: "upsert-by-id" | "replaced" | "set" | "deep-merged";
   added: number;
   updated: number;
   preserved: number;
 }
 
+/** Resolve an object's identity: `id` first, then `name`. */
+function identityOf(item: unknown): unknown {
+  if (!item || typeof item !== "object") return undefined;
+  if ("id" in (item as object)) return (item as { id: unknown }).id;
+  if ("name" in (item as object)) return (item as { name: unknown }).name;
+  return undefined;
+}
+
 /**
- * Merge an incoming array into an existing one by `id`.
- * - Items whose `id` matches an existing entry replace that entry (update).
- * - Items without a matching `id` (or without an `id`) are appended.
+ * Merge an incoming array into an existing one by identity (`id`, falling
+ * back to `name`).
+ * - Items whose identity matches an existing entry replace that entry (update).
+ * - Items without a matching identity are appended.
  * - Existing entries not mentioned in the incoming array are preserved.
  */
 function upsertById(existing: unknown[], incoming: unknown[]): { merged: unknown[]; stats: MergeStats } {
@@ -74,12 +101,13 @@ function upsertById(existing: unknown[], incoming: unknown[]): { merged: unknown
   let added = 0;
   let updated = 0;
   for (const item of incoming) {
-    const itemId = item && typeof item === "object" && "id" in item ? (item as { id: unknown }).id : undefined;
+    const itemId = identityOf(item);
     const idx =
       itemId !== undefined
-        ? merged.findIndex(
-            (e) => e && typeof e === "object" && "id" in e && (e as { id: unknown }).id === itemId,
-          )
+        ? merged.findIndex((e) => {
+            const eid = identityOf(e);
+            return eid !== undefined && eid === itemId;
+          })
         : -1;
     if (idx >= 0) {
       merged[idx] = item;
@@ -90,6 +118,28 @@ function upsertById(existing: unknown[], incoming: unknown[]): { merged: unknown
     }
   }
   return { merged, stats: { mode: "upsert-by-id", added, updated, preserved: existing.length - updated } };
+}
+
+/**
+ * Shallow-recursive merge for context objects (issue #48): keys present in
+ * `incoming` win; keys only in `existing` are preserved. Arrays and scalars
+ * inside the object are replaced when explicitly passed — add-intent for a
+ * sibling key must never delete it.
+ */
+function deepMergeContext(existing: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    const prev = existing[key];
+    if (
+      value && typeof value === "object" && !Array.isArray(value) &&
+      prev && typeof prev === "object" && !Array.isArray(prev)
+    ) {
+      out[key] = deepMergeContext(prev as Record<string, unknown>, value as Record<string, unknown>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 /**
@@ -674,13 +724,25 @@ export async function updateSystemTool(args: { id?: string; path?: string; field
     const replaceFields = args.replace ? (JSON.parse(args.replace) as string[]) : [];
     const replaceSet = new Set(replaceFields);
     const fieldsUpdated: string[] = [];
+    const mergeDetails: Record<string, MergeStats> = {};
 
     for (const [key, value] of Object.entries(updates)) {
       if (ID_BEARING_ARRAY_FIELDS.includes(key) && Array.isArray(value) && !replaceSet.has(key)) {
         const existing = Array.isArray(system[key]) ? (system[key] as unknown[]) : [];
-        const { merged } = upsertById(existing, value);
+        const { merged, stats } = upsertById(existing, value);
         system[key] = merged;
+        mergeDetails[key] = stats;
+      } else if (
+        DEEP_MERGE_OBJECT_FIELDS.has(key) && value && typeof value === "object" &&
+        !Array.isArray(value) && system[key] && typeof system[key] === "object" && !Array.isArray(system[key])
+      ) {
+        // Partial context-object update = deep-merge, never sibling deletion (#48)
+        system[key] = deepMergeContext(system[key] as Record<string, unknown>, value as Record<string, unknown>);
+        mergeDetails[key] = { mode: "deep-merged", added: 0, updated: Object.keys(value as object).length, preserved: 0 };
       } else {
+        if (ID_BEARING_ARRAY_FIELDS.includes(key)) {
+          mergeDetails[key] = { mode: "replaced", added: Array.isArray(value) ? value.length : 0, updated: 0, preserved: 0 };
+        }
         system[key] = value;
       }
       fieldsUpdated.push(key);
@@ -693,7 +755,10 @@ export async function updateSystemTool(args: { id?: string; path?: string; field
 
     atomicWrite(filePath, yaml.dump(system, { indent: 2, lineWidth: 100, noRefs: true, quotingType: '"' }));
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ updated: true, path: filePath, fields_updated: fieldsUpdated }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({
+        updated: true, path: filePath, fields_updated: fieldsUpdated,
+        ...(Object.keys(mergeDetails).length > 0 ? { merge_details: mergeDetails } : {}),
+      }, null, 2) }],
     };
   } catch (err) {
     return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Update failed: ${(err as Error).message}` }, null, 2) }], isError: true };
@@ -732,13 +797,25 @@ export async function updateServiceTool(args: { id?: string; path?: string; fiel
     const replaceFields = args.replace ? (JSON.parse(args.replace) as string[]) : [];
     const replaceSet = new Set(replaceFields);
     const fieldsUpdated: string[] = [];
+    const mergeDetails: Record<string, MergeStats> = {};
 
     for (const [key, value] of Object.entries(updates)) {
       if (ID_BEARING_ARRAY_FIELDS.includes(key) && Array.isArray(value) && !replaceSet.has(key)) {
         const existing = Array.isArray(service[key]) ? (service[key] as unknown[]) : [];
-        const { merged } = upsertById(existing, value);
+        const { merged, stats } = upsertById(existing, value);
         service[key] = merged;
+        mergeDetails[key] = stats;
+      } else if (
+        DEEP_MERGE_OBJECT_FIELDS.has(key) && value && typeof value === "object" &&
+        !Array.isArray(value) && service[key] && typeof service[key] === "object" && !Array.isArray(service[key])
+      ) {
+        // Partial context-object update = deep-merge, never sibling deletion (#48)
+        service[key] = deepMergeContext(service[key] as Record<string, unknown>, value as Record<string, unknown>);
+        mergeDetails[key] = { mode: "deep-merged", added: 0, updated: Object.keys(value as object).length, preserved: 0 };
       } else {
+        if (ID_BEARING_ARRAY_FIELDS.includes(key)) {
+          mergeDetails[key] = { mode: "replaced", added: Array.isArray(value) ? value.length : 0, updated: 0, preserved: 0 };
+        }
         service[key] = value;
       }
       fieldsUpdated.push(key);
@@ -751,7 +828,10 @@ export async function updateServiceTool(args: { id?: string; path?: string; fiel
 
     atomicWrite(filePath, yaml.dump(service, { indent: 2, lineWidth: 100, noRefs: true, quotingType: '"' }));
     return {
-      content: [{ type: "text" as const, text: JSON.stringify({ updated: true, path: filePath, fields_updated: fieldsUpdated }, null, 2) }],
+      content: [{ type: "text" as const, text: JSON.stringify({
+        updated: true, path: filePath, fields_updated: fieldsUpdated,
+        ...(Object.keys(mergeDetails).length > 0 ? { merge_details: mergeDetails } : {}),
+      }, null, 2) }],
     };
   } catch (err) {
     return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Update failed: ${(err as Error).message}` }, null, 2) }], isError: true };
