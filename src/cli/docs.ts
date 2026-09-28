@@ -846,7 +846,12 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
   // The group is titled "Getting Started" — a same-named item inside it is
   // redundant (repeated nav text). The page itself is linked from the
   // homepage hero; group-name-as-page-title suffices.
-  if (audience === "developer" && docExists("agent-setup-guide")) {
+  // Agent Setup Guide — both audiences: it's the onboarding page for the
+  // exact person the help audience is (wiring an agent into the spec-first
+  // workflow), shipped as universal package content (usm/pkg-universal-docs).
+  // The old developer-only guard orphaned it in help: the page rendered but
+  // no nav pointed at it.
+  if (docExists("agent-setup-guide")) {
     pushItem("Agent Setup Guide", "/agent-setup-guide", gettingStarted);
   }
   // Editor setup guides — available for both audiences (help + developer)

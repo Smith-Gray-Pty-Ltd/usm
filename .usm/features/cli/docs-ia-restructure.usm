@@ -116,12 +116,15 @@ contracts:
         Help tree excludes features/ area pages (all areas, including cli) and
         design/decision-register
       - >-
-        Help keeps Roadmap, reference pages, guides, getting-started, editor setup, language
-        support, feedback
+        Help keeps Roadmap, reference pages, guides, getting-started, agent-setup-guide, editor
+        setup, language support, feedback
       - >-
         Roadmap links that point at excluded feature pages degrade to plain text in the help tree
         (same guard pattern as package docs)
       - Help sidebar never shows a group containing contract/flow/test internals
+      - >-
+        Agent Setup Guide appears in the help sidebar Getting Started group — the page renders in
+        both audiences (universal package content) and must never be nav-orphaned in either
   - description: >-
       The roadmap stays current: every shipped feature appears, and stale statuses are corrected at
       the spec level — the roadmap page renders from system.usm, so fixing the source fixes the

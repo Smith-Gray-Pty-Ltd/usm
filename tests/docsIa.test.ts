@@ -203,6 +203,14 @@ describe("sidebar IA restructure (usm/docs-ia-restructure)", () => {
       const roadmapEntries = (pm?.items ?? []).filter((i) => i.text === "Roadmap");
       expect(roadmapEntries.length).toBe(1);
     });
+
+    it("Agent Setup Guide is reachable from the help sidebar (not nav-orphaned)", () => {
+      // Page shipped + sidebar link present in the Getting Started group
+      writePage("agent-setup-guide.md");
+      groups = generateSidebar(dir, docsRoot, "help") as typeof groups;
+      const gs = groups.find((g) => g.text === "Getting Started");
+      expect(gs?.items?.some((i) => i.text === "Agent Setup Guide")).toBe(true);
+    });
   });
 });
 describe("roadmap covers built features (usm/docs-ia-restructure roadmap-current)", () => {
