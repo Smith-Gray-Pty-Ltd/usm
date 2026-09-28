@@ -624,7 +624,7 @@ function loadHelpPersonas(root: string): Persona[] {
  * in the help-docs tree. Fixes dead links in index/roadmap pages after
  * feature filtering removes the target pages.
  */
-function stripDeadLinks(content: string, dirPath: string): string {
+function stripDeadLinks(content: string, dirPath: string, helpRootForLinks?: string): string {
   const lines = content.split("\n");
   const result: string[] = [];
 
@@ -635,6 +635,11 @@ function stripDeadLinks(content: string, dirPath: string): string {
     // when the target does not resolve within the help tree.
     // Handles: absolute (/x/y), relative (./x, ../x, guides/x), with or
     // without .md suffix (VitePress serves both; resolve .md on disk).
+    // Leading-slash targets are SITE-absolute: resolve them against the help
+    // tree root, NOT the filesystem root. path.resolve(dirPath, "/x") yields
+    // "/x" at the disk root, which never exists — that stripped every
+    // site-absolute link from every help page (editor-setup index rendered
+    // as bare headings with no links).
     const linkMatch = line.match(/\[([^\]]*)\]\(([^)]+)\)/);
     if (linkMatch) {
       const target = linkMatch[2];
@@ -645,9 +650,17 @@ function stripDeadLinks(content: string, dirPath: string): string {
           withoutAnchor.endsWith(".md") ? withoutAnchor : withoutAnchor + ".md",
           withoutAnchor.endsWith("/index.md") ? withoutAnchor : withoutAnchor.replace(/\/?$/, "/index.md"),
         ];
+        // helpRoot passed via module-level context: resolve site-absolute
+        // links against it, relative links against the file's own dir.
         const exists = candidates.some((c) => {
-          const resolved = path.resolve(dirPath, c);
-          return fs.existsSync(resolved);
+          if (c.startsWith("/")) {
+            // Site-absolute: resolve against the help tree root. Unavailable
+            // root (direct unit-test calls) → fall back to the file's dir,
+            // matching the pre-fix behaviour for relative-only content.
+            const base = helpRootForLinks ? path.join(helpRootForLinks, c.replace(/^\//, "")) : path.resolve(dirPath, c);
+            return fs.existsSync(base);
+          }
+          return fs.existsSync(path.resolve(dirPath, c));
         });
         if (!exists) {
           continue; // dead link — skip this line
@@ -738,9 +751,9 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
           }
         }
 
-        // Strip links to pages that don't exist in the help-docs tree
-        // (area-overview indexes and roadmap reference filtered-out features)
-        content = stripDeadLinks(content, path.dirname(dstPath));
+        // Link stripping now runs as a second pass after the full copy (see
+        // below) — in-copy stripping saw a mid-population tree and stripped
+        // forward references.
 
         fs.writeFileSync(dstPath, content, "utf-8");
         copied++;
@@ -749,6 +762,25 @@ export function filterForHelpAudience(root: string, docsRoot: string, helpRoot: 
   }
 
   copyFiltered(docsRoot, helpRoot, "");
+
+  // Dead-link stripping runs AFTER the full copy: stripDeadLinks checks
+  // targets against the help tree on disk, and during the copy the tree is
+  // mid-population (alphabetical order) — forward references like
+  // agent-setup-guide → cli-reference.md were stripped as dead even though
+  // cli-reference.md lands in the same pass. A second pass over the
+  // completed tree sees every target. (Ordering bug behind the missing
+  // editor-setup link lists and empty Next Steps sections.)
+  const stripPass = (d: string): void => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, entry.name);
+      if (entry.isDirectory()) { stripPass(p); continue; }
+      if (!entry.name.endsWith(".md")) continue;
+      const content = fs.readFileSync(p, "utf-8");
+      const stripped = stripDeadLinks(content, path.dirname(p), helpRoot);
+      if (stripped !== content) fs.writeFileSync(p, stripped, "utf-8");
+    }
+  };
+  stripPass(helpRoot);
 
   // Sidebar/nav may have changed (new/removed feature pages) — refresh the
   // VitePress config. Idempotent: write-on-change only, so the running dev

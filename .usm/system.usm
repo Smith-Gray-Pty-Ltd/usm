@@ -780,9 +780,9 @@ reference_pages:
         text: Next Steps
       - type: paragraph
         text: >-
-          - [CLI Reference](cli-reference.md) - [Configuration](config-reference.md) - [Schema
-          Reference](schema-reference.md) - [MCP Tools](mcp-reference.md) - [Language
-          Support](language-support.md)
+          - [CLI Reference](/cli-reference) - [Configuration](/config-reference) - [Schema
+          Reference](/schema-reference) - [MCP Tools](/mcp-reference) - [Language
+          Support](/language-support)
   - id: getting-started
     title: Getting Started
     audience: public
