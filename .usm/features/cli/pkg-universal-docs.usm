@@ -1,0 +1,176 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/pkg-universal-docs
+$type: feature
+$version: 1
+$last_updated: "2026-09-28"
+summary: >-
+  Ship universal onboarding docs (getting-started, agent-setup-guide, per-editor MCP setup guides)
+  inside the @smithgray/usm npm package and merge them into the consumer's generated docs tree when
+  the consumer repo has no docs-source/ of its own. Consumer docs-source/ always wins; package
+  content is fallback only.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  A consumer installing @smithgray/usm into a fresh repo gets zero onboarding pages:
+  getting-started, agent-setup-guide, and the per-editor MCP setup guides exist only in USM's own
+  docs-source/, which the npm package does not ship. The docs homepage guard silently swaps the
+  Getting Started link for "Browse the sidebar", so a new user's first click lands nowhere.
+  Universal onboarding should come from the package itself and be merged into the consumer's
+  generated docs when they have none of their own — the package knows how to teach USM; the
+  consumer's docs shouldn't start empty. Also the carrier for issue #45's consumer guidance: version
+  pinning, the upgrade → regenerate → commit workflow, and generate --check CI-gate semantics belong
+  in shipped docs so every consumer agent inherits them instead of guessing in chat.
+status: built
+flows:
+  - id: onboard-with-zero-setup
+    name: Onboard with zero authored docs
+    steps:
+      - actor: adopter
+        id: s1
+        action: install
+        surface: cli
+        target: "@smithgray/usm in a repo that has no docs-source/ of its own"
+      - actor: adopter
+        id: s2
+        action: run
+        surface: cli
+        target: usm generate
+      - actor: adopter
+        id: s3
+        action: review
+        surface: browser
+        target: >-
+          Getting Started and Agent Setup Guide pages in the docs preview — onboarding exists with
+          zero authored content
+      - actor: adopter
+        id: s4
+        action: follow
+        surface: browser
+        target: the agent-setup guide links into the per-editor MCP setup guides
+  - id: consumer-override
+    name: Override with your own docs-source
+    steps:
+      - actor: adopter
+        id: s1
+        action: create
+        surface: spec
+        target: docs-source/ in the repo root with their own agent-setup-guide.md or editor guides
+      - actor: adopter
+        id: s2
+        action: run
+        surface: cli
+        target: usm generate
+      - actor: adopter
+        id: s3
+        action: verify
+        surface: browser
+        target: their pages render and no package onboarding pages leaked in
+  - id: merge-universal-docs
+    name: Universal docs merge pipeline
+    steps:
+      - actor: agent
+        id: s1
+        action: detect
+        target: consumer docs-source/ at the repo root
+      - actor: agent
+        id: s2
+        action: copy
+        target: consumer docs-source/ into the docs output tree when present (today's behavior, unchanged)
+      - actor: agent
+        id: s3
+        action: resolve
+        target: package docs-source/ when the consumer repo has none
+      - actor: agent
+        id: s4
+        action: copy
+        target: >-
+          package universal pages into the docs output tree, skipping any filename that a generated
+          page already claimed
+contracts:
+  - id: package-ships-universal-docs
+    description: >-
+      The npm package ships a universal docs-source/ directory with the onboarding pages every
+      consumer repo needs; file list includes it so it lands in the tarball.
+    must_have:
+      - package files[] includes docs-source/
+      - >-
+        shipped set covers agent-setup-guide.md, getting-started.md, and editor-setup/ (index +
+        per-editor guides)
+      - shipped pages contain no repo-specific content (no Smith & Gray ids, no internal links)
+  - id: consumer-override
+    description: >-
+      Precedence is total: consumer repo docs-source/ wins wholesale; generated reference_pages beat
+      package content on filename collision; package content is fallback only.
+    must_have:
+      - >-
+        consumer repo with docs-source/ gets byte-identical output to today (no package content
+        copied)
+      - consumer repo without docs-source/ gets the package set copied into the docs output tree
+      - package file never overwrites a generated page with the same output name
+      - merge is skipped in --check mode (no writes)
+  - id: nav-lights-up-automatically
+    description: >-
+      Existing dead-link guards light up automatically once package content is present — no guard
+      changes required for consumers to see onboarding nav.
+    must_have:
+      - homepage renders the Getting Started link when the package page was copied (hasPage guard)
+      - >-
+        sidebar shows Editor Setup and Agent Setup Guide entries when the pages exist (docExists
+        guard)
+      - consumer trees without the package content keep today's guarded behavior (no regression)
+  - id: link-discipline-in-consumer-tree
+    description: >-
+      All shipped pages pass the full-link discipline in the CONSUMER output tree: every link
+      resolves, sidebar and content, both docs audiences.
+    must_have:
+      - no relative or .md-suffixed hrefs in shipped page content
+      - crawl of a consumer fixture tree: 0 dead links, 0 duplicate links, both audiences
+      - >-
+        cross-page links limited to pages guaranteed by the copy step (editor-setup/,
+        agent-setup-guide, getting-started) or guarded at generation time
+  - id: idempotent-universal-docs
+    description: >-
+      Package docs merge is deterministic and repeatable: same inputs produce byte-identical output
+      trees.
+    must_have:
+      - second usm generate run produces byte-identical docs output
+      - removed package files do not leave orphans in a clean tree
+      - existing consumer-repo behavior unchanged for every other generator pass
+tests:
+  - id: consumer-without-docs-source
+    setup:
+      consumer_repo_fixture_without_docs_source: true
+    expect:
+      - assertion: agent-setup-guide.md and editor-setup/index.md exist in the docs output tree
+      - assertion: sidebar contains Editor Setup and Agent Setup Guide entries
+      - assertion: homepage shows the Getting Started link
+    flow: onboard-with-zero-setup
+  - id: consumer-with-docs-source
+    setup:
+      consumer_repo_fixture_with_docs_source: true
+    expect:
+      - assertion: consumer pages copied; package onboarding pages absent
+      - assertion: output byte-identical to pre-feature generate run
+    flow: consumer-override
+  - id: link-crawl-consumer-tree
+    setup:
+      consumer_fixture_docs_built: true
+    expect:
+      - assertion: 0 dead links, 0 duplicate links across sidebar and content in both audiences
+      - assertion: no relative or .md-suffixed hrefs in shipped pages
+  - id: idempotent-merge
+    setup:
+      generate_run_twice: true
+    expect:
+      - assertion: second run byte-identical
+      - assertion: "--check mode writes nothing"
+see_also:
+  - usm/cli-generate
+  - usm/cli-docs
+implementation:
+  primary: >-
+    src/cli/index.ts (Pass 0 docs-source copy); package.json files[]; docs-source/getting-started.md
+    (new); docs-source/agent-setup-guide.md (link fixes); docs-source/editor-setup/* (absolute
+    links)
+  test_code: tests/packageDocs.test.ts
+  test_code_status: manual

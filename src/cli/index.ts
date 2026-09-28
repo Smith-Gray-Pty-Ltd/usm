@@ -1052,6 +1052,53 @@ program
       if (!checkedPaths.includes(p)) checkedPaths.push(p);
     };
 
+    // ─── Pass 0: static docs-source copy (BEFORE any generator renders) ────
+    // Universal onboarding from the npm package (issue #45): when the consumer
+    // repo has NO docs-source/ of its own, the package's docs-source/
+    // (getting-started, agent-setup-guide, editor setup guides) is merged
+    // instead. Consumer docs-source/ always wins wholesale; package files
+    // never overwrite a page a generator already produced.
+    // Runs FIRST so hasPage() sees the pages when Pass 1 renders the
+    // homepage — the Getting Started link lights up on the FIRST generate.
+    const copyDocsSource = (): void => {
+      let docsSourceDir = path.join(root, "docs-source");
+      let sourceKind: "consumer" | "package" | null = null;
+      if (fs.existsSync(docsSourceDir)) {
+        sourceKind = "consumer";
+      } else {
+        const packageDir = path.resolve(__dirname, "..", "..", "docs-source");
+        if (fs.existsSync(packageDir)) {
+          docsSourceDir = packageDir;
+          sourceKind = "package";
+        }
+      }
+      if (sourceKind === null) return;
+      const docsOutputDir = outDir(root, "docs");
+      const copyDir = (srcDir: string, destDir: string, isPackage: boolean) => {
+        for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+          const srcPath = path.join(srcDir, entry.name);
+          const destPath = path.join(destDir, entry.name);
+          if (entry.isDirectory()) {
+            fs.mkdirSync(destPath, { recursive: true });
+            copyDir(srcPath, destPath, isPackage);
+          } else if (entry.isFile()) {
+            // Package pages are fallback-only: skip any file a generator
+            // already claimed (e.g. a generated agent-setup-guide from
+            // system.usm reference_pages). Consumer files keep today's
+            // behavior — hand-authored beats generated on collision.
+            if (isPackage && generatedByPath.has(destPath)) continue;
+            fs.mkdirSync(path.dirname(destPath), { recursive: true });
+            fs.copyFileSync(srcPath, destPath);
+            console.log(arrow(`${destPath} ${dim(isPackage ? "(package docs)" : "(docs-source)")}`));
+          }
+        }
+      };
+      copyDir(docsSourceDir, docsOutputDir, sourceKind === "package");
+    };
+    if (!options.check && (runAll || onlyTarget === "docs")) {
+      copyDocsSource();
+    }
+
     // ─── Pass 1: Per-file generation (system, service, feature) ────────────
     const progressBar = startProgress("Generating", files.length);
     for (const filePath of files) {
@@ -1303,32 +1350,6 @@ program
         }
       } catch (err) {
         console.error(fail(`togaf — ${(err as Error).message}`));
-      }
-    }
-
-    // ─── Pass 7: Copy static docs-source/ files (editor setup guides, etc.) ─
-    // Hand-authored content that supplements the generated docs (e.g. 35
-    // per-editor MCP setup guides) lives in docs-source/ and is copied into
-    // .usm-workspace/docs/ so it appears in both developer and help docs sites.
-    if (!options.check && (runAll || onlyTarget === "docs")) {
-      const docsSourceDir = path.join(root, "docs-source");
-      if (fs.existsSync(docsSourceDir)) {
-        const docsOutputDir = outDir(root, "docs");
-        const copyDir = (srcDir: string, destDir: string) => {
-          for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-            const srcPath = path.join(srcDir, entry.name);
-            const destPath = path.join(destDir, entry.name);
-            if (entry.isDirectory()) {
-              fs.mkdirSync(destPath, { recursive: true });
-              copyDir(srcPath, destPath);
-            } else if (entry.isFile()) {
-              fs.mkdirSync(path.dirname(destPath), { recursive: true });
-              fs.copyFileSync(srcPath, destPath);
-              console.log(arrow(`${destPath} ${dim("(docs-source)")}`));
-            }
-          }
-        };
-        copyDir(docsSourceDir, docsOutputDir);
       }
     }
 

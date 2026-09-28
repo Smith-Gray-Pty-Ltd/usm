@@ -8,75 +8,75 @@ Find your editor, copy the config, start the spec-first workflow. Works with eve
 
 ### Anthropic
 
-- [**Claude Code**](./claude-code) — `claude mcp add` one-liner + CLAUDE.md always-on rules
-- [**Claude Desktop**](./claude-desktop) — Custom Connectors UI, paste one URL, no restart
+- [**Claude Code**](/editor-setup/claude-code) — `claude mcp add` one-liner + CLAUDE.md always-on rules
+- [**Claude Desktop**](/editor-setup/claude-desktop) — Custom Connectors UI, paste one URL, no restart
 
 ### OpenAI
 
-- [**Codex**](./openai-codex) — TOML at `~/.codex/config.toml` + AGENTS.md rules
-- [**ChatGPT**](./chatgpt) — Developer Mode apps (Pro, Plus, Team, Enterprise, Edu)
+- [**Codex**](/editor-setup/openai-codex) — TOML at `~/.codex/config.toml` + AGENTS.md rules
+- [**ChatGPT**](/editor-setup/chatgpt) — Developer Mode apps (Pro, Plus, Team, Enterprise, Edu)
 
 ### Cursor
 
-- [**Cursor**](./cursor) — `~/.cursor/mcp.json` + `.cursor/rules/usm-always.mdc` always-on rules
+- [**Cursor**](/editor-setup/cursor) — `~/.cursor/mcp.json` + `.cursor/rules/usm-always.mdc` always-on rules
 
 ### VS Code family
 
-- [**VS Code**](./vs-code) — `.vscode/mcp.json` per workspace + `.github/copilot-instructions.md`
-- [**Visual Studio**](./visual-studio) — `.mcp.json` per solution (VS 2022 17.12+)
-- [**Copilot Coding Agent**](./copilot-coding-agent) — Per-repo MCP configuration
-- [**Copilot CLI**](./copilot-cli) — `~/.copilot/mcp-config.json` with tools
-- [**Cline**](./cline) — VS Code extension, streamableHttp camelCase schema
-- [**Roo Code**](./roo-code) — Cline fork with `${env:VAR}` interpolation
-- [**Continue**](./continue) — VS Code extension, config in `config.json`
-- [**Augment Code**](./augment-code) — VS Code extension, `mcpServers` array schema
+- [**VS Code**](/editor-setup/vs-code) — `.vscode/mcp.json` per workspace + `.github/copilot-instructions.md`
+- [**Visual Studio**](/editor-setup/visual-studio) — `.mcp.json` per solution (VS 2022 17.12+)
+- [**Copilot Coding Agent**](/editor-setup/copilot-coding-agent) — Per-repo MCP configuration
+- [**Copilot CLI**](/editor-setup/copilot-cli) — `~/.copilot/mcp-config.json` with tools
+- [**Cline**](/editor-setup/cline) — VS Code extension, streamableHttp camelCase schema
+- [**Roo Code**](/editor-setup/roo-code) — Cline fork with `${env:VAR}` interpolation
+- [**Continue**](/editor-setup/continue) — VS Code extension, config in `config.json`
+- [**Augment Code**](/editor-setup/augment-code) — VS Code extension, `mcpServers` array schema
 
 ### Windsurf
 
-- [**Windsurf**](./windsurf) — Cascade marketplace + `${env:VAR}` interpolation
+- [**Windsurf**](/editor-setup/windsurf) — Cascade marketplace + `${env:VAR}` interpolation
 
 ### JetBrains
 
-- [**JetBrains**](./jetbrains) — AI Assistant across IntelliJ, WebStorm, PyCharm, Rider
+- [**JetBrains**](/editor-setup/jetbrains) — AI Assistant across IntelliJ, WebStorm, PyCharm, Rider
 
 ### opencode
 
-- [**opencode**](./opencode) — `opencode.json` local server + `.opencode/skills/usm-workflow/SKILL.md` always-on skill
+- [**opencode**](/editor-setup/opencode) — `opencode.json` local server + `.opencode/skills/usm-workflow/SKILL.md` always-on skill
 
 ### Google
 
-- [**Gemini CLI**](./gemini-cli) — httpUrl + SSE Accept header (use mcp-remote bridge)
-- [**Antigravity**](./antigravity) — MCP Store + raw `mcp_config.json`
+- [**Gemini CLI**](/editor-setup/gemini-cli) — httpUrl + SSE Accept header (use mcp-remote bridge)
+- [**Antigravity**](/editor-setup/antigravity) — MCP Store + raw `mcp_config.json`
 
 ### Other editors
 
-- [**Zed**](./zed) — `context_servers` + mcp-remote bridge
-- [**Trae**](./trae) — ByteDance IDE, Cursor-compatible config schema
-- [**Kiro**](./kiro) — AWS IDE, hot-reload on save, autoApprove per tool
-- [**Kilo Code**](./kilo-code) — `.kilocode/mcp.json` with streamable-http transport
+- [**Zed**](/editor-setup/zed) — `context_servers` + mcp-remote bridge
+- [**Trae**](/editor-setup/trae) — ByteDance IDE, Cursor-compatible config schema
+- [**Kiro**](/editor-setup/kiro) — AWS IDE, hot-reload on save, autoApprove per tool
+- [**Kilo Code**](/editor-setup/kilo-code) — `.kilocode/mcp.json` with streamable-http transport
 
 ### Other CLIs / terminals
 
-- [**Warp**](./warp) — AI terminal, STDIO-only + mcp-remote bridge
-- [**Amp**](./amp) — Sourcegraph CLI, `amp mcp add` one-liner
-- [**Amazon Q**](./amazon-q) — AWS Developer CLI, `/tools` + `/mcp` slash commands
-- [**Qwen Code**](./qwen-code) — Alibaba CLI, Gemini-compatible httpUrl schema
-- [**Crush**](./crush) — Charmbracelet TUI, top-level `mcp` object
-- [**Factory**](./factory) — droid CLI, `droid mcp add` one-liner
+- [**Warp**](/editor-setup/warp) — AI terminal, STDIO-only + mcp-remote bridge
+- [**Amp**](/editor-setup/amp) — Sourcegraph CLI, `amp mcp add` one-liner
+- [**Amazon Q**](/editor-setup/amazon-q) — AWS Developer CLI, `/tools` + `/mcp` slash commands
+- [**Qwen Code**](/editor-setup/qwen-code) — Alibaba CLI, Gemini-compatible httpUrl schema
+- [**Crush**](/editor-setup/crush) — Charmbracelet TUI, top-level `mcp` object
+- [**Factory**](/editor-setup/factory) — droid CLI, `droid mcp add` one-liner
 
 ### Desktop apps
 
-- [**LM Studio**](./lm-studio) — Local-LLM desktop, STDIO bridge via mcp-remote
-- [**BoltAI**](./boltai) — macOS AI chat, Settings → Plugins, STDIO bridge
-- [**Perplexity**](./perplexity) — Desktop Connectors (Pro, Max, Enterprise only)
+- [**LM Studio**](/editor-setup/lm-studio) — Local-LLM desktop, STDIO bridge via mcp-remote
+- [**BoltAI**](/editor-setup/boltai) — macOS AI chat, Settings → Plugins, STDIO bridge
+- [**Perplexity**](/editor-setup/perplexity) — Desktop Connectors (Pro, Max, Enterprise only)
 
 ### Other
 
-- [**Hermes**](./hermes) — Nous Research, YAML config at `~/.hermes/config.yaml`
-- [**Rovo Dev**](./rovo-dev) — Atlassian Rovo CLI, `acli rovodev mcp`
-- [**Zencoder**](./zencoder) — Agent tools menu, flat config
-- [**Qodo Gen**](./qodo-gen) — Qodo agent, VS Code + IntelliJ, agentic mode
-- [**Smithery**](./smithery) — Cross-client MCP installer, one command
+- [**Hermes**](/editor-setup/hermes) — Nous Research, YAML config at `~/.hermes/config.yaml`
+- [**Rovo Dev**](/editor-setup/rovo-dev) — Atlassian Rovo CLI, `acli rovodev mcp`
+- [**Zencoder**](/editor-setup/zencoder) — Agent tools menu, flat config
+- [**Qodo Gen**](/editor-setup/qodo-gen) — Qodo agent, VS Code + IntelliJ, agentic mode
+- [**Smithery**](/editor-setup/smithery) — Cross-client MCP installer, one command
 
 ---
 

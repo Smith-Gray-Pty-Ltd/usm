@@ -49,7 +49,7 @@ After configuring, your editor should show the USM MCP server with 18 tools:
 
 ## Next steps
 
-- [MCP setup index](./) — other editors
-- [Agent setup guide](../agent-setup-guide) — how to prompt your agent
-- [CLI reference](../cli-reference) — all USM commands
-- [Getting started](../getting-started) — full USM workflow
+- [MCP setup index](/editor-setup/) — other editors
+- [Agent setup guide](/agent-setup-guide) — how to prompt your agent
+- [CLI reference](/cli-reference) — all USM commands
+- [Getting started](/getting-started) — full USM workflow

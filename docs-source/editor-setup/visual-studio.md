@@ -27,7 +27,7 @@ npm install -g @smithgray/usm
 
 ## Rules file
 
-This editor does not support always-on rules/skills files. The spec-first workflow is enforced via the MCP tool descriptions and your prompts. See the [agent setup guide](../agent-setup-guide) for prompt templates.
+This editor does not support always-on rules/skills files. The spec-first workflow is enforced via the MCP tool descriptions and your prompts. See the [agent setup guide](/agent-setup-guide) for prompt templates.
 
 ## Verify it's working
 
@@ -38,7 +38,7 @@ After configuring, your editor should show the USM MCP server with 18 tools:
 
 ## Next steps
 
-- [MCP setup index](./) — other editors
-- [Agent setup guide](../agent-setup-guide) — how to prompt your agent
-- [CLI reference](../cli-reference) — all USM commands
-- [Getting started](../getting-started) — full USM workflow
+- [MCP setup index](/editor-setup/) — other editors
+- [Agent setup guide](/agent-setup-guide) — how to prompt your agent
+- [CLI reference](/cli-reference) — all USM commands
+- [Getting started](/getting-started) — full USM workflow

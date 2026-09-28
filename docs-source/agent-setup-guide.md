@@ -111,4 +111,6 @@ usm info .usm/system.usm         # Show system summary
 
 ## Next Steps
 
-- [CLI Reference](cli-reference.md) - [Configuration](config-reference.md) - [Schema Reference](schema-reference.md) - [MCP Tools](mcp-reference.md) - [Language Support](language-support.md)
+## Next Steps
+
+- [CLI Reference](/cli-reference) - [Configuration](/config-reference) - [Schema Reference](/schema-reference) - [MCP Tools](/mcp-reference) - [Language Support](/language-support)

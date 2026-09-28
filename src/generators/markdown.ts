@@ -2671,7 +2671,7 @@ export function generateDataIndex(root: string): GenerationResult {
   lines.push("");
   lines.push("Cross-cutting data documentation.");
   lines.push("");
-  lines.push("- [Data Models](models.md)");
+  lines.push("- [Data Models](/data/models)");
   lines.push("");
 
   return {
@@ -3271,7 +3271,7 @@ function buildArchDataModel(file: ServiceUsm, slug: string): string {
   lines.push("");
   lines.push(`This app uses the shared data model.`);
   lines.push("");
-  lines.push("For the full data model documentation, see [Data Models](../../../../.usm-workspace/docs/data/models.md).");
+  lines.push("For the full data model documentation, see [Data Models](/data/models).");
   lines.push("");
 
   // List modules that reference the database
