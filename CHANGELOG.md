@@ -1,5 +1,83 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- **feat: docs information architecture restructure** (`usm/docs-ia-restructure`)
+
+  The generated sidebar now renders correctly in VitePress and reads
+  audience-appropriately:
+
+  - Feature areas (CLI, Generators, MCP, Schema) are top-level sidebar
+    groups — the previous three-level nesting was silently flattened by
+    VitePress (a group titled "Roadmap" contained all 38 feature pages)
+  - Unique human labels: no "CLI CLI …" duplication, area overviews labelled
+    "<Area> overview", system.index names reused for disk-discovered features
+  - New top-level **Reference** group; "Design" renamed to "Architecture";
+    Source Map separated from reference pages
+  - Help docs = user journeys only: feature build specs and the Decision
+    Register excluded from the help tree; help sidebar is Getting Started →
+    Guides → Project Management (Roadmap) → Reference → Help
+  - Agent Setup Guide reachable in both audiences (was nav-orphaned in help)
+  - Roadmap brought current at the source: 17 shipped entries incl. all
+    0.9.x work, with a regression test that keeps it current
+  - Help filter link-strip fixes: site-absolute links resolve against the
+    tree root (were stripped as dead against the filesystem root); link
+    stripping runs post-copy (forward references no longer stripped mid-copy)
+
+### Patch Changes
+
+- **fix: usmconfig.json validated at load; `usm validate --config`** (#43)
+
+  Unknown/malformed config keys are hard errors with actionable messages
+  (rename hints, e.g. `api_docs` → `openapi`). All four config readers route
+  through one validated loader — `usm init` no longer emits keys that fail
+  the schema. Config-reference documents the two-schemas boundary (no
+  `usm.yaml`; the spec schema is unrelated to config keys).
+
+- **fix: `generate --check` skips missing untracked outputs** (#42)
+
+  On a fresh clone with gitignored build output, --check can now pass:
+  missing + untracked → skipped (reported, not failed); missing + tracked
+  and content drift still fail. Non-git directories keep strict behaviour.
+
+- **fix: MCP update_system/update_service merge id-bearing arrays** (#48)
+
+  `services`, `index`, `roles`, `modules`, `patterns` etc. merge by id/name
+  as documented — partial updates no longer silently delete unmentioned
+  entries (9 services → 1 data loss). Partial context-object updates
+  (`local_development`, `testing`, …) deep-merge. Responses include
+  `merge_details`.
+
+- **fix: `upgrade --apply` stamps alignment when nothing left to set up** (#46)
+
+  A repo whose capabilities are all configured gets `usm_version` recorded
+  instead of a silent no-op; unknown explicit targets fail loudly; `--check`
+  names `--apply` as the opt-in for the never-aligned case.
+
+- **fix: help-tree layout guard + honest output paths** (#44, #47)
+
+  `help_docs` nested inside `docs` is a hard error before any filesystem
+  mutation (was unbounded self-copy → ENAMETOOLONG); `docs build/serve
+  --audience help` derive the help tree instead of erroring; success
+  messages name the resolved output path.
+
+- **feat: universal onboarding docs shipped in the npm package** (#45)
+
+  getting-started, agent-setup-guide, and 36 per-editor MCP setup guides
+  ship inside the package and merge into consumer docs when the consumer
+  repo has no docs-source/ of its own. Homepage Getting Started link lights
+  up on the first generate. Links to absent pages degrade to plain text.
+
+- **fix(ci): commit messages passed via env, never interpolated into run:**
+
+  Command-injection hardening in USM's own deploy workflows (same class
+  fixed in a consumer repo).
+
+446 tests passing across 24 files.
+
+
 ## 0.9.0
 
 ### Minor Changes
