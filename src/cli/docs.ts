@@ -1313,9 +1313,13 @@ function generateVitePressConfig(root: string, docsRoot: string, audience: Audie
 
   const sitemapHost = audience === "help" ? "https://docs.usm.dev" : "https://dev-docs.usm.dev";
 
-  return `import { defineConfig } from 'vitepress'
-
-export default defineConfig({
+  // NOTE: no `import { defineConfig } from 'vitepress'` — the generated
+  // config must load WITHOUT vitepress being resolvable from the docs tree.
+  // In on-demand-fetch mode (and even with a global install), ESM resolution
+  // walking up from .usm-workspace/docs/.vitepress/ finds no vitepress
+  // package and the dev server dies at config load (ERR_MODULE_NOT_FOUND).
+  // defineConfig is identity for a plain object — a bare export works.
+  return `export default ({
   title: ${JSON.stringify(title)},
   description: ${JSON.stringify(description)},
   cleanUrls: true,
