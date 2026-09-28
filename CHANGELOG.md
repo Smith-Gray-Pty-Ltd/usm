@@ -1,6 +1,14 @@
 # Changelog
 # Changelog
 
+## 0.10.2
+
+### Patch Changes
+
+- **fix(docs): generated VitePress config no longer imports vitepress** — ESM resolution walks up from the docs tree and finds no vitepress package in on-demand-fetch or global-install modes, so the dev server died at config load (ERR_MODULE_NOT_FOUND); only project-local installs ever worked. `defineConfig` is identity for a plain object, so the config exports a bare object — docs serve/build now genuinely work with zero consumer-side install.
+
+# Changelog
+
 ## 0.10.1
 
 ### Patch Changes
