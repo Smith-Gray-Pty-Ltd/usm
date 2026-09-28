@@ -1,4 +1,17 @@
 # Changelog
+# Changelog
+
+## 0.10.1
+
+### Patch Changes
+
+- **fix: greenfield first-run bootstrap** — `usm scan` auto-creates `.usm/` (was ENOENT crash on a repo where `usm init` hadn't made the dir); `usm docs serve/build` resolve VitePress in order: project-local → global install → **on-demand fetch** via `npx -y vitepress@1`. First-ever `usm docs serve` in an empty repo now works and mutates nothing (no package.json/node_modules side effects). `--no-fetch-vitepress` restores the hard error with install guidance for hermetic/CI environments (usm/cli-docs `vitepress-on-demand-fetch`).
+- **fix(docs): help filter stripped site-absolute and forward-referenced links** — site-absolute targets resolved against the help tree root (was filesystem root → every `/…` link in help pages stripped as dead); link stripping now runs as a second pass over the completed tree (in-copy stripping raced tree population, killing forward references like agent-setup-guide → cli-reference).
+- **fix(docs): Agent Setup Guide reachable in help sidebar** — was rendered but nav-orphaned (developer-only sidebar guard); help Getting Started now matches dev.
+- **feat(docs): sidebar IA restructure + help purity + roadmap current** (`usm/docs-ia-restructure`, from 0.10.0's follow-up) — feature areas as top-level sidebar groups within VitePress's single-level nesting limit, unique human labels, dedicated Reference group, Architecture naming, help tree reduced to user-journey content, roadmap kept current with a regression test.
+
+451 tests passing across 27 files.
+
 
 ## 0.10.0
 

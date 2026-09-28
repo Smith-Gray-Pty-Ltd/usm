@@ -98,7 +98,10 @@ export function generateMarkdown(
   // Cheap disk read once per process, cached (freshness: schema-cached like
   // validate.ts; risks change rarely and watch regen runs a fresh process
   // via subprocess, so staleness window is bounded by process lifetime).
-  const systemHasRisks = systemRisksPresence(root);
+  // NOTE: currently unused by generateServiceMarkdown (risks link rendering
+  // is static); kept as the cached gate for when per-service risks links
+  // return. Prefixed to satisfy no-unused-vars until then.
+  const _systemHasRisks = systemRisksPresence(root);
 
   switch (file.$type) {
     case "system":

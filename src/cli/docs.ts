@@ -2,10 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
 import { spawn, execSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { parseUsmFile, isFeatureFile, findAllUsmFiles } from "../parse.js";
 import { collectJourneys, RESERVED } from "../generators/userDocs.js";
 import type { Persona } from "../types.js";
 import { outDir } from "../outputPaths.js";
+import { info } from "./colors.js";
 import type { SystemUsm, FeatureUsm, ServiceUsm, DataUsm } from "../types.js";
 import { getDesignSections, DESIGN_SECTION_LABELS } from "../generators/technicalDesign.js";
 
@@ -267,26 +269,75 @@ function titleFromPersonaSlug(slug: string): string {
 
 /**
  * Check if VitePress is installed (optional peer dependency).
+ * Kept for tooling/verification; the resolution order now lives in
+ * resolveVitePress (local → global → fetch), which subsumes this check.
  */
+const moduleRequire = createRequire(__filename);
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function isVitePressInstalled(): boolean {
   try {
-    require.resolve("vitepress", { paths: [process.cwd()] });
+    moduleRequire.resolve("vitepress", { paths: [process.cwd()] });
     return true;
   } catch {
-    return false;
+    // Project-local miss — try the global install before declaring it
+    // missing. A consumer who ran `npm i -g vitepress` shouldn't be told
+    // to install it again (and shouldn't have their repo mutated by a
+    // local devDependency just to preview docs).
+    try {
+      const globalRoot = execSync("npm root -g", { encoding: "utf-8" }).trim();
+      moduleRequire.resolve("vitepress", { paths: [globalRoot] });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 
 /**
- * Ensure VitePress is available. If missing, offer to install it
- * automatically (interactive prompt) or exit with guidance.
+ * How VitePress will be provided for this run:
+ * - "local"/"global": a real install is resolvable (spawn plain npx vitepress)
+ * - "fetch": on-demand via `npx -y vitepress@1` (mutates nothing; needs network)
+ * - "missing": fetch disabled (--no-fetch-vitepress) and no install — hard error
  */
-async function requireVitePress(): Promise<void> {
-  if (isVitePressInstalled()) return;
+export type VitePressSource = "local" | "global" | "fetch" | "missing";
 
-  const { execSync } = await import("node:child_process");
+/**
+ * Ensure VitePress is available for this run.
+ *
+ * Resolution order (usm/cli-docs contract vitepress-on-demand-fetch):
+ *   1. project-local install
+ *   2. global install (a consumer who ran `npm i -g vitepress` must not be
+ *      told to install again, nor have their repo mutated)
+ *   3. on-demand fetch via `npx -y vitepress@1` — DEFAULT when nothing is
+ *      installed. First-ever `usm docs serve` in a greenfield repo just
+ *      works, with no package.json/node_modules side effects.
+ *   4. `--no-fetch-vitepress` disables 3 → hard error with install guidance
+ *      (hermetic/CI behaviour preserved).
+ *
+ * Returns the resolved source so spawn sites can build the right argv
+ * (`vitepress` vs `vitepress@1 -y`).
+ */
+export function resolveVitePress(fetchAllowed: boolean): { source: VitePressSource; bin: string[] } {
+  // 1. project-local
+  try {
+    moduleRequire.resolve("vitepress", { paths: [process.cwd()] });
+    return { source: "local", bin: ["npx", "vitepress"] };
+  } catch { /* keep trying */ }
 
-  // Detect the package manager from lockfiles
+  // 2. global install
+  try {
+    const globalRoot = execSync("npm root -g", { encoding: "utf-8" }).trim();
+    moduleRequire.resolve("vitepress", { paths: [globalRoot] });
+    return { source: "global", bin: ["npx", "vitepress"] };
+  } catch { /* keep trying */ }
+
+  // 3. on-demand fetch (default) / 4. hard error (opt-out)
+  if (fetchAllowed) {
+    console.log(info("VitePress not installed — using on-demand fetch (vitepress@1). Run 'npm i -D vitepress' to make it permanent."));
+    return { source: "fetch", bin: ["npx", "-y", "vitepress@1"] };
+  }
+
   const usePnpm = fs.existsSync(path.join(process.cwd(), "pnpm-lock.yaml"));
   const isMonorepo = fs.existsSync(path.join(process.cwd(), "pnpm-workspace.yaml"));
   const useNpm = fs.existsSync(path.join(process.cwd(), "package-lock.json"));
@@ -301,48 +352,9 @@ async function requireVitePress(): Promise<void> {
     installCmd = "npm install -D vitepress";
   }
 
-  // Interactive prompt — offer to install automatically
-  const isTTY = process.stdin.isTTY;
-  if (isTTY) {
-    console.log("\nVitePress is not installed (optional peer dependency for docs preview).\n");
-    process.stdout.write(`Install it now with \`${installCmd}\`? [Y/n] `);
-
-    const answer = await new Promise<string>((resolve) => {
-      process.stdin.setEncoding("utf-8");
-      process.stdin.resume();
-      process.stdin.once("data", (data: string) => {
-        process.stdin.pause();
-        resolve(data.trim().toLowerCase());
-      });
-    });
-
-    if (answer === "" || answer === "y" || answer === "yes") {
-      console.log(`\nRunning: ${installCmd}\n`);
-      try {
-        execSync(installCmd, { cwd: process.cwd(), stdio: "inherit" });
-        // Verify it installed
-        if (isVitePressInstalled()) {
-          console.log("✓ VitePress installed.\n");
-          return;
-        }
-        // Maybe installed to a workspace root — check again after a moment
-        console.error("Install completed but VitePress still not resolvable. You may need to restart your terminal or install manually.");
-        process.exit(1);
-      } catch {
-        console.error(`\nInstall failed. Run \`${installCmd}\` manually and try again.`);
-        process.exit(1);
-      }
-    } else {
-      console.error(`\nSkipped. Install VitePress manually: \`${installCmd}\``);
-      process.exit(1);
-    }
-  } else {
-    // Non-interactive (CI, piped input) — just show the guidance
-    console.error("VitePress is not installed. It's an optional dependency of USM.\n");
-    console.error(`Install it with: \`${installCmd}\`\n`);
-    console.error("Or use --skip-docs with usm generate to skip the docs build step.");
-    process.exit(1);
-  }
+  console.error("VitePress is not installed and on-demand fetch is disabled (--no-fetch-vitepress).");
+  console.error(`Install it with: \`${installCmd}\`, or drop the flag to fetch on demand.`);
+  process.exit(1);
 }
 
 /**
@@ -1348,8 +1360,8 @@ function ensureIndexPage(docsRoot: string): void {
 /**
  * Write the VitePress config and run vitepress build.
  */
-export async function docsBuild(root: string, audience: Audience = "developer"): Promise<void> {
-  await requireVitePress();
+export async function docsBuild(root: string, audience: Audience = "developer", fetchAllowed = true): Promise<void> {
+  const { bin } = resolveVitePress(fetchAllowed);
 
   // Determine docs root based on audience
   const docsRoot = audience === "help"
@@ -1413,7 +1425,7 @@ export async function docsBuild(root: string, audience: Audience = "developer"):
 
   // Step 6: Build
   console.log("\nBuilding static site...");
-  const child = spawn("npx", ["vitepress", "build", docsRoot], {
+  const child = spawn(bin[0], [...bin.slice(1), "build", docsRoot], {
     stdio: "inherit",
     cwd: root,
     shell: process.platform === "win32",
@@ -1443,6 +1455,13 @@ export interface DocsServeOptions {
   restart?: boolean;
   watch?: boolean;
   open?: boolean;
+  /**
+   * When VitePress isn't installed anywhere: fetch on demand via
+   * `npx -y vitepress@1` (default true). `--no-fetch-vitepress` restores
+   * the hard error with install guidance (usm/cli-docs
+   * vitepress-on-demand-fetch contract).
+   */
+  fetchVitepress?: boolean;
 }
 
 /**
@@ -1450,8 +1469,8 @@ export interface DocsServeOptions {
  * Supports port checking, already-serving detection, watch mode, and graceful shutdown.
  */
 export async function docsServe(root: string, options: DocsServeOptions): Promise<void> {
-  const { port: requestedPort, audience = "developer", restart = false, watch = false, open = false } = options;
-  await requireVitePress();
+  const { port: requestedPort, audience = "developer", restart = false, watch = false, open = false, fetchVitepress = true } = options;
+  const { bin } = resolveVitePress(fetchVitepress);
 
   // Determine docs root based on audience
   const docsRoot = audience === "help"
@@ -1579,7 +1598,7 @@ export async function docsServe(root: string, options: DocsServeOptions): Promis
   const startChild = async (attemptPort: number): Promise<ReturnType<typeof spawn>> => {
     console.log(`Starting dev server on port ${attemptPort}...`);
     console.log(`  http://localhost:${attemptPort}/`);
-    const c = spawn("npx", ["vitepress", "dev", docsRoot, "--port", String(attemptPort), "--strictPort"], {
+    const c = spawn(bin[0], [...bin.slice(1), "dev", docsRoot, "--port", String(attemptPort), "--strictPort"], {
       stdio: "pipe", // bind failure is detected programmatically for retry
       cwd: root,
       shell: process.platform === "win32",

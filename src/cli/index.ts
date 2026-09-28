@@ -1837,19 +1837,21 @@ program
 
 program
   .command("docs")
-  .description("Docs site commands (requires VitePress)")
+  .description("Docs site commands. Works without VitePress installed — fetches it on demand (see --no-fetch-vitepress)")
   .arguments("<action>")
   .option("-p, --port <port>", "Dev server port (strict: fails if taken). Omit to auto-select the next free port (default)")
   .option("-a, --audience <audience>", "Audience: developer (default) or help", "developer")
   .option("--restart", "Kill existing server and restart")
   .option("--watch", "Watch .usm/ files and auto-regenerate docs on change")
   .option("--open", "Open browser at the served URL")
+  .option("--no-fetch-vitepress", "Error instead of on-demand fetching VitePress when it isn't installed (hermetic/CI mode)")
   .action(async (action: string, options: {
     port?: string;
     audience: string;
     restart?: boolean;
     watch?: boolean;
     open?: boolean;
+    fetchVitepress?: boolean;
   }) => {
     const root = path.resolve(process.cwd());
     const { docsBuild, docsServe, docsStatus, docsStop } = await import("./docs.js");
@@ -1857,7 +1859,7 @@ program
     const audience: "help" | "developer" = options.audience === "help" ? "help" : "developer";
 
     if (action === "build") {
-      await docsBuild(root, audience);
+      await docsBuild(root, audience, options.fetchVitepress !== false);
     } else if (action === "serve") {
       await docsServe(root, {
         // Omitted --port => auto-port (probe from 5173 until free).
@@ -1867,6 +1869,8 @@ program
         restart: options.restart,
         watch: options.watch,
         open: options.open,
+        // --no-fetch-vitepress → false; default true (on-demand fetch)
+        fetchVitepress: options.fetchVitepress !== false,
       });
     } else if (action === "status") {
       docsStatus(root, audience);

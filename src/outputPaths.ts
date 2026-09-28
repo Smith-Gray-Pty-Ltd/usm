@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import { getOutputPaths, type OutputPaths } from "./outputs.js";

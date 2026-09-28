@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/cli-docs
 $type: feature
 $version: 1
-$last_updated: "2026-09-27"
+$last_updated: "2026-09-28"
 status: built
 summary: >
   usm docs serve and usm docs build — serves generated docs locally via VitePress dev server with
@@ -277,8 +277,8 @@ contracts:
       - "Path pattern: docs/features/<area>/<feature>.md"
       - Services at docs/services/<service>.md
       - No docs scattered across apps/ or .agents-workspace/
-  - id: vitepress-missing-graceful-error
-    description: If VitePress is not installed, show helpful error not a crash
+  - description: If VitePress is not installed, show helpful error not a crash
+    id: vitepress-missing-graceful-error
     must_have:
       - Error message explains VitePress is optional dependency
       - Install command shown (pnpm add -D vitepress)
@@ -340,6 +340,29 @@ contracts:
         docs build --audience help with no existing help tree runs the filter pass first and then
         builds
       - docs build --audience help with an existing tree still rebuilds it (no stale-tree builds)
+  - description: >-
+      Docs commands work on first run without any VitePress install: missing local + missing global
+      → on-demand fetch via npx -y vitepress@1, transparently, mutating nothing;
+      --no-fetch-vitepress restores the hard error for hermetic/CI environments.
+    id: vitepress-on-demand-fetch
+    must_have:
+      - >-
+        Resolution order: project-local → global install → on-demand fetch (npx -y vitepress@1) →
+        hard error only with --no-fetch-vitepress
+      - >-
+        Fetch mode prints one line stating what happened and how to make it permanent (npm i -D
+        vitepress) — never silently
+      - On-demand fetch pins vitepress@1 (no unpinned floating major)
+      - >-
+        First-ever usm docs serve in a greenfield repo with no package.json works and mutates
+        nothing (no package.json/node_modules side effects)
+      - >-
+        Offline + no install + --no-fetch-vitepress → clear error naming the install command
+        (today's behaviour preserved)
+      - >-
+        spawn sites use the fetch-mode resolution (npx -y vitepress@1) consistently in both serve
+        and build
+      - Config-reference and getting-started document the fetch behaviour and the pinning option
 tests:
   - expect:
       - assertion: server starts on port 5173

@@ -998,6 +998,7 @@ function updateSystemUsm(params: UpdateSystemParams): boolean {
       index,
     };
 
+    fs.mkdirSync(usmSourceDir, { recursive: true });
     fs.writeFileSync(systemPath, yamlStringify(newSystem), "utf-8");
     return true;
   }
@@ -1094,6 +1095,7 @@ function updateSystemUsm(params: UpdateSystemParams): boolean {
 
   existing["$last_updated"] = todayDate();
 
+  fs.mkdirSync(usmSourceDir, { recursive: true });
   fs.writeFileSync(systemPath, yamlStringify(existing), "utf-8");
   return true;
 }
