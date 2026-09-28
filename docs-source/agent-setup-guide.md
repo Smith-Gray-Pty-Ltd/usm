@@ -111,6 +111,6 @@ usm info .usm/system.usm         # Show system summary
 
 ## Next Steps
 
-## Next Steps
-
+- [Getting Started](/getting-started) — full first-run walkthrough
+- [Editor Setup](/editor-setup/) — the 36 per-editor config guides
 - [CLI Reference](/cli-reference) - [Configuration](/config-reference) - [Schema Reference](/schema-reference) - [MCP Tools](/mcp-reference) - [Language Support](/language-support)

@@ -1353,6 +1353,36 @@ program
       }
     }
 
+    // ─── Package-docs link guard (AFTER all generation) ─────────────────────
+    // Shipped pages (usm/pkg-universal-docs) are copied raw in Pass 0; now
+    // that every generated page exists, degrade any package-page link whose
+    // target doesn't exist in the output tree to plain text — the consumer
+    // tree never renders a dead first-click. Idempotent: same page set both
+    // runs → same guard result → byte-identical output.
+    if (!options.check && (runAll || onlyTarget === "docs")) {
+      const docsOutputDir = outDir(root, "docs");
+      const packageDocsMarker = path.resolve(__dirname, "..", "..", "docs-source");
+      const guardCopiedPages = (d: string): void => {
+        for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+          const p = path.join(d, entry.name);
+          if (entry.isDirectory()) { guardCopiedPages(p); continue; }
+          if (!entry.name.endsWith(".md")) continue;
+          const content = fs.readFileSync(p, "utf-8");
+          const guarded = content.replace(/\[([^\]]+)\]\((\/[^)#\s]+)\)/g, (match, text: string, link: string) => {
+            const target = (link.endsWith("/") ? link + "index.md" : link + ".md").replace(/^\//, "");
+            return fs.existsSync(path.join(docsOutputDir, target)) ? match : text;
+          });
+          if (guarded !== content) fs.writeFileSync(p, guarded, "utf-8");
+        }
+      };
+      // Only guard pages that came from the package (consumer docs-source/
+      // is hand-authored — its links are the author's responsibility).
+      const consumerSource = path.join(root, "docs-source");
+      if (fs.existsSync(packageDocsMarker) && !fs.existsSync(consumerSource)) {
+        guardCopiedPages(docsOutputDir);
+      }
+    }
+
     // ─── Report: compare final composed content against disk (check mode) ───
     // Runs after every composing pass so paths that are written once and then
     // patched (e.g. overview.md + surface tables) are compared as a whole.
