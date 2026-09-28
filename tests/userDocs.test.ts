@@ -330,12 +330,14 @@ describe("usm/gen-user-docs", () => {
         );
 
         const count = filterForHelpAudience(root, docsRoot, helpRoot);
-        expect(count).toBeGreaterThan(0);
-        const helpDoc = fs.readFileSync(path.join(helpRoot, "features", "cli", "widget.md"), "utf-8");
-        expect(helpDoc).toContain("## Step-by-step guides"); // composed
-        expect(helpDoc).toContain("**Click** (ui): Publish button");
-        expect(helpDoc).not.toContain("## Contracts"); // subtraction still applied
-        expect(helpDoc).not.toContain("## Tests");
+        // IA restructure (help-audience-purity): features/ pages are excluded
+        // from the help tree wholesale — composed persona guides under
+        // guides/ carry the user-facing content instead of composed feature
+        // pages. Count 0 (no feature pages copied) is the new correct result;
+        // the guides/ tree is copied separately by copyGuidesIntoDocs.
+        expect(count).toBe(0);
+        expect(fs.existsSync(path.join(helpRoot, "features", "cli", "widget.md"))).toBe(false);
+        expect(fs.existsSync(path.join(helpRoot, "features"))).toBe(false);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -352,10 +354,11 @@ describe("usm/gen-user-docs", () => {
           "# usm/plain [built]\n\nPlain feature.\n",
         );
         const count = filterForHelpAudience(root, docsRoot, helpRoot);
-        expect(count).toBe(1);
-        const helpDoc = fs.readFileSync(path.join(helpRoot, "features", "cli", "plain.md"), "utf-8");
-        expect(helpDoc).not.toContain("Step-by-step guides"); // no personas → no composed section
-        expect(helpDoc).toContain("Plain feature.");
+        // IA restructure (help-audience-purity): features/ excluded wholesale
+        // even without personas — the subtraction filter no longer copies
+        // feature pages into help in any form.
+        expect(count).toBe(0);
+        expect(fs.existsSync(path.join(helpRoot, "features", "cli", "plain.md"))).toBe(false);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }

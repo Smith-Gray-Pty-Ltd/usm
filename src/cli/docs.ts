@@ -463,8 +463,16 @@ const HELP_EXCLUDE_PATHS = [
   "features/mcp",
   "features/schema",
   "features/docs-and-schema-improvements",
+  // Feature build specs are developer content in EVERY area — flows,
+  // contracts, and test internals are not user journeys (usm/docs-ia-restructure
+  // help-audience-purity). The composed persona guides carry user-facing
+  // feature content instead.
+  "features/cli",
+  "features",
   "shared-services",
   "packages",
+  // ADRs are contributor material
+  "design/decision-register.md",
 ];
 
 /**
@@ -881,16 +889,13 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
       const label = DESIGN_SECTION_LABELS[sectionId] || sectionId;
       designItems.push({ text: label, link: `/design/${sectionId}` });
     }
-    pushIfAny("Design", designItems);
+    pushIfAny("Architecture", designItems);
   }
 
-  // ── 3. Project Management ──────────────────────────────────────────────────
+  // ── 3. Project Management container ────────────────────────────────────────
+  // (items added at §3b — single Roadmap push there; the old pre-push here
+  // duplicated the entry, visible as Roadmap twice in the help sidebar)
   const pmItems: (SidebarItem | SidebarGroup)[] = [];
-
-  // Roadmap
-  if (docExists("roadmap")) {
-    pmItems.push({ text: "Roadmap", link: "/roadmap" });
-  }
 
   // Features (grouped by service/area)
   const coveredLinks = new Set<string>();
@@ -925,11 +930,30 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
   // Feature docs on disk not covered by system.index
   if (fs.existsSync(featuresRoot)) {
     const diskFeaturesByArea = new Map<string, SidebarItem[]>();
-    const titleFromSlug = (slug: string): string =>
-      slug.split(/[-_/]/).map((w) => AREA_ACRONYMS[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    // Display-name lookup from system.index — prefer the spec-declared name;
+    // fall back to title-casing the slug WITHOUT the area prefix, so the same
+    // feature never renders two different labels and "CLI CLI Color Output"
+    // duplication can't happen (usm/docs-ia-restructure).
+    const indexNameFor = new Map<string, { name: string; status?: string }>();
+    if (system.index) {
+      for (const feat of system.index) {
+        const m = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
+        if (m) indexNameFor.set(`${m[1]}/${m[2]}`, { name: feat.name, status: feat.status });
+      }
+    }
+    const titleFromSlug = (areaSlug: string, slug: string): string => {
+      const known = indexNameFor.get(`${areaSlug}/${slug}`);
+      if (known) return known.name;
+      return slug
+        .split(/[-_/]/)
+        .map((w) => AREA_ACRONYMS[w.toLowerCase()] || w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+    };
     const addDiskFeature = (areaDisplay: string | null, slug: string, link: string): void => {
       if (coveredLinks.has(link.replace(/\/+$/, ""))) return;
-      const item = { text: titleFromSlug(slug), link };
+      const areaSlug = areaDisplay ? slug.split("/")[0] : "";
+      const bareSlug = areaDisplay ? slug.split("/").slice(1).join("/") : slug;
+      const item = { text: titleFromSlug(areaSlug, bareSlug), link };
       if (areaDisplay === null) flatFeatures.push(item);
       else {
         if (!diskFeaturesByArea.has(areaDisplay)) diskFeaturesByArea.set(areaDisplay, []);
@@ -969,6 +993,17 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
         };
         walk("");
 
+        // Display-name lookup from system.index: the same feature must render
+        // the same human label whether discovered via index or disk scan
+        // (usm/docs-ia-restructure contract labels-unique-and-human).
+        const indexNameFor = new Map<string, { name: string; status?: string }>();
+        if (system.index) {
+          for (const feat of system.index) {
+            const m = feat.ref.match(/\.usm\/features\/([^/]+)\/(.+?)\.usm$/);
+            if (m) indexNameFor.set(`${m[1]}/${m[2]}`, { name: feat.name, status: feat.status });
+          }
+        }
+
         if (pageSlugs.length === 0) {
           // Index-only area (or a dir with no pages) — a flat link is correct.
           if (hasIndex) addDiskFeature(null, entry.name, `/features/${entry.name}/`);
@@ -979,11 +1014,13 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
           addDiskFeature(areaDisplay, `${entry.name}/${slug}`, `/features/${entry.name}/${slug}`);
         }
 
-        // Keep the area overview reachable inside the collapsible group.
+        // Keep the area overview reachable inside the collapsible group,
+        // labelled '<Area> overview' — a bare "Overview" repeated across
+        // groups is ambiguous (usm/docs-ia-restructure labels-unique-and-human).
         const overviewLink = `/features/${entry.name}/`;
         if (hasIndex && !coveredLinks.has(overviewLink.replace(/\/+$/, ""))) {
           if (!diskFeaturesByArea.has(areaDisplay)) diskFeaturesByArea.set(areaDisplay, []);
-          diskFeaturesByArea.get(areaDisplay)!.push({ text: "Overview", link: overviewLink });
+          diskFeaturesByArea.get(areaDisplay)!.unshift({ text: `${areaDisplay} overview`, link: overviewLink });
           coverLink(overviewLink);
         }
       } else if (entry.name.endsWith(".md") && entry.name !== "index.md") {
@@ -996,61 +1033,68 @@ export function generateSidebar(root: string, docsRoot: string, audience: Audien
     }
   }
 
-  if (featuresByArea.size > 0 || flatFeatures.length > 0) {
-    const featureSubGroups: (SidebarItem | SidebarGroup)[] = [];
+  // Feature area groups render as TOP-LEVEL collapsible groups (one per
+  // area) — VitePress supports only one level of sidebar nesting, so nesting
+  // areas inside a "Features" group silently flattened and destroyed the IA
+  // (usm/docs-ia-restructure contract sidebar-single-level-nesting).
+  // Help audience skips feature area groups entirely — build specs are
+  // developer content; help = user journeys only (help-audience-purity).
+  const sortByStatus = (a: SidebarItem, b: SidebarItem): number => {
+    const statusOf = (t: string): number =>
+      t.includes("[planned]") ? STATUS_ORDER["planned"]
+      : t.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
+      : t.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
+      : STATUS_ORDER["active"];
+    if (statusOf(a.text) !== statusOf(b.text)) return statusOf(a.text) - statusOf(b.text);
+    return a.text.localeCompare(b.text);
+  };
+  if (audience === "developer") {
     for (const [area, items] of [...featuresByArea.entries()].sort()) {
-      items.sort((a, b) => {
-        const aStatus = a.text.includes("[planned]") ? STATUS_ORDER["planned"]
-          : a.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
-          : a.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
-          : STATUS_ORDER["active"];
-        const bStatus = b.text.includes("[planned]") ? STATUS_ORDER["planned"]
-          : b.text.includes("[in-progress]") ? STATUS_ORDER["in-progress"]
-          : b.text.includes("[deprecated]") ? STATUS_ORDER["deprecated"]
-          : STATUS_ORDER["active"];
-        if (aStatus !== bStatus) return aStatus - bStatus;
-        return a.text.localeCompare(b.text);
-      });
-      featureSubGroups.push({ text: area, collapsed: true, items });
+      items.sort(sortByStatus);
+      sidebar.push({ text: area, collapsed: true, items });
     }
     flatFeatures.sort((a, b) => a.text.localeCompare(b.text));
-    featureSubGroups.unshift(...flatFeatures);
-    pmItems.push({ text: "Features", collapsed: true, items: featureSubGroups });
+    if (flatFeatures.length > 0) {
+      sidebar.push({ text: "Features", collapsed: true, items: flatFeatures });
+    }
   }
 
-  // Decision Register
-  if (docExists("design/decision-register")) {
+  // ── 3b. Project Management (Roadmap, Decision Register) ──────────────────
+  if (docExists("roadmap")) {
+    pmItems.push({ text: "Roadmap", link: "/roadmap" });
+  }
+  if (audience === "developer" && docExists("design/decision-register")) {
     pmItems.push({ text: "Decision Register", link: "/design/decision-register" });
   }
-
   if (pmItems.length > 0) {
     sidebar.push({ text: "Project Management", items: pmItems });
   }
 
-  // ── 4. Developers ──────────────────────────────────────────────────────────
-  const devItems: SidebarItem[] = [];
-
-  // Source Map / Test Coverage / Spec Coverage
-  if (docExists("code-navigator")) devItems.push({ text: "Source Map", link: "/code-navigator" });
-  if (docExists("spec-coverage")) devItems.push({ text: "Spec Coverage", link: "/spec-coverage" });
-  if (docExists("orphan-files")) devItems.push({ text: "Orphan Files", link: "/orphan-files" });
-
-  // Reference pages (only if data exists)
+  // ── 4. Reference (its own top-level group, not first-item-titled) ────────
+  const refItems: SidebarItem[] = [];
   if (audience === "developer" && docExists("schema-reference")) {
-    devItems.push({ text: "Schema Reference", link: "/schema-reference" });
+    refItems.push({ text: "Schema Reference", link: "/schema-reference" });
   }
-  if (docExists("cli-reference")) devItems.push({ text: "CLI Reference", link: "/cli-reference" });
-  if (docExists("config-reference")) devItems.push({ text: "Configuration", link: "/config-reference" });
-  if (docExists("mcp-reference")) devItems.push({ text: "MCP Tools", link: "/mcp-reference" });
+  if (docExists("cli-reference")) refItems.push({ text: "CLI Reference", link: "/cli-reference" });
+  if (docExists("config-reference")) refItems.push({ text: "Configuration", link: "/config-reference" });
+  if (docExists("mcp-reference")) refItems.push({ text: "MCP Tools", link: "/mcp-reference" });
 
   // Per-app API reference
   const apiRefDirs = fs.readdirSync(docsRoot, { withFileTypes: true })
     .filter((e) => e.isDirectory() && fs.existsSync(path.join(docsRoot, e.name, "api-reference.md")));
   for (const dir of apiRefDirs) {
-    devItems.push({ text: `${areaDisplayName(dir.name)} API`, link: `/${dir.name}/api-reference` });
+    refItems.push({ text: `${areaDisplayName(dir.name)} API`, link: `/${dir.name}/api-reference` });
   }
+  pushIfAny("Reference", refItems);
 
-  pushIfAny("Developers", devItems, true);
+  // ── 4b. Source Map (contributor tooling, its own group) ──────────────────
+  if (audience === "developer") {
+    const devItems: SidebarItem[] = [];
+    if (docExists("code-navigator")) devItems.push({ text: "Source Map", link: "/code-navigator" });
+    if (docExists("spec-coverage")) devItems.push({ text: "Spec Coverage", link: "/spec-coverage" });
+    if (docExists("orphan-files")) devItems.push({ text: "Orphan Files", link: "/orphan-files" });
+    pushIfAny("Source Map", devItems, true);
+  }
 
   // ── 5. Exports (collapsed) ──────────────────────────────────────────────────
   if (audience === "developer") {

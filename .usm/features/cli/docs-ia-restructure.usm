@@ -1,0 +1,175 @@
+$schema: https://usm.dev/schema/v1.json
+$id: usm/docs-ia-restructure
+$type: feature
+$version: 1
+$last_updated: "2026-09-28"
+summary: >-
+  Restructure the generated docs sidebar to a stable, audience-appropriate information architecture
+  that renders correctly in VitePress: single-level nesting with flattened-but-labelled feature area
+  groups, unique human labels (no 'CLI CLI…', no ambiguous 'Overview's), a dedicated Reference
+  group, Architecture instead of Design, help docs reduced to user-journey content (no feature build
+  specs, no decision register), and a roadmap brought current with all shipped features.
+$system: usm/system
+$service: usm/cli
+intent: >-
+  The generated sidebar misleads users about what the docs contain: VitePress supports only one
+  level of sidebar nesting, but we emit three (Project Management → Features → area → pages), so
+  VitePress silently flattens the inner groups and titles groups after arbitrary first items — a
+  group literally named "Roadmap" contains all 38 feature pages, another named "Source Map" contains
+  the reference pages. Labels duplicate area prefixes ("CLI CLI Color Output"), four different pages
+  are all labelled "Overview", and the help tree exposes feature build specs (flows/contracts/test
+  internals) that belong to the developer audience — violating the help = user-journey-only model.
+  Meanwhile the roadmap page renders from a system.usm roadmap that stopped tracking shipped
+  features at 0.9.0, so the public "what's shipping next" view is stale. Users cannot form a correct
+  mental model of the docs from the navigation as it stands.
+status: built
+flows:
+  - id: find-my-way-dev
+    name: Navigate the developer docs
+    steps:
+      - actor: platform-builder
+        id: s1
+        action: scan
+        surface: browser
+        target: >-
+          sidebar top-to-bottom: orient via Getting Started → Guides → Features by area → Project
+          Management → Reference → Architecture → Source Map → Exports
+      - actor: platform-builder
+        id: s2
+        action: open
+        surface: browser
+        target: >-
+          the MCP Tools area group and find usm_update_system without scrolling past 38 unrelated
+          pages
+      - actor: platform-builder
+        id: s3
+        action: verify
+        surface: browser
+        target: each group title says what it contains; no group is named after an arbitrary first item
+  - id: find-my-way-help
+    name: Navigate the help docs as a new user
+    steps:
+      - actor: adopter
+        id: s1
+        action: scan
+        surface: browser
+        target: >-
+          help sidebar: Getting Started → Guides → Reference → Roadmap → Help — no build specs, no
+          decision register
+      - actor: adopter
+        id: s2
+        action: follow
+        surface: browser
+        target: a persona guide from the Guides group and complete the task it describes
+      - actor: adopter
+        id: s3
+        action: verify
+        surface: browser
+        target: >-
+          no clicked link lands on contract/flow/test internals; no dead links from Roadmap to
+          removed pages
+contracts:
+  - description: >-
+      The sidebar renders within VitePress's single-level nesting limit: top-level groups with item
+      lists only. Nested group structures are flattened at generation time with boundaries preserved
+      as prefixed labels, never lost.
+    id: sidebar-single-level-nesting
+    must_have:
+      - >-
+        No group ever nests a group inside its items array — generation flattens Features sub-areas
+        into sibling top-level collapsible groups (CLI, Generators, MCP Tools, Schema & Docs)
+      - Every rendered group title is intentional (never falls back to first-item text)
+      - >-
+        Rendered sidebar verified structurally in a browser fixture: group titles match the intended
+        IA
+  - description: Every sidebar label is unique, human, and free of mechanical artifacts.
+    id: labels-unique-and-human
+    must_have:
+      - >-
+        No duplicated area prefixes ('CLI CLI Color Output') — disk-discovered features reuse
+        system.index display names when available, else title-case slug without area prefix
+      - >-
+        Area overview links are labelled '<Area> overview', not bare 'Overview' (no repeated labels
+        across groups)
+      - >-
+        Feature naming is consistent: the same feature renders the same label whether discovered
+        from system.index or disk scan
+  - description: Sidebar sections have a stable, audience-appropriate order and naming.
+    id: sections-ordered-and-named
+    must_have:
+      - >-
+        Dev order: Getting Started, Guides, Features, Project Management (Roadmap, Decision
+        Register), Reference, Architecture, Source Map, Exports
+      - >-
+        Help order: Getting Started, Guides, Reference (user-facing pages only), Roadmap, Help
+        (Language Support, Report Issue)
+      - >-
+        Reference is its own top-level group (CLI Reference, MCP Tools, Configuration, Schema
+        Reference) — not mixed into a group titled by its first item
+      - Design section renders as 'Architecture' with its section labels intact
+  - description: >-
+      Help docs contain user-journey content only: feature build specs (flows/contracts/test
+      internals) and the Decision Register are developer-docs content.
+    id: help-audience-purity
+    must_have:
+      - >-
+        Help tree excludes features/ area pages (all areas, including cli) and
+        design/decision-register
+      - >-
+        Help keeps Roadmap, reference pages, guides, getting-started, editor setup, language
+        support, feedback
+      - >-
+        Roadmap links that point at excluded feature pages degrade to plain text in the help tree
+        (same guard pattern as package docs)
+      - Help sidebar never shows a group containing contract/flow/test internals
+  - description: >-
+      The roadmap stays current: every shipped feature appears, and stale statuses are corrected at
+      the spec level — the roadmap page renders from system.usm, so fixing the source fixes the
+      docs.
+    id: roadmap-current
+    must_have:
+      - >-
+        Features marked built in system.index have roadmap entries with shipped_in set (rules-files,
+        docs-split, help-reference, config-outputs, mcp-write, this session's 0.9.x work)
+      - >-
+        No roadmap item claims 'planned' for something already shipped; statuses match feature
+        status
+      - The 2026-09-27/28 consumer-blocker fixes appear as shipped items once released
+tests:
+  - id: dev-sidebar-structure
+    setup:
+      generate_run: true
+    expect:
+      - assertion: sidebar JSON contains no group nested inside another group's items
+      - assertion: top-level groups match the intended dev order and names
+      - assertion: no label contains a doubled area prefix; no duplicate 'Overview' labels
+    flow: find-my-way-dev
+  - id: help-sidebar-purity
+    setup:
+      help_audience_generate: true
+    expect:
+      - assertion: help sidebar shows only Getting Started, Guides, Reference, Roadmap, Help groups
+      - assertion: no features/ or decision-register links appear in help sidebar
+      - assertion: roadmap feature links degrade to text when the target page is excluded
+    flow: find-my-way-help
+  - id: roadmap-covers-built
+    setup:
+      system_usm_with_built_features: true
+    expect:
+      - assertion: every feature marked built in system.index has a roadmap entry with shipped_in
+      - assertion: no roadmap item is 'planned' for an already-built feature
+  - id: sidebar-render-verified
+    setup:
+      playwright_crawl: true
+    expect:
+      - assertion: second generate produces byte-identical config.mts sidebar
+      - assertion: browser-rendered group titles match the intended IA (no first-item fallback titles)
+see_also:
+  - usm/cli-docs
+  - usm/gen-user-docs
+implementation:
+  primary: >-
+    src/cli/docs.ts (generateSidebar restructure + HELP_EXCLUDE_PATHS purity); .usm/system.usm
+    roadmap (17 shipped entries, feature refs aligned to index paths)
+  test_code: tests/docsIa.test.ts
+  test_code_status: manual

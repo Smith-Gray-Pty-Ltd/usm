@@ -417,13 +417,13 @@ roadmap:
     title: Configurable output paths
     description: Generators read output paths from usmconfig.json — no hardcoded .usm-workspace layout
     status: shipped
-    feature: usm/cli-config-outputs
+    feature: .usm/features/cli/config-outputs.usm
     shipped_in: 0.8.2
   - id: help-reference-expansion
     title: Help docs reference expansion
     description: CLI reference, usage examples, options, and prerequisites rendered in help docs from spec data
     status: shipped
-    feature: usm/gen-help-reference
+    feature: .usm/features/generators/help-reference.usm
     shipped_in: 0.8.2
   - id: agent-authoring-tools
     title: MCP write tools
@@ -431,7 +431,7 @@ roadmap:
       draft_feature, update_feature_status — close the spec-first loop so agents can author .usm
       files
     status: shipped
-    feature: usm/mcp-write
+    feature: .usm/features/mcp/write.usm
     shipped_in: 0.1.0
   - id: rules-file-generation
     title: Tool-specific rules files
@@ -439,7 +439,7 @@ roadmap:
       Generate .cursor/rules, CLAUDE.md, copilot-instructions.md with spec-first workflow
       instructions
     status: shipped
-    feature: usm/gen-rules-files
+    feature: .usm/features/generators/rules-files.usm
     shipped_in: 0.1.0
   - id: marketing-site
     title: Marketing site
@@ -454,13 +454,73 @@ roadmap:
     status: shipped
     feature: usm/gen-user-docs
     shipped_in: 0.9.0
+  - id: rules-files-generator
+    title: Tool-specific rules files generator
+    description: >-
+      Per-tool rules files (.cursor/rules, CLAUDE.md, copilot-instructions.md) generated from spec
+      data with the spec-first workflow instructions baked in
+    status: shipped
+    feature: .usm/features/generators/rules-files.usm
+    shipped_in: 0.1.0
+  - id: docs-split-generator
+    title: Help vs developer docs split
+    description: >-
+      Two docs audiences from one .usm source — developer docs (full internals) and help docs
+      (user journeys) with a subtraction filter and audience-specific sidebar
+    status: shipped
+    feature: .usm/features/generators/docs-split.usm
+    shipped_in: 0.9.0
+  - id: help-reference-generator
+    title: Help docs reference expansion
+    description: >-
+      CLI reference, usage examples, options, and prerequisites rendered in help docs from spec data
+    status: shipped
+    feature: .usm/features/generators/help-reference.usm
+    shipped_in: 0.8.2
+  - id: mcp-write-tools
+    title: MCP write tools (spec authoring)
+    description: >-
+      draft_feature, write_feature, update_feature, update_feature_status, write_system,
+      write_service — close the spec-first loop so agents author .usm files with validation
+    status: shipped
+    feature: .usm/features/mcp/write.usm
+    shipped_in: 0.1.0
+  - id: consumer-blocker-fixes
+    title: Consumer integration fixes (config validation, CI gate, help docs, MCP merge)
+    description: >-
+      From the safekeys integration report: usmconfig.json validated at load with usm validate
+      --config (issue #43); generate --check skips untracked outputs (issue #42); help-tree nesting
+      guard + path-honest output (issues #44/#47); upgrade --apply stamps alignment (issue #46);
+      update_system/update_service merge id-bearing arrays (issue #48); package ships universal
+      onboarding docs (issue #45)
+    status: shipped
+    feature: usm/config-validation
+    shipped_in: 0.9.1
+  - id: package-universal-docs
+    title: Universal onboarding docs shipped in the npm package
+    description: >-
+      getting-started, agent-setup-guide, and 36 per-editor MCP setup guides ship inside the
+      package and merge into consumer docs when the consumer repo has no docs-source/; homepage
+      Getting Started link lights up on first generate
+    status: shipped
+    feature: usm/pkg-universal-docs
+    shipped_in: 0.9.1
+  - id: docs-ia-restructure
+    title: Docs sidebar information architecture restructure
+    description: >-
+      Single-level sidebar nesting that VitePress renders correctly; unique human labels; dedicated
+      Reference group; Architecture naming; help docs reduced to user-journey content; roadmap kept
+      current
+    status: in-progress
+    feature: usm/docs-ia-restructure
   - id: help-docs-filter-deprecation
     title: Deprecate subtraction-based help docs for feature pages
     description: >-
       Feature pages in --audience help switch to composed content; subtraction filter retained for
-      system-level pages during one transition cycle
-    status: planned
-    feature: usm/gen-docs-split
+      system-level pages during one transition cycle. Progressed by usm/docs-ia-restructure: help
+      tree now excludes feature build specs entirely and surfaces composed persona guides instead.
+    status: in-progress
+    feature: .usm/features/generators/docs-split.usm
 principles:
   - key: structured-source-of-truth
     name: Structured Source of Truth

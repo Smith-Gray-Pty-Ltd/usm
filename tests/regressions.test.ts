@@ -246,7 +246,9 @@ describe("sidebar includes feature pages for index-bearing areas (issue #36)", (
 
   it("lists each feature page under a collapsible area group", () => {
     const sidebar = generateSidebar(root, docsRoot);
-    const featuresGroup = sidebar.find((g) => g.text === "Project Management");
+    // IA restructure: feature areas are TOP-LEVEL groups now (was nested in
+    // Project Management → Features). The area group is titled "Platform".
+    const featuresGroup = sidebar.find((g) => g.text === "Platform");
     expect(featuresGroup).toBeDefined();
 
     const json = JSON.stringify(featuresGroup);
