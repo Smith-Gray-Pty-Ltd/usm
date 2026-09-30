@@ -40,6 +40,13 @@ contracts:
       - >-
         Escape applied per diagram type: quoted labels for flowcharts, entity-code text for
         sequenceDiagram messages and notes
+      - >-
+        Each participant declared exactly once — alias form ('participant X as Alias') where an
+        alias exists, no redundant bare participant line
+      - >-
+        Explicit step.actor is honoured in arrows: 'system'/'agent' map to the Server participant,
+        persona ids become their own sanitized participant, actor-less steps keep the historical
+        User/Browser arrows
       - Each diagram in its own .mmd file
   - id: er-section-is-pure
     description: >-
@@ -65,13 +72,19 @@ tests:
     id: er-diagram-valid
     setup:
       data_models_present: true
-  - id: seq-escape-issue-49
-    setup:
-      feature_flow_with_special_chars: true
-    expect:
+  - expect:
       - assertion: >-
           flow step target containing ' : ; | & < > " ( ) [ ] { } generates sequenceDiagram message
           text using Mermaid entity codes (#39; #58; #59; ...) with no double escaping
+      - assertion: >-
+          aliased participant (IdP as Identity Provider) is declared exactly once — no redundant
+          bare participant line
+      - assertion: >-
+          step.actor 'system'/'agent' renders Server arrows; persona actors render their own
+          participant; actor-less steps keep User/Browser arrows
+    id: seq-escape-issue-49
+    setup:
+      feature_flow_with_special_chars: true
 implementation:
   primary: src/generators/mermaid.ts
   test_code: ""

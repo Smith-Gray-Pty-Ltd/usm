@@ -444,3 +444,57 @@ describe("sequenceDiagram escaping (issue #49)", () => {
     expect(messages[0]).toContain("say #34;hello#34;");
   });
 });
+
+// ─── #49 follow-ups: participant dedupe + step.actor mapping ─────────────────
+
+describe("sequenceDiagram participants (issue #49 follow-ups)", () => {
+  function actorFeature(steps: Array<{ action: string; target?: string; actor?: string }>): FeatureUsm {
+    return {
+      $schema: "https://usm.dev/schema/v1.json",
+      $id: "test/actors",
+      $type: "feature",
+      $version: 1,
+      summary: "Actor mapping fixture",
+      $system: "test/system",
+      $service: "test/cli",
+      flows: [{ id: "f1", name: "Flow", steps: steps.map((s, i) => ({ id: `s${i + 1}`, ...s })) }],
+    } as unknown as FeatureUsm;
+  }
+
+  it("declares an aliased participant exactly once (no redundant bare line)", () => {
+    const feature = actorFeature([{ action: "authenticate", target: "OIDC" }]);
+    const block = generateSequenceDiagrams(feature);
+    expect(block).toContain("participant IdP as Identity Provider");
+    expect(block).not.toMatch(/participant IdP\n/); // no bare declaration before the alias
+  });
+
+  it("system/agent actors map to the Server participant", () => {
+    // NOTE: generateSequenceDiagrams skips flows without at least one
+    // web-interaction step (navigate/click/fill/submit/authenticate), so the
+    // click step in this flow serves as the gate; the other steps assert the
+    // actor mapping.
+    const block = generateSequenceDiagrams(
+      actorFeature([
+        { action: "click", target: "run" },
+        { action: "generate", actor: "system", target: "markdown docs" },
+        { action: "observe", actor: "system", target: "docs tree" },
+      ]),
+    );
+    expect(block).toContain("Server->>Browser: generate markdown docs");
+    expect(block).toContain("Server-->>User: shows docs tree");
+    expect(block).not.toContain("User->>Browser: generate");
+  });
+
+  it("persona actors become their own participant", () => {
+    const block = generateSequenceDiagrams(
+      actorFeature([{ action: "click", actor: "reviewer persona", target: "approve button" }]),
+    );
+    expect(block).toContain("participant reviewer_persona");
+    expect(block).toContain("reviewer_persona->>Browser: click approve button");
+  });
+
+  it("leaves un-acted steps as User->>Browser", () => {
+    const messages = sequenceMessages(featureWithFlowTargets(["plain click"]));
+    expect(messages[0]).toBe("User->>Browser: click plain click");
+  });
+});
