@@ -13,34 +13,46 @@ import type {
 } from "../types.js";
 import { findUsmFiles, parseUsmFile } from "../index.js";
 
-// ─── Escape helper for Mermaid sequenceDiagram syntax ─────────────────────────
+// ─── Escape helper for Mermaid diagram text ───────────────────────────────────
 
 /**
- * Escape characters that collide with Mermaid sequenceDiagram syntax.
- * Mermaid uses `:` as the actor/message separator and `#` for line endings in some contexts.
- * HTML entities are parsed by Mermaid, so we use them to embed literal colons, pipes, and hashes.
+ * Characters that collide with Mermaid syntax, mapped to Mermaid entity codes
+ * (`#<code>;`). Mermaid encodes these sequences before lexing, so the trailing
+ * `;` can never terminate a statement — unlike HTML-style entities (`&#39;`),
+ * whose bare `;` breaks sequenceDiagram message text (grammar: TXT is
+ * `[^#\n;]+`).
+ *
+ * MUST be a single pass: a second `.replace(/#/g, ...)` after the first would
+ * re-escape the `#` inside the entity codes it just emitted, producing
+ * `&&#35;39;` and leaving a bare `39;` that Mermaid parses as a statement
+ * separator. See https://github.com/Smith-Gray-Pty-Ltd/usm/issues/49
  */
+const MERMAID_ENTITY: Record<string, string> = {
+  "&": "#38;",
+  "<": "#60;",
+  ">": "#62;",
+  '"': "#34;",
+  "'": "#39;",
+  "|": "#124;",
+  ":": "#58;",
+  "#": "#35;",
+  ";": "#59;", // bare `;` is itself a statement separator in sequenceDiagram
+  "(": "#40;",
+  ")": "#41;",
+  "[": "#91;",
+  "]": "#93;",
+  "{": "#123;",
+  "}": "#125;",
+};
+
 function escapeMermaidText(s: string | undefined | null): string {
   if (s == null) return "";
   return String(s)
-    .replace(/&/g, "&amp;")          // & FIRST (so we don't double-escape)
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-    .replace(/\|/g, "&#124;")        // pipe (mermaid label separator)
-    .replace(/:/g, "&#58;")          // colon (mermaid message separator)
-    .replace(/#/g, "&#35;")          // hash (CSS/JS contexts)
-    .replace(/\(/g, "&#40;")         // ( — cylinder/circle shape
-    .replace(/\)/g, "&#41;")         // ) — cylinder/circle shape
-    .replace(/\[/g, "&#91;")         // [ — rectangle shape
-    .replace(/\]/g, "&#93;")         // ] — close shape
-    .replace(/\{/g, "&#123;")        // { — rhombus shape
-    .replace(/\}/g, "&#125;")        // } — close rhombus
-    .replace(/\n/g, " ")             // newlines → spaces
+    .replace(/<br\s*\/?>/gi, "^@BR^@")   // protect <br/> through the &/</> escaping
+    .replace(/[&<>"'|:#;()[\]{}]/g, (c) => MERMAID_ENTITY[c])
     .replace(/\r/g, "")              // strip CR
-    // Restore <br/> tags — Mermaid supports HTML line breaks in labels
-    .replace(/&lt;br\s*\/?&gt;/gi, "<br/>")
+    .replace(/\n/g, " ")             // newlines → spaces
+    .replace(/\^@BR\^@/g, "<br/>")   // Restore <br/> tags — Mermaid supports HTML line breaks in labels
     .trim();
 }
 
@@ -204,13 +216,27 @@ export function generateSequenceDiagrams(feature: FeatureUsm): string {
     lines.push("```mermaid");
     lines.push("sequenceDiagram");
 
-    // Determine participants from the flow steps
+    // Determine participants from the flow steps. Explicit step actors become
+    // participants too: personas get their own id, "system"/"agent" map to the
+    // shared Server participant (issue #49 follow-up).
     const participants = inferParticipants(flow);
-    for (const p of participants) {
-      lines.push(`    participant ${p.id}`);
-      if (p.alias) {
-        lines.push(`    participant ${p.id} as ${escapeMermaidText(p.alias)}`);
+    for (const step of flow.steps) {
+      if (!step.actor) continue;
+      if (SYSTEM_ACTORS.has(step.actor)) {
+        if (!participants.some(p => p.id === SYSTEM_ACTOR_ID)) {
+          participants.push({ id: SYSTEM_ACTOR_ID });
+        }
+        continue;
       }
+      const id = mermaidParticipantId(step.actor);
+      if (!participants.some(p => p.id === id)) {
+        participants.push({ id, alias: id !== step.actor ? step.actor : undefined });
+      }
+    }
+    for (const p of participants) {
+      // Single declaration per participant — the `as` form declares and
+      // aliases in one line (a bare `participant X` line is redundant).
+      lines.push(p.alias ? `    participant ${p.id} as ${escapeMermaidText(p.alias)}` : `    participant ${p.id}`);
     }
 
     lines.push("");
@@ -264,49 +290,93 @@ function inferParticipants(flow: Flow): Participant[] {
 }
 
 /**
+ * The participant a "system"/"agent" actor maps to. Always Server — these
+ * actors represent non-human, server-side processors.
+ */
+const SYSTEM_ACTOR_ID = "Server";
+const SYSTEM_ACTORS = new Set(["system", "agent"]);
+
+/**
+ * Turn a step actor (persona id, "system", or free text) into a valid Mermaid
+ * participant id.
+ */
+function mermaidParticipantId(actor: string): string {
+  return sanitizeMermaidId(actor.replace(/\s+/g, "_"));
+}
+
+/**
+ * Resolve the from/to participants for a step, honouring step.actor: "system"
+ * and "agent" map to Server; persona ids get their own sanitized participant.
+ * Defaults preserve the historical User/Browser arrows for actor-less steps.
+ */
+function resolveStepParticipants(step: FlowStep): { from: string; to: string } {
+  const actor = step.actor;
+  if (actor && SYSTEM_ACTORS.has(actor)) {
+    switch (step.action) {
+      case "observe":
+        return { from: SYSTEM_ACTOR_ID, to: "User" };
+      default:
+        return { from: SYSTEM_ACTOR_ID, to: "Browser" };
+    }
+  }
+  if (actor && actor !== "user") {
+    // Persona-driven step — the persona performs it toward Browser
+    return { from: mermaidParticipantId(actor), to: "Browser" };
+  }
+  return { from: "User", to: "Browser" };
+}
+
+/**
  * Map a .usm FlowStep action to a Mermaid sequenceDiagram arrow.
  *
- * Action mapping:
+ * Action mapping (default actor = User):
  * - navigate → User->>Browser: navigate to <target>
  * - click → User->>Browser: click <target>
  * - fill → User->>Browser: fill <target>
  * - observe → Browser-->>User: shows <target>
  * - authenticate → Browser->>IdP: OIDC flow <target>
  * - setup → Note over Server,Browser: setup <target>
+ *
+ * An explicit step.actor overrides the from-participant (see
+ * resolveStepParticipants): "system"/"agent" map to Server, persona ids
+ * become their own participant, and actor-less steps keep the arrows above.
  */
 function mapStepToMermaid(step: FlowStep): { arrow: string } {
   const target = step.target || "";
+  const { from, to } = resolveStepParticipants(step);
 
   switch (step.action) {
     case "navigate":
       if (target.startsWith("/api/")) {
-        return { arrow: `    User->>Browser: navigate` };
+        return { arrow: `    ${from}->>Server: navigate` };
       }
       if (target.startsWith("/") || target.startsWith("http")) {
-        return { arrow: `    User->>Browser: navigate to ${escapeMermaidText(target)}` };
+        return { arrow: `    ${from}->>${to}: navigate to ${escapeMermaidText(target)}` };
       }
-      return { arrow: `    User->>Browser: navigate to ${escapeMermaidText(target)}` };
+      return { arrow: `    ${from}->>${to}: navigate to ${escapeMermaidText(target)}` };
 
     case "click":
       if (target.startsWith("#")) {
-        return { arrow: `    User->>Browser: interact with ${escapeMermaidText(target)}` };
+        return { arrow: `    ${from}->>${to}: interact with ${escapeMermaidText(target)}` };
       }
-      return { arrow: `    User->>Browser: click ${escapeMermaidText(target)}` };
+      return { arrow: `    ${from}->>${to}: click ${escapeMermaidText(target)}` };
 
     case "fill":
-      return { arrow: `    User->>Browser: fill ${escapeMermaidText(target)}` };
+      return { arrow: `    ${from}->>${to}: fill ${escapeMermaidText(target)}` };
 
-    case "observe":
-      return { arrow: `    Browser-->>User: shows ${escapeMermaidText(target)}` };
+    case "observe": {
+      const observer = SYSTEM_ACTORS.has(step.actor || "") ? from : "Browser";
+      return { arrow: `    ${observer}-->>${to}: shows ${escapeMermaidText(target)}` };
+    }
 
     case "authenticate":
-      return { arrow: `    Browser->>IdP: OIDC flow — ${escapeMermaidText(target)}` };
+      return { arrow: `    ${from}->>IdP: OIDC flow — ${escapeMermaidText(target)}` };
 
     case "setup":
       return { arrow: `    Note over Server,Browser: setup — ${escapeMermaidText(target)}` };
 
     default:
-      return { arrow: `    User->>Browser: ${escapeMermaidText(step.action)} ${escapeMermaidText(target)}` };
+      return { arrow: `    ${from}->>${to}: ${escapeMermaidText(step.action)} ${escapeMermaidText(target)}` };
   }
 }
 
@@ -318,14 +388,14 @@ function formatExpectationNote(
   if (entries.length === 0) return "";
 
   // Determine which participant the note applies to
-  const noteText = entries.map(([k, v]) => `${escapeMermaidText(k)}&#58; ${escapeMermaidText(String(v))}`).join(", ");
+  const noteText = entries.map(([k, v]) => `${escapeMermaidText(k)}#58; ${escapeMermaidText(String(v))}`).join(", ");
 
   // If the expectation mentions a visible element or status, it's about Browser
   const browserKeywords = ["visible", "redirect", "status", "cookie", "element", "value", "no_redirect", "no_cookie"];
   const isBrowserNote = entries.some(([k]) => browserKeywords.includes(k));
 
   const participant = isBrowserNote ? "Browser" :
-    (participants.find(p => p.id === "Server") ? "Server" : "Browser");
+    (participants.some(p => p.id === "Server") ? "Server" : "Browser");
 
   return `    Note over ${participant}: ${noteText}`;
 }
