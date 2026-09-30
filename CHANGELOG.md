@@ -1,4 +1,13 @@
 # Changelog
+
+## 0.10.3
+
+### Patch Changes
+
+- 6a6d65b: fix(generators): single-pass Mermaid entity escaping — feature sequenceDiagrams now parse again
+
+  `escapeMermaidText()` ran chained HTML-entity replaces, so the `#` → `&#35;` pass re-escaped the `#` inside entities emitted earlier (`Dave's` rendered as `Dave&&#35;39;s` and failed to parse), and entity `;` terminated sequenceDiagram messages (grammar: `[^#\n;]+`). Now escapes in a single pass using Mermaid's own entity codes (`#39; #58; #124; #59;` …), which Mermaid encodes before lexing — so `' : | & < > " ; ( ) [ ] { } #` in flow step targets produce valid, parseable diagrams. Also: aliased participants are declared exactly once (no redundant bare `participant X`), `step.actor` is honoured (`system`/`agent` arrows come from Server, persona actors become their own participant), and expectation notes use `#58;`. Fixes #49.
+
 # Changelog
 
 ## 0.10.2
@@ -19,7 +28,6 @@
 - **feat(docs): sidebar IA restructure + help purity + roadmap current** (`usm/docs-ia-restructure`, from 0.10.0's follow-up) — feature areas as top-level sidebar groups within VitePress's single-level nesting limit, unique human labels, dedicated Reference group, Architecture naming, help tree reduced to user-journey content, roadmap kept current with a regression test.
 
 451 tests passing across 27 files.
-
 
 ## 0.10.0
 
@@ -81,7 +89,7 @@
 
   `help_docs` nested inside `docs` is a hard error before any filesystem
   mutation (was unbounded self-copy → ENAMETOOLONG); `docs build/serve
-  --audience help` derive the help tree instead of erroring; success
+--audience help` derive the help tree instead of erroring; success
   messages name the resolved output path.
 
 - **feat: universal onboarding docs shipped in the npm package** (#45)
@@ -97,7 +105,6 @@
   fixed in a consumer repo).
 
 446 tests passing across 24 files.
-
 
 ## 0.9.0
 
