@@ -2,7 +2,7 @@ $schema: https://usm.dev/schema/v1.json
 $id: usm/gen-mermaid
 $type: feature
 $version: 1
-$last_updated: "2026-09-24"
+$last_updated: "2026-09-30"
 summary: >-
   Mermaid diagram generator — produces architecture, ER, sequence, and service-dependency diagrams
   from .usm data. The ER section is built as a pure function of the Prisma schema and composed into
@@ -28,10 +28,18 @@ flows:
         action: submit
         target: write to docs/diagrams/architecture.mmd
 contracts:
-  - id: mermaid-valid-syntax
-    description: Generated Mermaid files must parse without syntax errors
+  - description: Generated Mermaid files must parse without syntax errors
+    id: mermaid-valid-syntax
     must_have:
-      - Special characters escaped (colons, pipes, brackets)
+      - >-
+        Special characters escaped using single-pass Mermaid entity codes (#<code>;) — never chained
+        HTML-entity replaces that re-escape '#' or leave a bare ';' in sequenceDiagram message text
+      - >-
+        Semicolons in spec text itself are escaped (#59;) because a raw ';' is a statement separator
+        in sequenceDiagram
+      - >-
+        Escape applied per diagram type: quoted labels for flowcharts, entity-code text for
+        sequenceDiagram messages and notes
       - Each diagram in its own .mmd file
   - id: er-section-is-pure
     description: >-
@@ -42,16 +50,28 @@ contracts:
       - generateDataModelDoc is the sole writer of .usm-workspace/docs/data/models.md
       - No generator reads a file it is about to overwrite
 tests:
-  - id: arch-diagram-valid
+  - expect:
+      - assertion: >-
+          sequenceDiagram messages contain no double-escaped sequences (no '&&#35;') and no bare '
+          ;' outside entity codes
+      - assertion: >-
+          messages containing ' | & < > " ; ( ) [ ] { } parse via mermaid parse/mmdc without syntax
+          errors
+    id: arch-diagram-valid
     setup:
       system_with_services: true
-    expect:
-      - assertion: architecture.mmd contains valid Mermaid flowchart syntax
-  - id: er-diagram-valid
+  - expect:
+      - assertion: er-diagram.mmd contains erDiagram syntax
+    id: er-diagram-valid
     setup:
       data_models_present: true
+  - id: seq-escape-issue-49
+    setup:
+      feature_flow_with_special_chars: true
     expect:
-      - assertion: er-diagram.mmd contains erDiagram syntax
+      - assertion: >-
+          flow step target containing ' : ; | & < > " ( ) [ ] { } generates sequenceDiagram message
+          text using Mermaid entity codes (#39; #58; #59; ...) with no double escaping
 implementation:
   primary: src/generators/mermaid.ts
   test_code: ""

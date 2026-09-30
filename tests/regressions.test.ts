@@ -6,6 +6,8 @@
  *   #35 — area overviews written to a nested service workspace
  *   #36 — sidebar omitted feature pages when an area had index.md
  *   #37 — two generators wrote data/models.md; --check could never pass
+ *   #49 — escapeMermaidText double-escaped entities / left bare ';' so
+ *         feature sequenceDiagrams failed to parse (Mermaid 11)
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
@@ -19,6 +21,8 @@ import { generateSurfaceTables, generateAreaOverviews } from "../src/generators/
 import { featureDocsUrl, featureDocsPath, readDocsServePort } from "../src/mcp-utils.js";
 import { generateSidebar } from "../src/cli/docs.js";
 import { generateAllTestSpecs } from "../src/generators/testSpecs.js";
+import { generateSequenceDiagrams } from "../src/generators/mermaid.js";
+import type { FeatureUsm } from "../src/types.js";
 // ─── #32: AGENTS.md smart-merge idempotency ──────────────────────────────────
 
 describe("smartMerge idempotency (issue #32)", () => {
@@ -346,5 +350,97 @@ describe("splitImplementationPaths (usm check false positives)", () => {
 
   it("ignores empty segments", () => {
     expect(splitImplementationPaths("src/a.ts;;  ; src/b.ts")).toEqual(["src/a.ts", "src/b.ts"]);
+  });
+});
+
+// ─── #49: sequenceDiagram escaping must produce parseable Mermaid ────────────
+
+/**
+ * Build a minimal feature spec with one web-interaction flow whose steps
+ * exercise every character the old escaping chain mishandled.
+ */
+function featureWithFlowTargets(targets: string[]): FeatureUsm {
+  return {
+    $schema: "https://usm.dev/schema/v1.json",
+    $id: "test/seq-escape",
+    $type: "feature",
+    $version: 1,
+    summary: "Sequence diagram escaping regression fixture",
+    $system: "test/system",
+    $service: "test/cli",
+    flows: [
+      {
+        id: "f1",
+        name: "On Me Way",
+        steps: targets.map((target, i) => ({
+          id: `s${i + 1}`,
+          action: "click",
+          target,
+        })),
+      },
+    ],
+  } as unknown as FeatureUsm;
+}
+
+function sequenceMessages(feature: FeatureUsm): string[] {
+  const block = generateSequenceDiagrams(feature);
+  return block
+    .split("\n")
+    .filter((line) => line.includes("->>") || line.includes("-->>"))
+    .map((line) => line.trim());
+}
+
+describe("sequenceDiagram escaping (issue #49)", () => {
+  it("emits single-escaped entity codes — no double-escaped &&#35;39;", () => {
+    const messages = sequenceMessages(featureWithFlowTargets(["Owner taps 'On Me Way'"]));
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Owner taps #39;On Me Way#39;");
+    expect(messages[0]).not.toContain("&&");
+  });
+
+  it("escapes colons in targets without leaving a bare ';'", () => {
+    const messages = sequenceMessages(featureWithFlowTargets(["SMS: 'Dave's on his way'; ETA optional"]));
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toBe(
+      "User->>Browser: click SMS#58; #39;Dave#39;s on his way#39;#59; ETA optional",
+    );
+  });
+
+  it("each emitted message text contains no raw syntax characters", () => {
+    const feature = featureWithFlowTargets([
+      "a & b <c> \"d\" 'e' ",
+      "pipe | colon : semi ; hash #1",
+      "paren (x) [y] {z}",
+    ]);
+    for (const line of sequenceMessages(feature)) {
+      // Message text runs after the first ': ' following the arrow
+      const text = line.split(/: (?=[^:]*$)/)[1];
+      expect(text).toBeDefined();
+      // Entity codes (#<digits>;) are encoded by Mermaid before lexing, so the
+      // `;` inside them is safe — strip them, then assert nothing raw remains.
+      const stripped = text.replace(/#\d+;/g, "");
+      expect(stripped).not.toMatch(/[&<>"'|:;()[\]{}]/);
+      expect(stripped).not.toContain("&&");
+    }
+  });
+
+  it("preserves <br/> tags in labels", () => {
+    const messages = sequenceMessages(featureWithFlowTargets(["line one<br/>line two"]));
+    expect(messages[0]).toContain("line one<br/>line two");
+  });
+
+  it("expectation notes use entity-code colon instead of &#58;", () => {
+    const feature = featureWithFlowTargets(["click thing"]);
+    feature.flows![0].steps[0].expect = [{ visible: "the thing" }];
+    const block = generateSequenceDiagrams(feature);
+    expect(block).toContain("Note over Browser: visible#58; the thing");
+    expect(block).not.toContain("&#58;");
+  });
+
+  it("flowchart labels are wrapped in quotes and entity-escaped", () => {
+    // Flowcharts (graph TD) rely on "..." wrapping; escaping must not emit
+    // bare quotes that would break the label.
+    const messages = sequenceMessages(featureWithFlowTargets(['say "hello"']));
+    expect(messages[0]).toContain("say #34;hello#34;");
   });
 });

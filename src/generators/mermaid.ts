@@ -13,34 +13,46 @@ import type {
 } from "../types.js";
 import { findUsmFiles, parseUsmFile } from "../index.js";
 
-// ─── Escape helper for Mermaid sequenceDiagram syntax ─────────────────────────
+// ─── Escape helper for Mermaid diagram text ───────────────────────────────────
 
 /**
- * Escape characters that collide with Mermaid sequenceDiagram syntax.
- * Mermaid uses `:` as the actor/message separator and `#` for line endings in some contexts.
- * HTML entities are parsed by Mermaid, so we use them to embed literal colons, pipes, and hashes.
+ * Characters that collide with Mermaid syntax, mapped to Mermaid entity codes
+ * (`#<code>;`). Mermaid encodes these sequences before lexing, so the trailing
+ * `;` can never terminate a statement — unlike HTML-style entities (`&#39;`),
+ * whose bare `;` breaks sequenceDiagram message text (grammar: TXT is
+ * `[^#\n;]+`).
+ *
+ * MUST be a single pass: a second `.replace(/#/g, ...)` after the first would
+ * re-escape the `#` inside the entity codes it just emitted, producing
+ * `&&#35;39;` and leaving a bare `39;` that Mermaid parses as a statement
+ * separator. See https://github.com/Smith-Gray-Pty-Ltd/usm/issues/49
  */
+const MERMAID_ENTITY: Record<string, string> = {
+  "&": "#38;",
+  "<": "#60;",
+  ">": "#62;",
+  '"': "#34;",
+  "'": "#39;",
+  "|": "#124;",
+  ":": "#58;",
+  "#": "#35;",
+  ";": "#59;", // bare `;` is itself a statement separator in sequenceDiagram
+  "(": "#40;",
+  ")": "#41;",
+  "[": "#91;",
+  "]": "#93;",
+  "{": "#123;",
+  "}": "#125;",
+};
+
 function escapeMermaidText(s: string | undefined | null): string {
   if (s == null) return "";
   return String(s)
-    .replace(/&/g, "&amp;")          // & FIRST (so we don't double-escape)
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-    .replace(/\|/g, "&#124;")        // pipe (mermaid label separator)
-    .replace(/:/g, "&#58;")          // colon (mermaid message separator)
-    .replace(/#/g, "&#35;")          // hash (CSS/JS contexts)
-    .replace(/\(/g, "&#40;")         // ( — cylinder/circle shape
-    .replace(/\)/g, "&#41;")         // ) — cylinder/circle shape
-    .replace(/\[/g, "&#91;")         // [ — rectangle shape
-    .replace(/\]/g, "&#93;")         // ] — close shape
-    .replace(/\{/g, "&#123;")        // { — rhombus shape
-    .replace(/\}/g, "&#125;")        // } — close rhombus
-    .replace(/\n/g, " ")             // newlines → spaces
+    .replace(/<br\s*\/?>/gi, "^@BR^@")   // protect <br/> through the &/</> escaping
+    .replace(/[&<>"'|:#;()[\]{}]/g, (c) => MERMAID_ENTITY[c])
     .replace(/\r/g, "")              // strip CR
-    // Restore <br/> tags — Mermaid supports HTML line breaks in labels
-    .replace(/&lt;br\s*\/?&gt;/gi, "<br/>")
+    .replace(/\n/g, " ")             // newlines → spaces
+    .replace(/\^@BR\^@/g, "<br/>")   // Restore <br/> tags — Mermaid supports HTML line breaks in labels
     .trim();
 }
 
@@ -318,7 +330,7 @@ function formatExpectationNote(
   if (entries.length === 0) return "";
 
   // Determine which participant the note applies to
-  const noteText = entries.map(([k, v]) => `${escapeMermaidText(k)}&#58; ${escapeMermaidText(String(v))}`).join(", ");
+  const noteText = entries.map(([k, v]) => `${escapeMermaidText(k)}#58; ${escapeMermaidText(String(v))}`).join(", ");
 
   // If the expectation mentions a visible element or status, it's about Browser
   const browserKeywords = ["visible", "redirect", "status", "cookie", "element", "value", "no_redirect", "no_cookie"];
